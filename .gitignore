@@ -216,6 +216,3 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
-
-# AI workflow: hook audit log is metadata-only and local (AI_WORKFLOW.md §15)
-.ai/logs/

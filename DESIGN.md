@@ -1,0 +1,396 @@
+# CME 6E Systematic Trading System
+
+- Document version: 1.5.0-draft
+- Revised: 2026-07-29
+- Status: `DRAFT`
+- Documentation language: English
+- Market: CME Euro FX Futures (`6E`), outright futures only
+- Default decision interval: 1 second
+- Optional decision interval: 500 milliseconds
+- Target holding period: 15 minutes to 4 hours
+- Live platform candidates: IBKR and AMP Futures with Rithmic
+
+---
+
+## 1. Purpose of This Document
+
+This document owns the high-level system design:
+
+1. What the project builds
+2. The implementation phases and their order
+3. The objective and completion criteria of each phase
+4. Principles that implementation convenience cannot override
+5. Where unresolved questions must be answered
+
+Provider callbacks, order state machines, recovery procedures, IAM, signing,
+and other implementation details belong in the relevant phase design.
+Unverified provider behavior must not be treated as a fixed contract.
+
+### Document authority
+
+| Document | Authority |
+|---|---|
+| `DESIGN.md` | Project objective, scope, phase order, and governing principles |
+| `PHASE_N_DESIGN.md` | Implementation, tests, deliverables, and open questions for that phase |
+| `VALIDATION.md` | Numeric criteria for rejection, Paper entry, Live approval, and performance |
+| `RESEARCH_PLAN.md` | Hypothesis families, experiment scope, priorities, and trial budget |
+
+Lower-level documents cannot change this document's direction. Amend
+`DESIGN.md` first when the project direction changes.
+
+---
+
+## 2. Project Objective
+
+The project has one ultimate objective:
+
+> Build an automated trading system that produces sustainable positive net
+> returns after commissions, exchange and routing fees, spread, slippage,
+> market-data and API costs, and operating expenses.
+
+A statistically interesting pattern, high predictive accuracy, or positive
+gross return is not sufficient.
+
+### In scope
+
+- CME `6E` only
+- Actual expiry contracts
+- A 1-second baseline decision interval
+- A 500-millisecond challenger only when it proves material economic value
+- Holding periods from 15 minutes to 4 hours
+- Historical research using verified MBP-10 data
+- Measured comparison of IBKR and Rithmic before selecting one Live platform
+- An initial Live allocation of one 6E contract
+
+### Out of scope
+
+- M6E or other products
+- HFT, market making, or colocation
+- Simultaneous Live trading on two platforms
+- Automatic broker failover
+- AI authority to approve Live trading, relax risk, or increase capital
+- Strategies that depend on unverified provider behavior
+
+---
+
+## 3. System Flow
+
+```text
+Historical MBP-10 data
+    ↓
+AI hypothesis generation and backtesting
+    ↓
+IBKR/Rithmic Live-data and order-path comparison
+    ↓
+Paper Trading
+    ↓
+Live approval package and user approval
+    ↓
+One-contract Controlled Live on one selected platform
+    ↓
+Promote / Scale / Reduce / Pause / Retire
+```
+
+Risk management is cross-cutting. A minimum Risk Engine must be complete
+before Paper Trading and strengthened before Live trading and scaling.
+
+---
+
+## 4. Data Source
+
+[`mbo-mbp10-converter`](https://github.com/seokminsong97/mbo-mbp10-converter)
+
+---
+
+## 5. Development Phases
+
+### Phase 1: AI Research and Backtesting
+
+Objectives:
+
+- Generate hypotheses through a controlled AI research process.
+- Implement and test each hypothesis reproducibly.
+- Measure performance with realistic costs, latency, spread, slippage, and
+  risk.
+- Send only strategies that pass `VALIDATION.md` to Paper Trading.
+
+Paper entry does not require user approval. AI cannot change the pass criteria.
+
+Design: [`PHASE_1_DESIGN.md`](PHASE_1_DESIGN.md)
+
+### Phase 2: Live Platform Evaluation and Paper Trading
+
+Objectives:
+
+- Capture comparable 6E data from IBKR and Rithmic.
+- Measure which platform delivers required MBP-10 information more quickly
+  and reliably.
+- Compare submit, acknowledgement, cancel, recovery, and operational safety.
+- Run backtest-qualified strategies in Paper Trading.
+- Select one Production platform based on measured cost and performance.
+
+Default selection rule:
+
+> Select IBKR when its data and order path meet the strategy requirements.
+> Select Rithmic only when IBKR's measured limitations damage strategy
+> economics or safety enough to justify the additional cost.
+
+Design: [`PHASE_2_DESIGN.md`](PHASE_2_DESIGN.md)
+
+### Phase 3: Controlled Live Trading
+
+Objectives:
+
+- Trade only through the selected platform.
+- Start with one 6E contract after explicit user approval.
+- Measure actual fills, slippage, fees, protection, and recovery.
+- Verify that Backtest and Paper results survive in the real market.
+
+Design: [`PHASE_3_DESIGN.md`](PHASE_3_DESIGN.md)
+
+### Phase 4: Risk and Capital Management
+
+Objectives:
+
+- Apply risk controls across Research, Paper, Live, and scaling.
+- Control losses, positions, orders, data failures, expiry, and operational
+  failures.
+- Permit capital growth only when supported by evidence and risk capacity.
+
+Phase 4 is an independent, cross-cutting workstream. It runs in parallel with
+the other phases and must deliver the required controls before each gate:
+
+- Before Phase 2 Paper Trading: basic Risk Engine
+- Before Phase 3 Controlled Live: protection, loss limits, and emergency paths
+- Before Phase 5 scaling: portfolio and capital-allocation controls
+
+Design: [`PHASE_4_DESIGN.md`](PHASE_4_DESIGN.md)
+
+### Phase 5: Continuous Strategy Lifecycle
+
+Objectives:
+
+- Continue proposing and testing new strategies.
+- Route every strategy through the same Research, Backtest, Paper, and Live
+  gates.
+- Promote improving strategies and reduce, pause, or retire deteriorating
+  strategies.
+- Preserve failures and all state transitions.
+
+Design: [`PHASE_5_DESIGN.md`](PHASE_5_DESIGN.md)
+
+---
+
+## 6. Implementation Dependencies
+
+```text
+Data Source
+    ↓
+Phase 1: AI research and backtesting
+    ↓
+Phase 2: Platform comparison and Paper Trading
+    ↓
+Phase 3: User-approved Controlled Live
+    ↓
+Phase 5: Continuous lifecycle and scaling
+```
+
+Phase 4 runs alongside Phase 1 onward. The required risk controls must be
+complete before each downstream gate.
+
+---
+
+## 7. Platform Selection Principles
+
+The core question is:
+
+> At the time a strategy must decide, which platform delivers the required
+> market data more quickly and accurately and routes orders to CME more safely?
+
+Price matters, but it is not the sole criterion. Fees and entitlements must be
+rechecked before Phase 2.
+
+IBKR documentation describes Level 2 market depth through `reqMktDepth`, but it
+does not provide a Production guarantee for:
+
+- CME-event-to-callback latency
+- Exchange timestamps on every callback
+- Exchange sequence
+- Snapshot completion markers
+- Consistent usable depth for every strategy
+
+These properties must be measured in Phase 2.
+
+Both candidates must be compared using the same active contract, host
+conditions, time window, and synchronized clock. Compare:
+
+- Callback delay and jitter
+- BBO and L1-L10 price/size differences
+- Missing, stale, reset, and recovery behavior
+- Feature and signal differences
+- Paper submit, acknowledgement, cancel, and recovery behavior
+- Fixed costs, transaction costs, and operating complexity
+
+After selection, only one platform may hold Live order credentials.
+
+---
+
+## 8. Live Approval
+
+A strategy that passes backtesting may enter Paper Trading automatically.
+Explicit user approval is mandatory before real capital is used.
+
+The approval package must include:
+
+- Strategy name, version, and hypothesis
+- Features and holding horizon
+- Backtest period and out-of-sample results
+- Paper start/end dates and active trading days
+- Signal and order counts
+- Order types, average holding time, and exit reasons
+- Gross and fully loaded net PnL
+- Maximum drawdown and consecutive losses
+- Slippage, partial fills, rejects, and operational incidents
+- Selected platform and selection rationale
+- Proposed one-contract take-profit, stop-loss, potential profit, planned loss,
+  and reward-to-risk
+- Live stop conditions
+
+Production orders are prohibited before approval.
+
+---
+
+## 9. Governing Risk Rules
+
+1. AI cannot place Live orders, change risk limits, or increase capital.
+2. Exactly one automated Production broker writer may exist. Manual emergency
+   actions must be detected and reconciled before automation continues.
+3. The selected broker is the operational source of truth for orders, fills,
+   and intraday positions.
+4. Unresolved orders or position mismatches block new exposure. An ambiguous
+   submit result must be marked `UNKNOWN`, reconciled against broker state,
+   and never blindly retried.
+5. Every exposure-increasing Paper and Live entry must define its take-profit
+   target and stop-loss and use a verified broker-managed OCO bracket.
+6. Initial Live allocation is one 6E contract.
+7. Daily, strategy/project cumulative, and drawdown limits are mandatory.
+8. Stale, incomplete, or unavailable market data blocks new entries.
+9. Physical delivery is not intended; positions and orders must be closed
+   before expiry deadlines.
+10. A selected-platform failure does not trigger automatic failover.
+11. Capital increases, risk relaxation, normal reactivation, and activation of
+    a new Live strategy require user approval.
+
+These are non-numeric system invariants. `VALIDATION.md` exclusively owns the
+numeric thresholds. Phase 4 owns risk semantics and enforcement; Phase 3
+applies those controls during Controlled Live and records the resulting
+evidence. Child designs may specialize these rules but cannot weaken them.
+
+---
+
+## 10. Strategy Lifecycle
+
+```text
+RESEARCH
+    ↓ validation pass
+BACKTEST_PASSED
+    ↓ automatic Paper deployment
+PAPER
+    ↓ evidence package and user approval
+LIVE_APPROVED
+    ↓ one-contract launch
+CANARY
+    ↓ sustained Live evidence
+ACTIVE
+    ↓ approved scaling
+SCALED
+```
+
+Deterioration path:
+
+```text
+CANARY | ACTIVE | SCALED
+    ↓
+REDUCED
+    ↓
+PAUSED
+    ↓
+REVALIDATING
+    ├─ return to PAPER or CANARY
+    └─ RETIRED
+```
+
+Safety breaches may automatically block new orders. Normal Live activation,
+reactivation, and capital increases require user approval.
+
+---
+
+## 11. Technical Direction
+
+- Python 3.12+
+- Parquet with Polars/PyArrow
+- PostgreSQL for metadata and trading state
+- AWS S3 for historical storage
+- A deterministic custom event-driven backtester
+- Reproducible Docker environments
+- pytest, golden fixtures, and property tests
+
+Technology is an implementation means, not a project objective. Do not add
+distributed infrastructure before measured requirements justify it.
+
+---
+
+## 12. Handling Unknowns
+
+1. Do not guess behavior before the responsible phase.
+2. Record the source and verification date for documented behavior.
+3. Measure behavior that documentation does not guarantee.
+4. Record findings in the responsible phase design.
+5. Amend `DESIGN.md` only when a finding changes project direction.
+
+Examples:
+
+- IBKR callback latency: Phase 2
+- Rithmic depth semantics: Phase 2
+- Order races and reconnect behavior: Phases 2 and 3
+- Risk thresholds: `VALIDATION.md` and Phase 4
+- Licensing and automation disclosures: before the relevant paid or Live use
+
+---
+
+## 13. Stop or Redesign Conditions
+
+Consider stopping or redesigning the project without weakening standards when:
+
+- Every preregistered hypothesis family fails under realistic costs.
+- Reliable Historical MBP-10 data cannot be obtained.
+- Neither Live candidate provides sufficient data quality or order safety.
+- Platform and transaction costs structurally exceed the verified edge.
+- Safe protection, reconciliation, or emergency exit cannot be implemented.
+- Required capital is unavailable.
+- Live approval would require weakening validation standards.
+
+A third platform or another product is not an automatic fallback. Either
+requires a separate user decision and design amendment.
+
+---
+
+## 14. Official References
+
+### IBKR
+
+- TWS API:
+  https://www.interactivebrokers.com/campus/ibkr-api-page/twsapi-doc/
+- Market depth:
+  https://www.interactivebrokers.com/docs/tws-api/doc/market-data-live/market-depth-l-2/introduction
+- Request market depth:
+  https://www.interactivebrokers.com/docs/tws-api/doc/market-data-live/market-depth-l-2/request-market-depth
+- Receive market depth:
+  https://www.interactivebrokers.com/docs/tws-api/doc/market-data-live/market-depth-l-2/receive-market-depth
+- Market-data subscriptions:
+  https://www.interactivebrokers.com/docs/general/market-data-subscriptions/introduction
+
+### Rithmic and AMP
+
+- Rithmic API suite: https://www.rithmic.com/products/api-suite
+- AMP Rithmic API: https://www.ampfutures.com/trading-platform/rithmic-r-api
