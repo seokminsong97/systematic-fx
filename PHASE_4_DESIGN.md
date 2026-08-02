@@ -1,6 +1,6 @@
 # Phase 4 Design: Risk and Capital Management
 
-- Document version: 1.6.0-draft
+- Document version: 1.7.0-draft
 - Status: `DRAFT`
 - Parent document: [`DESIGN.md`](DESIGN.md)
 - Type: Cross-cutting design
@@ -61,7 +61,8 @@ outcomes.
 ### Strategy risk
 
 - Stop distance
-- Maximum holding time
+- Open-position duration and capital occupancy
+- Weekend, roll, and expiry exposure
 - Expected and stressed loss
 - Drawdown
 - Regime failure
@@ -105,7 +106,8 @@ Before a new entry or exposure increase, verify:
 - Strategy state permits trading.
 - The signal has not expired.
 - The feature version matches.
-- Holding horizon fits session and expiry limits.
+- The bracket and terminal exit policy fit session, weekend, roll, and expiry
+  limits.
 
 ### Account
 
@@ -207,10 +209,15 @@ Every strategy defines:
 
 - Take-profit target
 - Hard stop-loss
-- Maximum holding time
-- Early-exit conditions
+- Stop-trigger execution policy
+- Optional strategy time exit, if the artifact uses one
+- Terminal risk and emergency exits
 - Session and weekend handling
 - Roll and expiry handling
+
+No alpha-imposed maximum holding period is required. Duration monitoring,
+capital reservation, broker-resident protection, and the mandatory roll/expiry
+cutoff remain active for the entire open position.
 
 Account-safety rules take precedence over strategy rules.
 
@@ -284,7 +291,7 @@ Physical delivery is not intended.
 
 - Confirm the active contract and expiry.
 - Confirm broker closeout and CME last-trade deadlines.
-- Ensure maximum holding time plus exit buffer ends before the deadline.
+- Ensure the terminal exit policy and exit buffer end before the deadline.
 - Flatten positions and working orders before the deadline.
 - Block new entries when expiry is uncertain.
 

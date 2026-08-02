@@ -1,6 +1,6 @@
 # Phase 1 Design: AI Research and Backtesting
 
-- Document version: 1.6.0-draft
+- Document version: 1.7.0-draft
 - Status: `DRAFT`
 - Parent document: [`DESIGN.md`](DESIGN.md)
 - Input: Historical MBP-10 from the Data Source
@@ -10,15 +10,20 @@
 
 ## 1. Objective
 
-Phase 1 turns AI-generated trading hypotheses into reproducible, realistic
-experiments.
+Phase 1 lets AI explore Discovery data through reproducible computations and
+turns measured patterns into executable, realistically tested bracket
+strategies.
 
 ```text
-AI hypothesis
+Verified MBP-10
+    ↓
+one-second features and five-minute research rows
+    ↓
+AI-directed exploration
     ↓
 Registered experiment
     ↓
-Feature and strategy implementation
+directional entry, take-profit, and stop-loss policy
     ↓
 Deterministic backtest
     ↓
@@ -74,18 +79,25 @@ Owns:
 
 ### Decision intervals
 
-- 1 second as the baseline
-- 500 milliseconds as a challenger
-- Promote 500 milliseconds only when measured value justifies the added cost
-  and complexity
+- Event-level MBP-10 remains the source for book state, ordering, first-touch,
+  and simulated execution.
+- One-second buckets are the default layer for intrabucket feature generation.
+- Five-minute closed buckets are the default AI discovery rows and signal
+  decision interval.
+- A faster signal interval requires a separately registered research campaign
+  and evidence that its economic value justifies the added data and execution
+  requirements.
 
-### Holding horizons
+### Exit horizon
 
-```text
-15m | 30m | 1h | 2h | 4h
-```
-
-Strategies holding longer than four hours are out of scope.
+- The primary strategy exit is the first executed take-profit or stop-loss OCO
+  child.
+- Phase 1 imposes no alpha-driven maximum holding period.
+- Time to take-profit, time to stop, total open duration, capital occupancy,
+  weekend exposure, and unresolved observations are mandatory metrics.
+- Risk, emergency, roll, and delivery-avoidance exits override the strategy.
+- Discovery labels that do not resolve inside the registered observation window
+  are censored, never silently dropped or counted as wins or losses.
 
 ---
 
@@ -101,6 +113,22 @@ Strategies holding longer than four hours are out of scope.
 - Short-horizon return and realized volatility
 - Quote age and stale state
 - Session, roll, and trading status
+
+### Multiresolution representation
+
+The five-minute research table must not reduce MBP-10 to OHLCV alone. Build
+one-second point-in-time features first, then preserve economically meaningful
+five-minute distributions and paths, including where available:
+
+- Open, high, low, close, mean, standard deviation, and quantiles
+- Last value and change from bucket open
+- Extreme duration and threshold-persistence time
+- Direction changes and depletion/replenishment counts
+- Trade and quote intensity
+- Valid, stale, missing, and locked/crossed-book durations
+
+All aggregates close before the signal decision. A feature may not be revised
+with late or future information after its decision bucket closes.
 
 ### Excluded from the current input
 
@@ -125,13 +153,16 @@ common champion beforehand.
 
 ## 5. AI Research Loop
 
-### AI may propose
+### AI may inspect and propose
 
+- Discovery-only feature rows, registered summaries, and representative event
+  windows
+- Reproducible queries, groupings, comparisons, and visualizations
 - Hypotheses
 - Feature transformations
 - Regime definitions
 - Entry and exit rules
-- Holding horizons
+- Absolute and volatility-normalized take-profit and stop-loss distances
 - Model families
 - Bounded hyperparameter ranges
 - Failure analyses and next experiments
@@ -143,6 +174,9 @@ common champion beforehand.
 - Delete trial counts or failed results
 - Remove trading costs
 - Bypass experiment registration or validation
+- Inspect sealed-holdout features, labels, trades, or aggregate results before
+  the artifact is frozen
+- Treat AI-visible chronological slices as independent evidence
 
 Live authority and capital restrictions are governed by `DESIGN.md`.
 
@@ -157,8 +191,13 @@ hypothesis
 feature_set
 signal_rule_or_model
 parameter_range
-holding_horizon
 entry_and_exit_policy
+direction_policy
+entry_order_and_price_policy
+take_profit_policy
+stop_trigger_and_execution_policy
+barrier_observation_window
+terminal_exit_policy
 cost_model
 execution_model
 train_validation_plan
@@ -168,6 +207,10 @@ parent_experiment_id
 
 Changing a parameter boundary or success criterion after execution creates a
 new experiment.
+
+Every period exposed to AI or used to select, reject, or refine a candidate is
+Discovery data for that candidate and its descendants. Period summaries do not
+recover out-of-sample status.
 
 ---
 
@@ -181,7 +224,10 @@ strategy_version
 hypothesis
 feature_set_version
 signal and entry rules
-take-profit, stop-loss, and maximum holding rules
+direction and entry order policy
+take-profit and stop-trigger rules
+stop execution and OCO rules
+barrier observation and terminal exit policies
 position sizing rule
 applicable regimes
 contract and roll policy
@@ -227,6 +273,10 @@ routing delay
 estimated exchange arrival
     ↓
 fill / partial fill / no fill
+    ↓
+broker-managed OCO protection
+    ↓
+take-profit first | stop first | terminal risk exit
 ```
 
 ### Execution assumptions
@@ -247,7 +297,14 @@ Permitted initial models:
 - Passive limits use a conservative fill or no-fill model.
 - Stops include routing delay and slippage after trigger.
 - Every simulated entry applies the artifact's take-profit, stop-loss, OCO,
-  and maximum-holding-time rules.
+  and terminal risk/roll rules.
+- Barrier results are determined from executable-side MBP-10 event order, not
+  from five-minute high/low ordering.
+- A take-profit touch is not a fill unless the registered execution model
+  permits the fill. A stop price is a trigger, not a guaranteed fill.
+- Only one open position per strategy and contract is permitted in the initial
+  research scope; signals while occupied are recorded but do not create
+  overlapping exposure.
 
 An exact queue model is not accepted as Production evidence under the current
 scope.
@@ -285,9 +342,9 @@ Final strategy decisions must include fully loaded results.
 Numeric criteria belong in `VALIDATION.md`.
 
 ```text
-Train
+Discovery
     ↓
-Walk-forward validation
+Five-fold walk-forward validation
     ↓
 Independent stress
     ↓
@@ -345,6 +402,8 @@ A strategy artifact that passes `VALIDATION.md` is handed to Phase 2 with:
 - Exact strategy artifact
 - Backtest, out-of-sample, and stress results
 - Expected trade frequency and holding time
+- Take-profit-first, stop-first, roll/terminal-exit, and censored counts
+- Time-to-hit and capital-occupancy distributions
 - Expected costs and slippage
 - Take-profit, stop-loss, potential profit, planned loss, and reward-to-risk
 - Required Live features, depth, and freshness
@@ -355,7 +414,8 @@ A strategy artifact that passes `VALIDATION.md` is handed to Phase 2 with:
 ## 12. Deliverables
 
 - Experiment registry
-- AI hypothesis interface
+- AI data-exploration and hypothesis interface
+- One-second feature and five-minute research-table builders
 - Feature builder
 - Deterministic event-driven backtester
 - Execution and cost models

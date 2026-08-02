@@ -1,13 +1,13 @@
 # CME 6E Systematic Trading System
 
-- Document version: 1.5.0-draft
-- Revised: 2026-07-29
+- Document version: 1.6.0-draft
+- Revised: 2026-08-02
 - Status: `DRAFT`
 - Documentation language: English
 - Market: CME Euro FX Futures (`6E`), outright futures only
-- Default decision interval: 1 second
-- Optional decision interval: 500 milliseconds
-- Target holding period: 15 minutes to 4 hours
+- Default AI discovery and signal interval: 5 minutes
+- Intrabucket feature interval: 1 second where supported by the data
+- Exit model: price-barrier first touch with no alpha-imposed holding target
 - Live platform candidates: IBKR and AMP Futures with Rithmic
 
 ---
@@ -55,9 +55,14 @@ gross return is not sufficient.
 
 - CME `6E` only
 - Actual expiry contracts
-- A 1-second baseline decision interval
-- A 500-millisecond challenger only when it proves material economic value
-- Holding periods from 15 minutes to 4 hours
+- AI-directed discovery on 5-minute feature rows built from verified MBP-10
+- One-second intrabucket features when they preserve economically useful book
+  dynamics
+- Event-level MBP-10 execution and first-touch validation
+- Long and short strategies that emit an executable entry, take-profit, and
+  stop-loss bracket
+- Price-barrier exits without an alpha-imposed maximum holding period; duration,
+  capital occupancy, weekend exposure, and time to each exit remain measured
 - Historical research using verified MBP-10 data
 - Measured comparison of IBKR and Rithmic before selecting one Live platform
 - An initial Live allocation of one 6E contract
@@ -70,6 +75,8 @@ gross return is not sufficient.
 - Automatic broker failover
 - AI authority to approve Live trading, relax risk, or increase capital
 - Strategies that depend on unverified provider behavior
+- Strategies whose result is only a forecast, score, or chart pattern and does
+  not resolve to an executable bracket policy
 
 ---
 
@@ -78,7 +85,11 @@ gross return is not sufficient.
 ```text
 Historical MBP-10 data
     ↓
-AI hypothesis generation and backtesting
+One-second features and five-minute research rows
+    ↓
+AI-directed data exploration and registered bracket strategies
+    ↓
+Event-level first-touch and execution backtesting
     ↓
 IBKR/Rithmic Live-data and order-path comparison
     ↓
@@ -108,7 +119,10 @@ before Paper Trading and strengthened before Live trading and scaling.
 
 Objectives:
 
-- Generate hypotheses through a controlled AI research process.
+- Let AI inspect Discovery data through bounded, reproducible queries and
+  generate hypotheses from measured behavior.
+- Convert every candidate into a directional entry policy with take-profit and
+  stop-loss prices.
 - Implement and test each hypothesis reproducibly.
 - Measure performance with realistic costs, latency, spread, slippage, and
   risk.
@@ -243,11 +257,13 @@ Explicit user approval is mandatory before real capital is used.
 The approval package must include:
 
 - Strategy name, version, and hypothesis
-- Features and holding horizon
+- Features, signal interval, entry policy, and applicable regimes
 - Backtest period and out-of-sample results
 - Paper start/end dates and active trading days
 - Signal and order counts
 - Order types, average holding time, and exit reasons
+- Take-profit-first, stop-first, roll-exit, emergency-exit, and censored counts
+- Time-to-hit and capital-occupancy distributions
 - Gross and fully loaded net PnL
 - Maximum drawdown and consecutive losses
 - Slippage, partial fills, rejects, and operational incidents
@@ -272,13 +288,19 @@ Production orders are prohibited before approval.
    and never blindly retried.
 5. Every exposure-increasing Paper and Live entry must define its take-profit
    target and stop-loss and use a verified broker-managed OCO bracket.
-6. Initial Live allocation is one 6E contract.
-7. Daily, strategy/project cumulative, and drawdown limits are mandatory.
-8. Stale, incomplete, or unavailable market data blocks new entries.
-9. Physical delivery is not intended; positions and orders must be closed
+6. A strategy must define direction, entry policy, take-profit price,
+   stop-trigger price, stop execution policy, and terminal roll/expiry policy.
+   A stop trigger is not a guaranteed fill price.
+7. No alpha-imposed maximum holding period is required. Time-to-hit, open-risk
+   duration, capital occupancy, and weekend exposure must still be measured,
+   and risk or delivery controls may force an earlier exit.
+8. Initial Live allocation is one 6E contract.
+9. Daily, strategy/project cumulative, and drawdown limits are mandatory.
+10. Stale, incomplete, or unavailable market data blocks new entries.
+11. Physical delivery is not intended; positions and orders must be closed
    before expiry deadlines.
-10. A selected-platform failure does not trigger automatic failover.
-11. Capital increases, risk relaxation, normal reactivation, and activation of
+12. A selected-platform failure does not trigger automatic failover.
+13. Capital increases, risk relaxation, normal reactivation, and activation of
     a new Live strategy require user approval.
 
 These are non-numeric system invariants. `VALIDATION.md` exclusively owns the

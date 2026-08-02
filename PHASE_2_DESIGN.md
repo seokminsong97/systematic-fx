@@ -1,6 +1,6 @@
 # Phase 2 Design: Live Platform Evaluation and Paper Trading
 
-- Document version: 1.6.0-draft
+- Document version: 1.7.0-draft
 - Status: `DRAFT`
 - Parent document: [`DESIGN.md`](DESIGN.md)
 - Candidate A: IBKR Pro with CME market data
@@ -75,7 +75,8 @@ API entitlement.
 - Snapshot completion marker
 - Stable depth-level count for 6E
 - Callback queue behavior during bursts
-- Suitability for a 500-millisecond or 1-second signal
+- Suitability for required one-second feature aggregation and a five-minute
+  signal decision
 
 Do not equate published top-of-book update intervals with Level 2 delivery
 semantics. Measure IBKR before accepting or rejecting it.
@@ -146,7 +147,7 @@ Do not invent unavailable fields:
 - First callback time
 - Signed relative arrival between candidates
 - Callback jitter
-- 500-millisecond and 1-second bucket completion delay
+- One-second feature and five-minute signal-bucket completion delay
 - Stale duration
 - Burst and queue lag
 
@@ -224,7 +225,8 @@ stop_loss_price
 potential_profit_ticks_and_currency
 planned_loss_ticks_and_currency
 reward_to_risk_ratio
-maximum_holding_time
+terminal_exit_policy
+roll_and_expiry_cutoff
 ```
 
 The target and stop must come from the exact strategy artifact and Phase 4
@@ -328,7 +330,7 @@ Before Phase 3, submit:
 ### Strategy evidence
 
 - Strategy and hypothesis
-- Features, horizon, and exit logic
+- Features, signal interval, bracket policy, and terminal exit logic
 - Historical train and OOS periods
 - Backtest trades, net PnL, EV, and drawdown
 - Stress and failure cases
@@ -351,7 +353,8 @@ Before Phase 3, submit:
 ### Live proposal
 
 - One 6E contract
-- Take-profit, stop-loss, and maximum holding time
+- Entry policy, take-profit, stop-loss, and terminal roll/expiry policy
+- Take-profit/stop-first counts and time-to-hit distribution
 - Potential profit, planned loss, and reward-to-risk ratio
 - Daily and cumulative loss limits
 - Emergency exit path
