@@ -1,6 +1,14 @@
 # macOS metadata
 .DS_Store
 
+# Local market data (raw and derived datasets)
+/data/
+
+# Generated research state and reports
+/artifacts/
+/reports/generated/
+/logs/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
