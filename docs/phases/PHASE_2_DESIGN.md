@@ -2,7 +2,7 @@
 
 - Document version: 1.7.0-draft
 - Status: `DRAFT`
-- Parent document: [`DESIGN.md`](DESIGN.md)
+- Parent document: [`DESIGN.md`](../DESIGN.md)
 - Candidate A: IBKR Pro with CME market data
 - Candidate B: AMP Futures with the Rithmic API
 - Input strategies: Phase 1 Paper-eligible artifacts

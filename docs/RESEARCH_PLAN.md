@@ -4,7 +4,7 @@
 - Revised: 2026-08-02
 - Status: `DRAFT`
 - Parent documents: [`DESIGN.md`](DESIGN.md),
-  [`PHASE_1_DESIGN.md`](PHASE_1_DESIGN.md)
+  [`PHASE_1_DESIGN.md`](phases/PHASE_1_DESIGN.md)
 - Validation authority: [`VALIDATION.md`](VALIDATION.md)
 - Instrument: CME Euro FX Futures (`6E`)
 

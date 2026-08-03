@@ -130,7 +130,7 @@ Objectives:
 
 Paper entry does not require user approval. AI cannot change the pass criteria.
 
-Design: [`PHASE_1_DESIGN.md`](PHASE_1_DESIGN.md)
+Design: [`PHASE_1_DESIGN.md`](phases/PHASE_1_DESIGN.md)
 
 ### Phase 2: Live Platform Evaluation and Paper Trading
 
@@ -149,7 +149,7 @@ Default selection rule:
 > Select Rithmic only when IBKR's measured limitations damage strategy
 > economics or safety enough to justify the additional cost.
 
-Design: [`PHASE_2_DESIGN.md`](PHASE_2_DESIGN.md)
+Design: [`PHASE_2_DESIGN.md`](phases/PHASE_2_DESIGN.md)
 
 ### Phase 3: Controlled Live Trading
 
@@ -160,7 +160,7 @@ Objectives:
 - Measure actual fills, slippage, fees, protection, and recovery.
 - Verify that Backtest and Paper results survive in the real market.
 
-Design: [`PHASE_3_DESIGN.md`](PHASE_3_DESIGN.md)
+Design: [`PHASE_3_DESIGN.md`](phases/PHASE_3_DESIGN.md)
 
 ### Phase 4: Risk and Capital Management
 
@@ -178,7 +178,7 @@ the other phases and must deliver the required controls before each gate:
 - Before Phase 3 Controlled Live: protection, loss limits, and emergency paths
 - Before Phase 5 scaling: portfolio and capital-allocation controls
 
-Design: [`PHASE_4_DESIGN.md`](PHASE_4_DESIGN.md)
+Design: [`PHASE_4_DESIGN.md`](phases/PHASE_4_DESIGN.md)
 
 ### Phase 5: Continuous Strategy Lifecycle
 
@@ -191,7 +191,7 @@ Objectives:
   strategies.
 - Preserve failures and all state transitions.
 
-Design: [`PHASE_5_DESIGN.md`](PHASE_5_DESIGN.md)
+Design: [`PHASE_5_DESIGN.md`](phases/PHASE_5_DESIGN.md)
 
 ---
 

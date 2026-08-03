@@ -2,7 +2,7 @@
 
 - Document version: 1.6.0-draft
 - Status: `DRAFT`
-- Parent document: [`DESIGN.md`](DESIGN.md)
+- Parent document: [`DESIGN.md`](../DESIGN.md)
 - Prerequisite: Phase 2 completion
 
 ---

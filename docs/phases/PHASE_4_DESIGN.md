@@ -2,7 +2,7 @@
 
 - Document version: 1.7.0-draft
 - Status: `DRAFT`
-- Parent document: [`DESIGN.md`](DESIGN.md)
+- Parent document: [`DESIGN.md`](../DESIGN.md)
 - Type: Cross-cutting design
 
 ---

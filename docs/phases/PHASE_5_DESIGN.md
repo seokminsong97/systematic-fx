@@ -2,7 +2,7 @@
 
 - Document version: 1.5.0-draft
 - Status: `DRAFT`
-- Parent document: [`DESIGN.md`](DESIGN.md)
+- Parent document: [`DESIGN.md`](../DESIGN.md)
 - Input: Research, Paper, and Live evidence
 
 ---

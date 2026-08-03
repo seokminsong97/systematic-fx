@@ -2,9 +2,10 @@
 
 - Document version: 1.7.0-draft
 - Status: `DRAFT`
-- Parent document: [`DESIGN.md`](DESIGN.md)
+- Parent document: [`DESIGN.md`](../DESIGN.md)
 - Input: Historical MBP-10 from the Data Source
-- Governing documents: `VALIDATION.md`, `RESEARCH_PLAN.md`
+- Governing documents: [`VALIDATION.md`](../VALIDATION.md),
+  [`RESEARCH_PLAN.md`](../RESEARCH_PLAN.md)
 
 ---
 
