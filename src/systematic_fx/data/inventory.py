@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
-
 _DAILY_FILE_PATTERN = re.compile(
     r"(?P<year>\d{4})/(?P<month>\d{2})/(?P<day>\d{2})/"
     r"glbx-mdp3-(?P<stamp>\d{8})\.mbp-10\.parquet"
