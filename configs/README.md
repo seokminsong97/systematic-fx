@@ -5,6 +5,7 @@ database credentials belong in environment variables, not here.
 
 - `campaigns/`: immutable calendar scope, split identity, and trial budget
 - `costs/`: commissions, fees, slippage, and fixed-cost allocation versions
+- `data/`: raw/reference input contracts and qualification requirements
 - `execution/`: latency, fill, stop-trigger, and OCO model versions
 - `features/`: one-second and five-minute feature-definition versions
 
