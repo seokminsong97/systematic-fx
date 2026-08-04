@@ -1,0 +1,181 @@
+[feature_set]
+id = "mbp10_pilot_v1"
+research_eligible = false
+source_schema = "GLBX.MDP3/mbp-10"
+implementation = "systematic_fx.features.pilot"
+price_encoding = "fixed_int64"
+price_scale = "1e-9"
+undefined_price = 9223372036854775807
+
+[scope]
+purpose = "bounded pipeline mechanics only"
+contract_selection = "explicit instrument_id plus explicit active outright raw_symbol"
+automatic_active_contract_selection = false
+automatic_roll_selection = false
+trading_status = false
+depletion_replenishment = false
+stale_quote_classification = false
+labels = false
+performance_metrics = false
+
+[availability]
+event_clock = "ts_recv"
+input_order = "physical Parquet row order across sequential row groups"
+intraperiod_seconds = 1
+decision_seconds = 300
+close_rule = "right_closed"
+one_second_formula = "ceil(ts_recv_ns / 1e9) * 1e9"
+five_minute_formula = "ceil(one_second_bucket_end_ns / 300e9) * 300e9"
+late_event_policy = "ignore an event whose one-second bucket precedes the open bucket"
+emit_unobserved_seconds = false
+forward_fill = false
+
+[one_second.book]
+snapshot = "last selected event row in the observed second"
+price_null_rule = "mask undefined_price before comparison and arithmetic"
+mid_px_x2_raw = "bid_px_00_raw + ask_px_00_raw, null on missing input or int64 overflow"
+spread_raw = "ask_px_00_raw - bid_px_00_raw, null on missing input or int64 overflow"
+cumulative_sizes = "sum size at defined-price levels in prefixes L1/L3/L5/L10"
+book_missing = "top bid or top ask is undefined"
+locked_book = "top bid and ask are defined and bid equals ask"
+crossed_book = "top bid and ask are defined and bid exceeds ask"
+valid_second = "BBO present, bid below ask, arithmetic valid, and last row is not reset/MAYBE_BAD_BOOK/BAD_TS_RECV"
+
+[one_second.flow]
+event_count = "all selected rows accepted into the second"
+action_counts = "separate A/C/F/M/N/R/T counts plus other"
+trade_count = "action T rows"
+trade_volume = "sum size for action T rows"
+aggressor_buy_volume = "sum size where action T and side B"
+aggressor_sell_volume = "sum size where action T and side A"
+unknown_side_trade_volume = "sum size where action T and side is neither A nor B"
+signed_trade_volume = "aggressor_buy_volume - aggressor_sell_volume"
+
+[five_minute]
+source = "closed mbp10_pilot_v1 observed-second rows only"
+book_snapshot = "last observed second in the five-minute bucket"
+price_statistics = "mid_x2 OHLC and spread min/max/mean over valid seconds only"
+count_statistics = "sum all event, action, and trade-flow counts"
+observed_seconds = "number of emitted one-second rows"
+missing_seconds = "300 - observed_seconds"
+invalid_seconds = "observed_seconds - valid_seconds"
+source_window_complete = "the full (end-5m,end] interval lies inside the explicit UTC source_date"
+valid_window = "source window complete, 300 observed seconds, and every observed second valid"
+
+[output]
+one_second = "derived/features_1s/version=mbp10_pilot_v1/contract=<symbol>/source_date=YYYY-MM-DD/part-000.parquet"
+five_minute = "derived/research_5m/version=mbp10_pilot_v1/contract=<symbol>/source_date=YYYY-MM-DD/part-000.parquet"
+existing_output_policy = "refuse"
+publication = "fully written same-filesystem temporary file, then atomic no-overwrite link"
+report = "returned in memory with SHA-256, rows, schema SHA-256, and bucket bounds"
+
+[one_second.schema]
+fields = [
+  "feature_version:string:not_null",
+  "research_eligible:bool:not_null",
+  "source_date:date32:not_null",
+  "contract:string:not_null",
+  "instrument_id:uint32:not_null",
+  "bucket_end:timestamp[ns,UTC]:not_null",
+  "source_last_row:uint64:not_null",
+  "last_action:string:not_null",
+  "last_side:string:not_null",
+  "last_flags:uint8:not_null",
+  "bid_px_00_raw:int64:nullable",
+  "ask_px_00_raw:int64:nullable",
+  "mid_px_x2_raw:int64:nullable",
+  "spread_raw:int64:nullable",
+  "bid_size_00:uint32:nullable",
+  "ask_size_00:uint32:nullable",
+  "bid_count_00:uint32:nullable",
+  "ask_count_00:uint32:nullable",
+  "bid_cum_size_l1:uint64:not_null",
+  "ask_cum_size_l1:uint64:not_null",
+  "bid_cum_size_l3:uint64:not_null",
+  "ask_cum_size_l3:uint64:not_null",
+  "bid_cum_size_l5:uint64:not_null",
+  "ask_cum_size_l5:uint64:not_null",
+  "bid_cum_size_l10:uint64:not_null",
+  "ask_cum_size_l10:uint64:not_null",
+  "bid_valid_levels:uint8:not_null",
+  "ask_valid_levels:uint8:not_null",
+  "event_count:uint64:not_null",
+  "action_a_count:uint64:not_null",
+  "action_c_count:uint64:not_null",
+  "action_f_count:uint64:not_null",
+  "action_m_count:uint64:not_null",
+  "action_n_count:uint64:not_null",
+  "action_r_count:uint64:not_null",
+  "action_t_count:uint64:not_null",
+  "action_other_count:uint64:not_null",
+  "trade_count:uint64:not_null",
+  "trade_volume:uint64:not_null",
+  "aggressor_buy_volume:uint64:not_null",
+  "aggressor_sell_volume:uint64:not_null",
+  "unknown_side_trade_volume:uint64:not_null",
+  "signed_trade_volume:int64:not_null",
+  "observed_second:bool:not_null",
+  "missing_second:bool:not_null",
+  "book_missing:bool:not_null",
+  "valid_second:bool:not_null",
+  "locked_book:bool:not_null",
+  "crossed_book:bool:not_null",
+  "maybe_bad_book:bool:not_null",
+  "bad_ts_recv:bool:not_null",
+  "snapshot_row:bool:not_null",
+  "reset_row:bool:not_null",
+  "price_arithmetic_overflow:bool:not_null",
+]
+
+[five_minute.schema]
+fields = [
+  "feature_version:string:not_null",
+  "research_eligible:bool:not_null",
+  "source_date:date32:not_null",
+  "contract:string:not_null",
+  "instrument_id:uint32:not_null",
+  "bucket_end:timestamp[ns,UTC]:not_null",
+  "first_1s_bucket_end:timestamp[ns,UTC]:not_null",
+  "last_1s_bucket_end:timestamp[ns,UTC]:not_null",
+  "last_source_row:uint64:not_null",
+  "last_bid_px_00_raw:int64:nullable",
+  "last_ask_px_00_raw:int64:nullable",
+  "last_spread_raw:int64:nullable",
+  "last_bid_cum_size_l10:uint64:not_null",
+  "last_ask_cum_size_l10:uint64:not_null",
+  "mid_px_x2_raw_open:int64:nullable",
+  "mid_px_x2_raw_high:int64:nullable",
+  "mid_px_x2_raw_low:int64:nullable",
+  "mid_px_x2_raw_close:int64:nullable",
+  "spread_raw_min:int64:nullable",
+  "spread_raw_max:int64:nullable",
+  "spread_raw_mean:float64:nullable",
+  "event_count:uint64:not_null",
+  "action_a_count:uint64:not_null",
+  "action_c_count:uint64:not_null",
+  "action_f_count:uint64:not_null",
+  "action_m_count:uint64:not_null",
+  "action_n_count:uint64:not_null",
+  "action_r_count:uint64:not_null",
+  "action_t_count:uint64:not_null",
+  "action_other_count:uint64:not_null",
+  "trade_count:uint64:not_null",
+  "trade_volume:uint64:not_null",
+  "aggressor_buy_volume:uint64:not_null",
+  "aggressor_sell_volume:uint64:not_null",
+  "unknown_side_trade_volume:uint64:not_null",
+  "signed_trade_volume:int64:not_null",
+  "observed_seconds:uint16:not_null",
+  "missing_seconds:uint16:not_null",
+  "valid_seconds:uint16:not_null",
+  "invalid_seconds:uint16:not_null",
+  "book_missing_seconds:uint16:not_null",
+  "locked_seconds:uint16:not_null",
+  "crossed_seconds:uint16:not_null",
+  "maybe_bad_book_seconds:uint16:not_null",
+  "bad_ts_recv_seconds:uint16:not_null",
+  "reset_seconds:uint16:not_null",
+  "source_window_complete:bool:not_null",
+  "closed_bucket:bool:not_null",
+  "valid_window:bool:not_null",
+]
