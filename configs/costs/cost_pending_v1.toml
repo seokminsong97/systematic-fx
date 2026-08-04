@@ -1,0 +1,31 @@
+[cost_model]
+id = "cost_pending_v1"
+status = "UNRESOLVED"
+numeric_verified = false
+research_eligible = false
+currency = "USD"
+contract = "6E"
+contracts_per_entry = 1
+
+[cost_model.required_inputs]
+broker_or_fcm_commission_round_trip = "REQUIRED"
+exchange_and_regulatory_fees_round_trip = "REQUIRED"
+platform_routing_fee_round_trip = "REQUIRED"
+market_data_and_api_cost_monthly = "REQUIRED"
+license_cost_monthly = "REQUIRED"
+account_and_operating_cost_monthly = "REQUIRED"
+expected_filled_trades_monthly_for_allocation = "REQUIRED"
+
+[cost_model.accounting]
+spread_and_depth_effect = "represented_in_executable_fill_prices"
+additional_slippage = "must_be_registered_separately"
+double_count_spread_or_slippage = false
+fully_loaded_required_for_decision = true
+
+[cost_model.barrier_floor]
+formula = "max(10, ceil(3 * conservative_round_trip_variable_cost_ticks))"
+computed_ticks = "UNRESOLVED"
+
+[cost_model.gate]
+block_economic_screening = true
+reason = "Verified broker, exchange, routing, and fixed-cost inputs are not configured"

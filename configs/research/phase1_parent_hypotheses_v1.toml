@@ -1,0 +1,713 @@
+[bundle]
+id = "phase1_parent_hypotheses_v1"
+schema_version = 1
+execution_blocked = true
+block_reasons = [
+  "Full source qualification, eligible-day calendar, and sealed splits are pending",
+  "The numeric cost model cost_pending_v1 is unresolved",
+  "The numeric execution model execution_pending_v1 is unresolved",
+]
+
+[market_units]
+instrument = "CME Euro FX Futures"
+parent_symbol = "6E.FUT"
+tick_size = "0.00005"
+tick_value = "6.25"
+status = "REVERIFY_REQUIRED"
+
+[feature_definition_versions]
+features_1s = "mbp10_v1"
+research_5m = "mbp10_v1"
+outcomes = "outcomes_v1_pending"
+
+[search_boundary]
+signal_cadence_seconds = 300
+lookback_bars = [3, 6, 12, 24, 48, 96]
+absolute_barrier_ticks = [10, 16, 24, 32, 48, 64, 96, 128, 192]
+volatility_multipliers = ["0.50", "0.75", "1.00", "1.50", "2.00", "3.00", "4.00"]
+observation_active_sessions = 20
+cost_floor_minimum_ticks = 10
+cost_floor_multiplier = 3
+selection_rule = "contiguous_positive_region_then_predeclared_medoid_or_least_risk_within_10pct_median_ev"
+
+[trial_budget]
+campaign_strategy_variants = 240
+strategy_variants_per_parent = 4
+descendants_per_parent = 3
+experiment_local_total = 272
+
+[trial_budget.experiment_local_breakdown]
+strategy_variant = 4
+absolute_barrier_cell = 162
+volatility_barrier_cell = 98
+screen_or_model_fit = 8
+
+[[hypotheses]]
+id = "p1_01_supported_move_continuation"
+family = "P1"
+title = "Depth-supported move continuation"
+direction = "BOTH"
+model_family = "DETERMINISTIC_STATE_MACHINE"
+hypothesis = "A directional return accompanied by stable spread, persistent same-side pressure, and intact supporting depth has higher same-direction executable first-touch probability."
+entry_condition = "Test a closed five-minute directional move conditional on tight spread, intact supporting depth, and non-decaying participation."
+economic_rationale = "A move supported by participation and resilient depth is less likely to be only a transient quote displacement."
+features = ["return", "spread", "depth_l1_l5_l10", "trade_participation", "quote_intensity"]
+
+[[hypotheses]]
+id = "p1_02_depleted_move_reversal"
+family = "P1"
+title = "Depletion-driven move reversal"
+direction = "BOTH"
+model_family = "DETERMINISTIC_STATE_MACHINE"
+hypothesis = "A directional move produced by temporary opposite-side depletion, followed by rapid book recovery without confirming flow, has higher reversal first-touch probability."
+entry_condition = "Test reversal after a closed move when depleted depth replenishes and aggressor flow fails to confirm."
+economic_rationale = "Temporary liquidity withdrawal can move quotes without durable information and may reverse when providers return."
+features = ["return", "depth_depletion", "replenishment", "aggressor_flow", "spread_recovery"]
+
+[[hypotheses]]
+id = "p1_03_spread_shock_recovery_reversal"
+family = "P1"
+title = "Spread-shock recovery reversal"
+direction = "BOTH"
+model_family = "DETERMINISTIC_THRESHOLD"
+hypothesis = "A price move occurring during a short spread shock that normalizes before the decision close has higher reversal probability than the same move under a stable spread."
+entry_condition = "Test against the move after spread shock duration ends and the book returns to a registered normal state."
+economic_rationale = "A temporary spread shock can exaggerate marked price movement while executable liquidity is impaired."
+features = ["return", "spread_max", "spread_duration", "spread_last", "valid_seconds"]
+
+[[hypotheses]]
+id = "p1_04_participation_confirmed_continuation"
+family = "P1"
+title = "Participation-confirmed continuation"
+direction = "BOTH"
+model_family = "REGULARIZED_LINEAR"
+hypothesis = "Directional price movement with increasing trade count, volume, and quote activity has higher continuation probability than equal movement with falling participation."
+entry_condition = "Condition move direction on registered changes in trade volume, trade count, and quote intensity."
+economic_rationale = "Broad participation can distinguish information-bearing pressure from a thin-book price change."
+features = ["return", "trade_volume", "trade_count", "quote_intensity", "spread"]
+
+[[hypotheses]]
+id = "p1_05_unconfirmed_move_reversal"
+family = "P1"
+title = "Unconfirmed move reversal"
+direction = "BOTH"
+model_family = "REGULARIZED_LINEAR"
+hypothesis = "A large return with weak aggressor flow, low trade participation, and no persistent depth shift has higher reversal probability."
+entry_condition = "Test reversal when normalized return is large but flow and persistent depth state remain below bounded thresholds."
+economic_rationale = "Price displacement without confirming order flow may reflect sparse liquidity rather than persistent demand."
+features = ["normalized_return", "aggressor_flow", "trade_participation", "imbalance_persistence"]
+
+[[hypotheses]]
+id = "p1_06_asymmetric_recovery_continuation"
+family = "P1"
+title = "Asymmetric book-recovery continuation"
+direction = "BOTH"
+model_family = "DETERMINISTIC_STATE_MACHINE"
+hypothesis = "After a move, faster replenishment behind the move than ahead of it predicts continuation, while the opposite asymmetry predicts reversal."
+entry_condition = "Compare same-side and opposite-side replenishment rates after a bounded directional impulse."
+economic_rationale = "Where liquidity reforms after impact may reveal whether providers support or resist the new price."
+features = ["return_shock", "bid_replenishment", "ask_replenishment", "depth_recovery_time"]
+
+[[hypotheses]]
+id = "p1_07_multihorizon_return_alignment"
+family = "P1"
+title = "Multi-horizon return alignment"
+direction = "BOTH"
+model_family = "GENERALIZED_ADDITIVE"
+hypothesis = "A five-minute move aligned with registered longer lookback returns and stable liquidity has higher continuation probability than a countertrend move."
+entry_condition = "Test short-horizon direction conditional on the signs and magnitudes of longer point-in-time returns and liquidity validity."
+economic_rationale = "Alignment across horizons may identify durable pressure while liquidity controls exclude fragile moves."
+features = ["return_5m", "return_multihorizon", "spread", "book_valid", "realized_volatility"]
+
+[[hypotheses]]
+id = "p1_08_fast_resilience_reversal"
+family = "P1"
+title = "Fast-resilience reversal"
+direction = "BOTH"
+model_family = "DETERMINISTIC_THRESHOLD"
+hypothesis = "A price impulse followed by fast restoration of pre-impulse depth and spread has higher reversal probability."
+entry_condition = "Test against the impulse after registered price-impact resilience completes before the decision close."
+economic_rationale = "Fast book resilience suggests liquidity providers absorbed the shock without accepting a new equilibrium."
+features = ["return_shock", "depth_resilience_time", "spread_recovery_time", "microprice_reversion"]
+
+[[hypotheses]]
+id = "p1_09_depth_supported_breakout"
+family = "P1"
+title = "Depth-supported range breakout"
+direction = "BOTH"
+model_family = "DETERMINISTIC_STATE_MACHINE"
+hypothesis = "A range breakout with expanding same-direction depth imbalance and no spread deterioration has higher continuation first-touch probability."
+entry_condition = "Test a closed range breakout only when imbalance expands and executable spread remains within its registered state."
+economic_rationale = "A breakout supported by book asymmetry may represent a genuine repricing rather than a liquidity gap."
+features = ["range_breakout", "depth_imbalance", "imbalance_change", "spread", "trade_flow"]
+
+[[hypotheses]]
+id = "p1_10_failed_breakout_reversal"
+family = "P1"
+title = "Failed range-breakout reversal"
+direction = "BOTH"
+model_family = "DETERMINISTIC_STATE_MACHINE"
+hypothesis = "A range break that closes back inside the range while depth and flow cease confirming has higher reversal probability."
+entry_condition = "Test toward the prior range after an intrabucket break, re-entry, and loss of flow and depth confirmation."
+economic_rationale = "Failed acceptance outside a range may trap short-lived directional demand."
+features = ["intrabar_range_break", "close_location", "aggressor_flow_change", "imbalance_change"]
+
+[[hypotheses]]
+id = "p2_01_l1_imbalance_persistence"
+family = "P2"
+title = "Persistent L1 imbalance"
+direction = "BOTH"
+model_family = "DETERMINISTIC_THRESHOLD"
+hypothesis = "Large L1 imbalance sustained for a registered fraction of valid seconds predicts the same-direction executable barrier first."
+entry_condition = "Require bounded L1 imbalance magnitude, persistence, valid book time, and acceptable spread at the five-minute close."
+economic_rationale = "Persistent top-level asymmetry may reflect near-term executable supply-demand pressure."
+features = ["l1_imbalance", "l1_imbalance_persistence", "valid_seconds", "spread"]
+
+[[hypotheses]]
+id = "p2_02_multilevel_imbalance_agreement"
+family = "P2"
+title = "Multi-level imbalance agreement"
+direction = "BOTH"
+model_family = "REGULARIZED_LINEAR"
+hypothesis = "Agreement in the sign and magnitude of L1, L3, L5, and L10 imbalance predicts same-direction first touch more reliably than L1 alone."
+entry_condition = "Test when registered imbalance levels agree in sign and exceed bounded persistence thresholds."
+economic_rationale = "Agreement across depth reduces sensitivity to a single displayed order near the touch."
+features = ["imbalance_l1", "imbalance_l3", "imbalance_l5", "imbalance_l10", "sign_agreement"]
+
+[[hypotheses]]
+id = "p2_03_top_deep_imbalance_divergence"
+family = "P2"
+title = "Top-versus-deep imbalance divergence"
+direction = "BOTH"
+model_family = "GENERALIZED_ADDITIVE"
+hypothesis = "Divergence between L1 and L10 imbalance identifies either fragile top-of-book pressure or latent deeper support with distinct reversal probabilities."
+entry_condition = "Condition direction on the signed L1-minus-L10 imbalance and its duration."
+economic_rationale = "Top-level pressure unsupported by deeper liquidity may be less durable than broad book asymmetry."
+features = ["imbalance_l1", "imbalance_l10", "imbalance_divergence", "divergence_persistence"]
+
+[[hypotheses]]
+id = "p2_04_imbalance_acceleration"
+family = "P2"
+title = "Imbalance acceleration"
+direction = "BOTH"
+model_family = "REGULARIZED_LINEAR"
+hypothesis = "Accelerating same-sign depth imbalance near the decision close predicts same-direction first touch beyond the effect of its final level."
+entry_condition = "Test bounded imbalance slope and last-minus-first values conditional on final magnitude."
+economic_rationale = "Increasing asymmetry may capture newly arriving pressure rather than a stale static book state."
+features = ["imbalance_last", "imbalance_slope", "imbalance_last_minus_first", "quote_intensity"]
+
+[[hypotheses]]
+id = "p2_05_stable_imbalance_low_flip"
+family = "P2"
+title = "Stable low-flip imbalance"
+direction = "BOTH"
+model_family = "DETERMINISTIC_THRESHOLD"
+hypothesis = "An imbalance state with few sign changes predicts direction more reliably than an equal mean imbalance with frequent flips."
+entry_condition = "Require bounded mean imbalance, low sign-change count, and minimum persistence."
+economic_rationale = "Low flip frequency may separate stable pressure from noisy order replacement."
+features = ["imbalance_mean", "imbalance_sign_changes", "imbalance_persistence", "book_valid"]
+
+[[hypotheses]]
+id = "p2_06_imbalance_flip_reversal"
+family = "P2"
+title = "Persistent imbalance flip"
+direction = "BOTH"
+model_family = "DETERMINISTIC_STATE_MACHINE"
+hypothesis = "A persistent imbalance that flips sign and remains in the new state predicts a reversal toward the new imbalance direction."
+entry_condition = "Detect one bounded persistent state followed by a confirmed opposite persistent state before decision close."
+economic_rationale = "A durable sign transition can indicate that displayed liquidity control has changed sides."
+features = ["imbalance_state", "imbalance_sign_changes", "post_flip_persistence", "microprice"]
+
+[[hypotheses]]
+id = "p2_07_replenishment_sustained_imbalance"
+family = "P2"
+title = "Replenishment-sustained imbalance"
+direction = "BOTH"
+model_family = "DETERMINISTIC_STATE_MACHINE"
+hypothesis = "Persistent imbalance maintained through repeated same-side replenishment predicts same-direction first touch more strongly than static size."
+entry_condition = "Test imbalance persistence conditional on registered same-side replenishment count and volume."
+economic_rationale = "Repeated replenishment may reveal continuing liquidity commitment not visible in a snapshot."
+features = ["depth_imbalance", "replenishment_count", "replenishment_volume", "depletion_count"]
+
+[[hypotheses]]
+id = "p2_08_depletion_driven_imbalance"
+family = "P2"
+title = "Depletion-driven imbalance fragility"
+direction = "BOTH"
+model_family = "GENERALIZED_ADDITIVE"
+hypothesis = "Imbalance caused mainly by opposite-side depletion has different and less stable directional economics than imbalance caused by same-side additions."
+entry_condition = "Separate imbalance changes into depletion and addition components before testing direction."
+economic_rationale = "The mechanism producing imbalance may distinguish transient withdrawal from durable displayed demand."
+features = ["imbalance_change", "opposite_side_depletion", "same_side_addition", "spread_change"]
+
+[[hypotheses]]
+id = "p2_09_depth_slope_confirmation"
+family = "P2"
+title = "Depth-slope confirmation"
+direction = "BOTH"
+model_family = "REGULARIZED_LINEAR"
+hypothesis = "Imbalance aligned with an asymmetric depth slope and nearby liquidity gaps predicts same-direction first touch more reliably."
+entry_condition = "Condition signed imbalance on depth-slope asymmetry and gap distance."
+economic_rationale = "The shape of depth beyond aggregate size may determine how far price can travel before meeting liquidity."
+features = ["depth_imbalance", "depth_slope", "liquidity_gap_bid", "liquidity_gap_ask"]
+
+[[hypotheses]]
+id = "p2_10_volatility_conditioned_imbalance"
+family = "P2"
+title = "Volatility-conditioned imbalance"
+direction = "BOTH"
+model_family = "GENERALIZED_ADDITIVE"
+hypothesis = "The directional value of persistent imbalance varies smoothly with point-in-time volatility and spread state."
+entry_condition = "Test imbalance magnitude and persistence interactions with registered volatility and spread states."
+economic_rationale = "The same displayed asymmetry may be material in calm markets and immaterial during rapid repricing."
+features = ["imbalance_persistence", "realized_volatility", "spread", "quote_intensity"]
+
+[[hypotheses]]
+id = "p3_01_buy_flow_absorption_reversal"
+family = "P3"
+title = "Buy-flow absorption reversal"
+direction = "SHORT"
+model_family = "DETERMINISTIC_STATE_MACHINE"
+hypothesis = "Persistent aggressive buy flow without proportional upward price response predicts a short reversal after absorption is confirmed."
+entry_condition = "Require positive defensible aggressor flow, bounded price response, and stable or replenishing ask depth."
+economic_rationale = "Sellers repeatedly absorbing buys may exhaust near-term demand."
+features = ["aggressor_buy_flow", "price_response", "ask_replenishment", "trade_volume"]
+
+[[hypotheses]]
+id = "p3_02_sell_flow_absorption_reversal"
+family = "P3"
+title = "Sell-flow absorption reversal"
+direction = "LONG"
+model_family = "DETERMINISTIC_STATE_MACHINE"
+hypothesis = "Persistent aggressive sell flow without proportional downward price response predicts a long reversal after absorption is confirmed."
+entry_condition = "Require negative defensible aggressor flow, bounded price response, and stable or replenishing bid depth."
+economic_rationale = "Buyers repeatedly absorbing sells may exhaust near-term supply."
+features = ["aggressor_sell_flow", "price_response", "bid_replenishment", "trade_volume"]
+
+[[hypotheses]]
+id = "p3_03_flow_price_confirmation"
+family = "P3"
+title = "Flow-price confirmation continuation"
+direction = "BOTH"
+model_family = "REGULARIZED_LINEAR"
+hypothesis = "Aggressor flow with proportional same-direction price response and depth consumption predicts continuation."
+entry_condition = "Test signed flow jointly with signed return and opposite-side depletion."
+economic_rationale = "Flow that both consumes liquidity and moves price may reflect directional urgency."
+features = ["signed_aggressor_flow", "return", "opposite_side_depletion", "spread"]
+
+[[hypotheses]]
+id = "p3_04_flow_price_divergence"
+family = "P3"
+title = "Flow-price divergence"
+direction = "BOTH"
+model_family = "GENERALIZED_ADDITIVE"
+hypothesis = "A widening divergence between cumulative aggressor flow and price response predicts a reversal toward the resisting liquidity side."
+entry_condition = "Test a bounded signed flow-minus-price-response divergence with persistent opposing replenishment."
+economic_rationale = "Divergence can indicate absorption or exhaustion hidden by aggregate volume."
+features = ["cumulative_aggressor_flow", "cumulative_return", "flow_price_divergence", "replenishment"]
+
+[[hypotheses]]
+id = "p3_05_absorption_then_break"
+family = "P3"
+title = "Absorption failure continuation"
+direction = "BOTH"
+model_family = "DETERMINISTIC_STATE_MACHINE"
+hypothesis = "After a period of absorption, failure of the resisting side's replenishment predicts delayed continuation with the original aggressor flow."
+entry_condition = "Detect absorption followed by registered replenishment failure and renewed executable price response."
+economic_rationale = "Liquidity that initially resists pressure may be exhausted, releasing delayed directional movement."
+features = ["absorption_state", "replenishment_failure", "aggressor_flow", "price_response"]
+
+[[hypotheses]]
+id = "p3_06_flow_exhaustion_reversal"
+family = "P3"
+title = "Aggressor-flow exhaustion reversal"
+direction = "BOTH"
+model_family = "DETERMINISTIC_STATE_MACHINE"
+hypothesis = "Declining aggressor intensity after a directional price move predicts reversal when opposing depth recovers."
+entry_condition = "Test against the move after flow intensity peaks, decays, and opposing depth replenishes."
+economic_rationale = "A move may stall when urgent orders are exhausted and liquidity returns."
+features = ["aggressor_intensity", "flow_peak_age", "return", "opposing_depth_recovery"]
+
+[[hypotheses]]
+id = "p3_07_large_trade_low_impact"
+family = "P3"
+title = "Large-flow low-impact absorption"
+direction = "BOTH"
+model_family = "GENERALIZED_ADDITIVE"
+hypothesis = "High normalized aggressive volume with unusually low price impact predicts reversal toward the absorbing side."
+entry_condition = "Condition price impact per unit of defensible aggressive volume on depth and spread validity."
+economic_rationale = "Low impact despite large flow suggests substantial opposing liquidity."
+features = ["aggressor_volume", "price_impact_per_volume", "depth", "spread"]
+
+[[hypotheses]]
+id = "p3_08_small_flow_high_impact_reversal"
+family = "P3"
+title = "Thin-liquidity high-impact reversal"
+direction = "BOTH"
+model_family = "GENERALIZED_ADDITIVE"
+hypothesis = "A large price response to small aggressive volume predicts reversal when spread and depth normalize."
+entry_condition = "Test against high impact-per-volume moves after executable liquidity recovery."
+economic_rationale = "Disproportionate impact may be a temporary thin-book displacement rather than persistent information."
+features = ["price_impact_per_volume", "aggressor_volume", "spread_recovery", "depth_recovery"]
+
+[[hypotheses]]
+id = "p3_09_flow_imbalance_alignment"
+family = "P3"
+title = "Flow and book-imbalance alignment"
+direction = "BOTH"
+model_family = "REGULARIZED_LINEAR"
+hypothesis = "Aggressor flow aligned with persistent depth imbalance predicts continuation more reliably than either signal alone."
+entry_condition = "Require registered agreement between signed flow and persistent multi-level imbalance."
+economic_rationale = "Alignment of executed demand and displayed liquidity may identify broader directional pressure."
+features = ["signed_aggressor_flow", "multilevel_imbalance", "imbalance_persistence", "return"]
+
+[[hypotheses]]
+id = "p3_10_flow_imbalance_conflict"
+family = "P3"
+title = "Flow and book-imbalance conflict"
+direction = "BOTH"
+model_family = "SHALLOW_TREE_ENSEMBLE"
+hypothesis = "Conflict between aggressive flow and persistent displayed imbalance defines bounded absorption and delayed-break regimes with different first-touch outcomes."
+entry_condition = "Classify only preregistered combinations of signed flow, imbalance, price response, and replenishment."
+economic_rationale = "Executed and displayed order states can disagree when liquidity providers absorb or strategically replenish."
+features = ["signed_aggressor_flow", "multilevel_imbalance", "price_response", "replenishment"]
+
+[[hypotheses]]
+id = "p4_01_ask_depletion_upward_continuation"
+family = "P4"
+title = "Ask-depth depletion continuation"
+direction = "LONG"
+model_family = "DETERMINISTIC_STATE_MACHINE"
+hypothesis = "Rapid multi-level ask depletion without equivalent replenishment predicts upward executable first touch."
+entry_condition = "Require registered ask depletion across levels, low ask replenishment, and valid executable spread."
+economic_rationale = "Loss of nearby offers can reduce resistance to upward movement."
+features = ["ask_depletion_l1_l10", "ask_replenishment", "ask_gap", "spread"]
+
+[[hypotheses]]
+id = "p4_02_bid_depletion_downward_continuation"
+family = "P4"
+title = "Bid-depth depletion continuation"
+direction = "SHORT"
+model_family = "DETERMINISTIC_STATE_MACHINE"
+hypothesis = "Rapid multi-level bid depletion without equivalent replenishment predicts downward executable first touch."
+entry_condition = "Require registered bid depletion across levels, low bid replenishment, and valid executable spread."
+economic_rationale = "Loss of nearby bids can reduce support against downward movement."
+features = ["bid_depletion_l1_l10", "bid_replenishment", "bid_gap", "spread"]
+
+[[hypotheses]]
+id = "p4_03_depletion_replenishment_reversal"
+family = "P4"
+title = "Post-depletion replenishment reversal"
+direction = "BOTH"
+model_family = "DETERMINISTIC_STATE_MACHINE"
+hypothesis = "A directional move caused by depletion reverses when the depleted side rapidly replenishes beyond its pre-shock state."
+entry_condition = "Test against the move after depletion followed by confirmed overshooting replenishment."
+economic_rationale = "Liquidity restoration can close a transient gap and reverse a fragile move."
+features = ["depletion_shock", "replenishment_ratio", "depth_recovery", "return"]
+
+[[hypotheses]]
+id = "p4_04_one_sided_gap_continuation"
+family = "P4"
+title = "One-sided liquidity-gap continuation"
+direction = "BOTH"
+model_family = "DETERMINISTIC_THRESHOLD"
+hypothesis = "An unusually large gap on one executable side predicts movement through that side when same-direction pressure is present."
+entry_condition = "Require asymmetric registered gap distance plus aligned flow or microprice pressure."
+economic_rationale = "Sparse price levels can lower the liquidity required for a move beyond transaction costs."
+features = ["bid_gap", "ask_gap", "gap_asymmetry", "aggressor_flow", "microprice"]
+
+[[hypotheses]]
+id = "p4_05_gap_fill_reversal"
+family = "P4"
+title = "Liquidity-gap fill reversal"
+direction = "BOTH"
+model_family = "DETERMINISTIC_STATE_MACHINE"
+hypothesis = "A price move through a temporary liquidity gap reverses after the skipped levels refill and spread normalizes."
+entry_condition = "Test against the prior move after registered gap closure and executable-book recovery."
+economic_rationale = "A gap-driven move may lack continuing flow once liquidity returns."
+features = ["gap_traversal", "gap_refill", "spread_recovery", "aggressor_flow_decay"]
+
+[[hypotheses]]
+id = "p4_06_replenishment_asymmetry_continuation"
+family = "P4"
+title = "Replenishment asymmetry continuation"
+direction = "BOTH"
+model_family = "REGULARIZED_LINEAR"
+hypothesis = "Persistent replenishment behind one side combined with weak replenishment ahead predicts movement toward the weak side."
+entry_condition = "Test signed bid-versus-ask replenishment asymmetry with depth and spread controls."
+economic_rationale = "Unequal liquidity renewal can reveal which side can continue absorbing pressure."
+features = ["bid_replenishment", "ask_replenishment", "replenishment_asymmetry", "depth"]
+
+[[hypotheses]]
+id = "p4_07_depletion_cascade"
+family = "P4"
+title = "Multi-level depletion cascade"
+direction = "BOTH"
+model_family = "DETERMINISTIC_STATE_MACHINE"
+hypothesis = "Sequential depletion from L1 into deeper levels predicts continuation more strongly than simultaneous cancellation."
+entry_condition = "Detect registered event-order depletion progressing through L1, L3, L5, and L10."
+economic_rationale = "A cascade may reflect executable pressure consuming successive liquidity layers."
+features = ["depletion_sequence", "depth_l1_l3_l5_l10", "trade_flow", "event_intensity"]
+
+[[hypotheses]]
+id = "p4_08_symmetric_depth_withdrawal_no_trade"
+family = "P4"
+title = "Symmetric withdrawal fragility filter"
+direction = "BOTH"
+model_family = "DETERMINISTIC_THRESHOLD"
+hypothesis = "Broad symmetric depth withdrawal predicts high execution risk but no stable direction and should suppress entries unless another registered directional state is present."
+entry_condition = "Treat symmetric depth loss as NO_TRADE absent a separately registered directional interaction."
+economic_rationale = "General liquidity withdrawal can increase slippage without supplying directional information."
+features = ["symmetric_depth_depletion", "spread", "volatility", "book_valid"]
+
+[[hypotheses]]
+id = "p4_09_gap_imbalance_alignment"
+family = "P4"
+title = "Gap and imbalance alignment"
+direction = "BOTH"
+model_family = "REGULARIZED_LINEAR"
+hypothesis = "A one-sided gap aligned with persistent multi-level imbalance predicts same-direction first touch more reliably than a gap alone."
+entry_condition = "Require registered agreement among gap asymmetry, imbalance sign, and spread validity."
+economic_rationale = "Both sparse opposing liquidity and supporting displayed depth may be needed for robust movement."
+features = ["gap_asymmetry", "multilevel_imbalance", "imbalance_persistence", "spread"]
+
+[[hypotheses]]
+id = "p4_10_liquidity_recovery_speed"
+family = "P4"
+title = "Liquidity-recovery speed regime"
+direction = "BOTH"
+model_family = "GENERALIZED_ADDITIVE"
+hypothesis = "Recovery time after a depletion shock separates continuation from reversal regimes in a bounded nonlinear relationship."
+entry_condition = "Condition post-shock direction on registered depth and spread recovery durations."
+economic_rationale = "Slow recovery can sustain fragility while fast recovery can neutralize the shock."
+features = ["depletion_shock", "depth_recovery_duration", "spread_recovery_duration", "return"]
+
+[[hypotheses]]
+id = "p5_01_compression_breakout"
+family = "P5"
+title = "Compression breakout continuation"
+direction = "BOTH"
+model_family = "DETERMINISTIC_STATE_MACHINE"
+hypothesis = "A low-volatility state followed by rising trade and quote intensity with directional book pressure predicts breakout continuation."
+entry_condition = "Require registered volatility compression, intensity expansion, and aligned depth or flow at decision close."
+economic_rationale = "Latent demand released after compression may generate movement large enough to exceed costs."
+features = ["realized_volatility", "volatility_percentile", "trade_intensity", "quote_intensity", "depth_pressure"]
+
+[[hypotheses]]
+id = "p5_02_compression_false_break_reversal"
+family = "P5"
+title = "Compression false-break reversal"
+direction = "BOTH"
+model_family = "DETERMINISTIC_STATE_MACHINE"
+hypothesis = "A range break from compression without intensity or depth confirmation predicts reversion into the compressed range."
+entry_condition = "Test against a break lacking registered flow, intensity, and book confirmation."
+economic_rationale = "A thin or unconfirmed probe outside compression may fail to establish a new price region."
+features = ["volatility_compression", "range_breakout", "trade_intensity", "depth_confirmation"]
+
+[[hypotheses]]
+id = "p5_03_volatility_expansion_continuation"
+family = "P5"
+title = "Confirmed volatility expansion"
+direction = "BOTH"
+model_family = "REGULARIZED_LINEAR"
+hypothesis = "Rising point-in-time volatility accompanied by aligned return, flow, and stable executable spread predicts continuation."
+entry_condition = "Test volatility change jointly with signed return, flow, and spread state."
+economic_rationale = "Expansion with participation can represent an active repricing rather than isolated noise."
+features = ["volatility_change", "return", "aggressor_flow", "spread"]
+
+[[hypotheses]]
+id = "p5_04_volatility_spike_exhaustion"
+family = "P5"
+title = "Volatility-spike exhaustion reversal"
+direction = "BOTH"
+model_family = "GENERALIZED_ADDITIVE"
+hypothesis = "An extreme volatility spike followed by declining intensity and recovering depth predicts reversal after the spike."
+entry_condition = "Test against the spike direction after registered intensity decay and liquidity recovery."
+economic_rationale = "A short-lived burst can exhaust urgent demand and invite liquidity back into the book."
+features = ["volatility_shock", "intensity_decay", "depth_recovery", "return_shock"]
+
+[[hypotheses]]
+id = "p5_05_volatility_of_volatility_transition"
+family = "P5"
+title = "Volatility-of-volatility transition"
+direction = "BOTH"
+model_family = "GENERALIZED_ADDITIVE"
+hypothesis = "A rising volatility-of-volatility state changes the stability and suitable barrier region of otherwise identical directional signals."
+entry_condition = "Condition registered directional signals on bounded trailing volatility-of-volatility states."
+economic_rationale = "Rapidly changing risk can alter both move magnitude and stop-out probability."
+features = ["realized_volatility", "volatility_of_volatility", "return", "spread"]
+
+[[hypotheses]]
+id = "p5_06_range_expansion_depth_support"
+family = "P5"
+title = "Depth-supported range expansion"
+direction = "BOTH"
+model_family = "REGULARIZED_LINEAR"
+hypothesis = "Range expansion aligned with persistent depth pressure and controlled spread predicts continuation."
+entry_condition = "Test expansion direction with multi-level imbalance persistence and spread controls."
+economic_rationale = "Liquidity support may distinguish tradable expansion from unstable wide-spread movement."
+features = ["range_expansion", "depth_imbalance", "imbalance_persistence", "spread"]
+
+[[hypotheses]]
+id = "p5_07_high_volatility_mean_reversion"
+family = "P5"
+title = "High-volatility mean reversion"
+direction = "BOTH"
+model_family = "GENERALIZED_ADDITIVE"
+hypothesis = "At high but non-dislocated volatility, extreme normalized returns with flow exhaustion and book recovery predict reversal."
+entry_condition = "Test against extreme normalized return only after flow decay and valid book recovery."
+economic_rationale = "Volatility-normalized extremes may revert after transient pressure ends."
+features = ["normalized_return", "realized_volatility", "flow_exhaustion", "book_recovery"]
+
+[[hypotheses]]
+id = "p5_08_low_volatility_imbalance_break"
+family = "P5"
+title = "Low-volatility imbalance break"
+direction = "BOTH"
+model_family = "DETERMINISTIC_STATE_MACHINE"
+hypothesis = "Persistent imbalance emerging during low volatility predicts the direction of the next expansion."
+entry_condition = "Require low trailing volatility followed by new persistent multi-level imbalance and rising intensity."
+economic_rationale = "Book pressure can accumulate before price variability expands."
+features = ["volatility_compression", "imbalance_persistence", "imbalance_change", "intensity_change"]
+
+[[hypotheses]]
+id = "p5_09_shock_count_clustering"
+family = "P5"
+title = "Intrabucket shock clustering"
+direction = "BOTH"
+model_family = "SHALLOW_TREE_ENSEMBLE"
+hypothesis = "The count, sign agreement, and timing of one-second shocks within a five-minute bucket define bounded continuation and reversal states."
+entry_condition = "Classify preregistered shock-count, sign-agreement, and recency bins with liquidity controls."
+economic_rationale = "Several aligned shocks can differ economically from one isolated extreme observation."
+features = ["shock_count", "shock_sign_agreement", "shock_recency", "spread", "depth"]
+
+[[hypotheses]]
+id = "p5_10_volatility_scaled_signal_strength"
+family = "P5"
+title = "Volatility-scaled signal strength"
+direction = "BOTH"
+model_family = "REGULARIZED_LINEAR"
+hypothesis = "Scaling return, flow, and imbalance by point-in-time volatility yields more stable first-touch probabilities across volatility regimes."
+entry_condition = "Test registered normalized signal values while retaining absolute spread and cost constraints."
+economic_rationale = "Risk scaling may make thresholds comparable across changing market variability without using future data."
+features = ["volatility_scaled_return", "volatility_scaled_flow", "volatility_scaled_imbalance", "spread"]
+
+[[hypotheses]]
+id = "p6_01_p1_session_interaction"
+family = "P6"
+interaction_family = "P1"
+title = "Price-response by session state"
+direction = "BOTH"
+model_family = "GENERALIZED_ADDITIVE"
+hypothesis = "P1 continuation and reversal effects differ across preregistered session states after conditioning on liquidity."
+entry_condition = "Apply a fixed P1 signal with registered session-state interactions and identical execution rules."
+economic_rationale = "Participation and provider mix vary through the trading day and can alter price-response persistence."
+features = ["p1_signal_state", "session_state", "spread", "depth", "trade_intensity"]
+
+[[hypotheses]]
+id = "p6_02_p2_session_interaction"
+family = "P6"
+interaction_family = "P2"
+title = "Depth imbalance by session state"
+direction = "BOTH"
+model_family = "GENERALIZED_ADDITIVE"
+hypothesis = "The directional value of persistent depth imbalance differs across preregistered session states."
+entry_condition = "Apply a fixed P2 imbalance state with session interaction and common liquidity validity rules."
+economic_rationale = "Displayed depth can have different meaning when participation and quote competition change."
+features = ["p2_imbalance_state", "session_state", "quote_intensity", "spread"]
+
+[[hypotheses]]
+id = "p6_03_p3_session_interaction"
+family = "P6"
+interaction_family = "P3"
+title = "Absorption by session state"
+direction = "BOTH"
+model_family = "GENERALIZED_ADDITIVE"
+hypothesis = "P3 absorption and flow-divergence effects differ across preregistered session states."
+entry_condition = "Apply fixed flow-response states with session interaction and identical barrier policy."
+economic_rationale = "The capacity and behavior of liquidity providers can vary by session."
+features = ["p3_flow_response_state", "session_state", "depth", "trade_intensity"]
+
+[[hypotheses]]
+id = "p6_04_p4_session_interaction"
+family = "P6"
+interaction_family = "P4"
+title = "Liquidity fragility by session state"
+direction = "BOTH"
+model_family = "SHALLOW_TREE_ENSEMBLE"
+hypothesis = "P4 depletion and gap effects differ across bounded session and baseline-liquidity states."
+entry_condition = "Classify only preregistered P4 state by session combinations with fixed feature limits."
+economic_rationale = "An identical gap can be routine in one session and exceptional in another."
+features = ["p4_fragility_state", "session_state", "baseline_depth", "spread"]
+
+[[hypotheses]]
+id = "p6_05_p5_session_interaction"
+family = "P6"
+interaction_family = "P5"
+title = "Volatility transition by session state"
+direction = "BOTH"
+model_family = "GENERALIZED_ADDITIVE"
+hypothesis = "P5 compression and expansion effects differ across preregistered session states."
+entry_condition = "Apply fixed P5 volatility states with session interaction and common execution constraints."
+economic_rationale = "Expected volatility transitions depend on the scheduled participation cycle."
+features = ["p5_volatility_state", "session_state", "trade_intensity", "spread"]
+
+[[hypotheses]]
+id = "p6_06_p1_weekday_interaction"
+family = "P6"
+interaction_family = "P1"
+title = "Price response by weekday"
+direction = "BOTH"
+model_family = "REGULARIZED_LINEAR"
+hypothesis = "A fixed P1 price-response state has different first-touch probabilities across preregistered weekdays after controlling for liquidity."
+entry_condition = "Interact a frozen P1 state with weekday while preserving the same entry and barrier rules."
+economic_rationale = "Scheduled weekly participation patterns may alter continuation and reversal without constituting standalone alpha."
+features = ["p1_signal_state", "weekday", "spread", "depth", "volatility"]
+
+[[hypotheses]]
+id = "p6_07_p2_time_to_expiry_interaction"
+family = "P6"
+interaction_family = "P2"
+title = "Depth imbalance by time to expiry"
+direction = "BOTH"
+model_family = "GENERALIZED_ADDITIVE"
+hypothesis = "A fixed P2 imbalance state changes with preregistered time-to-expiry bins before the roll cutoff."
+entry_condition = "Interact persistent imbalance with contemporaneously known time-to-expiry bins on the execution contract."
+economic_rationale = "Liquidity concentration and participant behavior change through the contract lifecycle."
+features = ["p2_imbalance_state", "time_to_expiry", "roll_state", "depth", "spread"]
+
+[[hypotheses]]
+id = "p6_08_p3_roll_state_interaction"
+family = "P6"
+interaction_family = "P3"
+title = "Flow absorption by roll state"
+direction = "BOTH"
+model_family = "REGULARIZED_LINEAR"
+hypothesis = "A fixed P3 absorption state has different economics across preregistered pre-roll liquidity states."
+entry_condition = "Interact a frozen absorption state with contemporaneous roll state while never using future contract selection."
+economic_rationale = "Migration of volume and liquidity can change the capacity to absorb aggressive flow."
+features = ["p3_absorption_state", "roll_state", "time_to_expiry", "contract_depth"]
+
+[[hypotheses]]
+id = "p6_09_p4_roll_state_interaction"
+family = "P6"
+interaction_family = "P4"
+title = "Liquidity gaps by roll state"
+direction = "BOTH"
+model_family = "GENERALIZED_ADDITIVE"
+hypothesis = "P4 depletion and gap signals have different first-touch behavior across preregistered roll states."
+entry_condition = "Interact frozen gap/depletion states with contemporaneous roll state and contract liquidity."
+economic_rationale = "Book fragility can increase as liquidity migrates between expiries."
+features = ["p4_fragility_state", "roll_state", "time_to_expiry", "contract_depth", "spread"]
+
+[[hypotheses]]
+id = "p6_10_p5_contract_lifecycle_interaction"
+family = "P6"
+interaction_family = "P5"
+title = "Volatility state by contract lifecycle"
+direction = "BOTH"
+model_family = "GENERALIZED_ADDITIVE"
+hypothesis = "P5 volatility transitions differ across preregistered contract-lifecycle bins before mandatory terminal exit."
+entry_condition = "Interact fixed volatility states with contemporaneous lifecycle bins while excluding delivery-risk periods."
+economic_rationale = "Liquidity migration and expiry proximity can alter both volatility and feasible barrier duration."
+features = ["p5_volatility_state", "time_to_expiry", "roll_state", "spread", "depth"]

@@ -1,0 +1,75 @@
+[feature_set]
+id = "mbp10_v1"
+source_schema = "GLBX.MDP3/mbp-10"
+price_encoding = "fixed_int64"
+price_scale = "1e-9"
+undefined_price = 9223372036854775807
+intraperiod_seconds = 1
+decision_seconds = 300
+book_levels = [1, 3, 5, 10]
+
+[availability]
+event_clock = "ts_recv"
+close_rule = "right_closed"
+late_event_policy = "do_not_rewrite_closed_bucket"
+missing_session_policy = "mark_invalid"
+book_reset_policy = "invalidate_until_rebuilt"
+permit_forward_fill_across_session = false
+
+[one_second]
+book_features = [
+  "bid_price",
+  "ask_price",
+  "mid_price",
+  "spread",
+  "bid_size",
+  "ask_size",
+  "cumulative_bid_size",
+  "cumulative_ask_size",
+  "depth_imbalance",
+  "depth_slope",
+  "liquidity_gap",
+]
+flow_features = [
+  "event_count",
+  "trade_count",
+  "trade_volume",
+  "defensible_aggressor_flow",
+  "depletion_count",
+  "replenishment_count",
+]
+state_features = [
+  "quote_age",
+  "book_valid",
+  "locked_book",
+  "crossed_book",
+  "trading_status",
+]
+
+[five_minute]
+statistics = [
+  "open",
+  "high",
+  "low",
+  "close",
+  "mean",
+  "standard_deviation",
+  "p05",
+  "p25",
+  "median",
+  "p75",
+  "p95",
+  "first",
+  "last",
+  "last_minus_first",
+  "threshold_persistence",
+  "sign_changes",
+  "shock_count",
+]
+validity_fields = [
+  "valid_seconds",
+  "stale_seconds",
+  "missing_seconds",
+  "locked_seconds",
+  "crossed_seconds",
+]

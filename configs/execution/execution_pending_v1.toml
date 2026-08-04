@@ -1,0 +1,36 @@
+[execution_model]
+id = "execution_pending_v1"
+status = "UNRESOLVED"
+numeric_verified = false
+research_eligible = false
+contract = "6E"
+position_size_contracts = 1
+decision_interval_seconds = 300
+availability_clock = "ts_recv"
+
+[execution_model.fixed_invariants]
+executable_side_depth = true
+midpoint_fill_prohibited = true
+zero_latency_fill_prohibited = true
+passive_touch_fill_prohibited = true
+infinite_liquidity_prohibited = true
+stop_trigger_is_fill = false
+oco_required = true
+one_open_position_per_strategy_contract = true
+occupied_signals = "log_and_skip"
+barrier_order_source = "event_ordered_mbp10"
+
+[execution_model.required_inputs]
+baseline_routing_delay_ms = "REQUIRED"
+entry_order_type = "REQUIRED"
+entry_expiry_ms = "REQUIRED"
+partial_fill_policy = "REQUIRED"
+passive_fill_policy = "REQUIRED"
+stop_order_type = "REQUIRED"
+baseline_stop_slippage_ticks = "REQUIRED"
+roll_terminal_exit_lead_time = "REQUIRED"
+same_timestamp_tie_break = "REQUIRED"
+
+[execution_model.gate]
+block_economic_screening = true
+reason = "Routing, entry, partial-fill, stop-fill, and terminal-exit parameters are not frozen"

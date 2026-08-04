@@ -1,0 +1,71 @@
+[campaign]
+id = "phase1_discovery_v1"
+name = "Phase 1 MBP-10 discovery campaign v1"
+status = "DRAFT"
+research_eligible = false
+dataset = "GLBX.MDP3"
+schema = "mbp-10"
+parent_symbol = "6E.FUT"
+source_start = 2022-01-02
+source_end = 2026-07-31
+feature_version = "mbp10_v1"
+outcome_version = "outcomes_v1_pending"
+cost_model_version = "cost_pending_v1"
+execution_model_version = "execution_pending_v1"
+
+[budget]
+primary_families = 6
+parents_per_family = 10
+parent_hypotheses = 60
+descendants_per_parent = 3
+strategy_variants = 240
+sealed_holdout_finalists = 10
+
+[data_gate]
+exact_raw_contract = true
+footer_catalog = true
+full_content_sha256 = true
+canonical_expiry_and_roll = false
+all_row_group_quality = false
+eligible_day_calendar = false
+sealed_split = false
+features_1s = false
+research_rows_5m = false
+event_ordered_outcomes = false
+numeric_cost_model = false
+numeric_execution_model = false
+
+[data_gate.policy]
+block_strategy_performance = true
+allow_pipeline_pilot = true
+allow_a_priori_hypothesis_registration = true
+derived_root = "data/derived"
+
+[split_policy]
+minimum_eligible_active_days = 740
+minimum_quarterly_roll_cycles = 12
+minimum_scheduled_day_eligibility_ratio = "0.98"
+holdout_embargo_days = 20
+sealed_holdout_decision_days = 120
+sealed_outcome_tail_days = 20
+discovery_base_days = 220
+walk_forward_folds = 5
+minimum_fold_days = 72
+outcome_observation_days = 20
+discovery_slice_days = 5
+split_before_results = true
+
+[visibility]
+discovery = "VISIBLE"
+walk_forward_until_all_folds_complete = "SEALED"
+embargo = "SEALED"
+holdout = "SEALED"
+outcome_tail = "SEALED"
+
+[provenance]
+footer_manifest_sha256 = "1451620c2f6c6a47a37cdc61d404e92795decbffaf48a24de99f4ff3c43a8633"
+source_manifest_sha256 = "14db710d8a522a83d495faeac1c05c9a0169f80f088dfbeb7a66b38f14b6e3de"
+raw_schema_sha256 = "57c7cc404aec87845b9e3872a4b2abcc651bd07858810324b4c9e3aa636ef5ea"
+research_plan_version = "1.0.0-draft"
+validation_version = "1.0.0-draft"
+phase1_design_version = "1.7.0-draft"
