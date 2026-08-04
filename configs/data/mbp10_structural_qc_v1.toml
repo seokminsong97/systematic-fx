@@ -1,0 +1,64 @@
+[quality]
+artifact_schema = "systematic_fx.mbp10_structural_qc_file.v1"
+checkpoint_schema = "systematic_fx.mbp10_structural_qc_row_group_checkpoint.v1"
+checker_version = "mbp10_structural_qc_v1"
+expected_rtype = 10
+expected_publisher_id = 1
+maximum_depth = 9
+book_levels = 10
+undefined_price = 9223372036854775807
+known_actions = ["A", "C", "M", "N", "R", "T"]
+known_sides = ["A", "B", "N"]
+hard_violation_maximum = 0
+diagnostics_affect_result = false
+
+# These names are frozen with the checker version. Every hard counter has zero
+# tolerance. Changing the list requires a new checker/config version.
+hard_checks = [
+  "null_required_values",
+  "unexpected_rtype",
+  "unexpected_publisher_id",
+  "unknown_action",
+  "unknown_side",
+  "reset_side_not_none",
+  "reset_book_not_empty",
+  "depth_out_of_range",
+  "unmapped_instrument_id",
+  "ts_recv_outside_request_range",
+  "trusted_ts_recv_regression_per_instrument",
+  "clean_trade_none_book_mutation",
+  "book_level_noncontiguous",
+  "bid_ladder_not_strictly_descending",
+  "ask_ladder_not_strictly_ascending",
+  "defined_book_price_zero_size",
+  "defined_book_price_zero_count",
+  "defined_book_count_exceeds_size",
+  "undefined_book_price_nonzero_size",
+  "undefined_book_price_nonzero_count",
+]
+
+# Diagnostics are always retained but never change PASS/FAIL in this scanner.
+# They need later session/status/reset-aware classification before eligibility.
+diagnostic_checks = [
+  "publisher_id_zero",
+  "global_ts_recv_regression",
+  "all_ts_recv_regression_per_instrument",
+  "bad_ts_recv_exempted_regression_per_instrument",
+  "ts_recv_before_ts_event",
+  "global_ts_event_regression",
+  "ts_event_outside_request_range",
+  "negative_ts_in_delta",
+  "sequence_repeat",
+  "sequence_regression",
+  "sequence_forward_gap",
+  "adjacent_event_key_repeat",
+  "reset_action_rows",
+  "snapshot_flag_rows",
+  "maybe_bad_book_flag_rows",
+  "bad_ts_recv_flag_rows",
+  "undefined_event_price_rows",
+  "undefined_event_price_non_reset_rows",
+  "incomplete_bbo_rows",
+  "locked_bbo_rows",
+  "crossed_bbo_rows",
+]

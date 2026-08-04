@@ -1,0 +1,65 @@
+[exclusion_policy]
+id = "phase1_structural_exclusions_v1"
+status = "FROZEN_CONSERVATIVE"
+research_eligible = false
+scope = "phase1_discovery_v1"
+effect = "exclude_entire_source_date_from_campaign_common_eligible_calendar"
+reason = "mbp10_structural_qc_v1 hard violation"
+allow_wall_clock_exception = false
+allow_implicit_reclassification = false
+
+[exclusion_policy.provenance]
+checker_version = "mbp10_structural_qc_v1"
+checker_config_sha256 = "689e682ddbb0cd2b138df95a4c4583127b18b15fd22247e8c26197f0356750a5"
+qc_manifest = "data/derived/manifests/mbp10_structural_qc_v1.jsonl"
+qc_manifest_sha256 = "47efca0afcd8ac97b78f3a5b7ce6b1194ef83d9764fa30314e253cbcbd296ffc"
+detail_manifest = "data/derived/manifests/mbp10_clean_trade_none_book_mutations_v1.jsonl"
+detail_manifest_sha256 = "8f77077ae9243a2eedb893455a49bad1f75ff6ea02629a4ca442596e6ec67d23"
+
+[exclusion_policy.reconsideration]
+required_reference_schema = "status"
+optional_reconstruction_schema = "mbo"
+required_evidence = "point-in-time pre-cross/open transition plus matching reconstructed book"
+new_checker_version_required = true
+
+[[excluded_sources]]
+source_date = 2024-06-30
+relative_uri = "2024/06/30/glbx-mdp3-20240630.mbp-10.parquet"
+source_sha256 = "380918a5d7c25ad807554887aa3b99b32dde5a361073b49bce9158ef68c0fcce"
+hard_check = "clean_trade_none_book_mutation"
+observed_count = 2
+
+[[excluded_sources]]
+source_date = 2024-07-01
+relative_uri = "2024/07/01/glbx-mdp3-20240701.mbp-10.parquet"
+source_sha256 = "11eacf1e04b2da45c0835f4656b2a1d49a1af533d20becdbf39cea7b14a3f343"
+hard_check = "clean_trade_none_book_mutation"
+observed_count = 2
+
+[[excluded_sources]]
+source_date = 2024-07-14
+relative_uri = "2024/07/14/glbx-mdp3-20240714.mbp-10.parquet"
+source_sha256 = "d721b2ba6298f37256110c7e79128cc1b1b7d3d773ec2a4f8c82fa1d44466731"
+hard_check = "clean_trade_none_book_mutation"
+observed_count = 2
+
+[[excluded_sources]]
+source_date = 2026-04-19
+relative_uri = "2026/04/19/glbx-mdp3-20260419.mbp-10.parquet"
+source_sha256 = "f01fa328b3e219a071a0965bb8fd41ff48fbd7c15324426eda8642ccd5db14e1"
+hard_check = "clean_trade_none_book_mutation"
+observed_count = 3
+
+[[excluded_sources]]
+source_date = 2026-06-07
+relative_uri = "2026/06/07/glbx-mdp3-20260607.mbp-10.parquet"
+source_sha256 = "09dd8a1f0d57bdfedb123535f90a1b1ff31696dbf2491b33aa37021e9c1927a7"
+hard_check = "clean_trade_none_book_mutation"
+observed_count = 1
+
+[[excluded_sources]]
+source_date = 2026-06-21
+relative_uri = "2026/06/21/glbx-mdp3-20260621.mbp-10.parquet"
+source_sha256 = "24106305a592fa7a0d636c45cd16221f35c3adaefcf25c5fc255399bc784b5d6"
+hard_check = "clean_trade_none_book_mutation"
+observed_count = 1
