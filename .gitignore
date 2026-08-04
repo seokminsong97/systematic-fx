@@ -8,6 +8,7 @@
 /artifacts/
 /reports/generated/
 /logs/
+/.local/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

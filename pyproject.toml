@@ -10,17 +10,29 @@ readme = "README.md"
 requires-python = ">=3.12"
 license = { file = "LICENSE" }
 dependencies = [
-    "alembic",
+    "numpy",
     "polars",
     "psycopg[binary]",
     "pyarrow",
-    "sqlalchemy",
+    "python-dotenv",
 ]
 
 [project.optional-dependencies]
 dev = [
+    "hypothesis",
     "pytest",
+    "pytest-cov",
     "ruff",
+]
+research = [
+    "matplotlib",
+    "scikit-learn",
+    "scipy",
+    "statsmodels",
+]
+notebook = [
+    "ipykernel",
+    "jupyterlab",
 ]
 
 [project.scripts]
@@ -32,6 +44,14 @@ where = ["src"]
 [tool.pytest.ini_options]
 addopts = "-ra --strict-markers"
 testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["systematic_fx"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
 
 [tool.ruff]
 line-length = 100
