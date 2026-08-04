@@ -1,0 +1,28 @@
+[campaign]
+id = "pipeline_smoke_v1"
+purpose = "PIPELINE_ONLY"
+research_eligible = false
+dataset = "GLBX.MDP3"
+schema = "mbp-10"
+parent_symbol = "6E.FUT"
+source_start = 2022-01-02
+source_end = 2022-01-09
+
+[catalog]
+scan_all_footers = true
+compute_content_sha256 = false
+manifest_version = 1
+
+[event_smoke]
+source_date = 2022-01-03
+row_groups = 1
+allowed_actions = ["A", "C", "M", "N", "R", "T"]
+allowed_sides = ["A", "B", "N"]
+
+[gates]
+require_exact_arrow_schema = true
+require_known_instrument_mapping = true
+measure_receive_time_regressions = true
+measure_receive_before_event_time = true
+require_depth_in_range = true
+measure_invalid_locked_crossed_book = true

@@ -1,0 +1,49 @@
+[reference_bundle]
+id = "phase1_reference_inputs_v1"
+status = "REQUIRED_NOT_PRESENT"
+research_eligible = false
+provider = "Databento"
+dataset = "GLBX.MDP3"
+parent_symbol = "6E.FUT"
+start = 2022-01-01
+end_exclusive = 2026-08-01
+raw_root = "data/reference/glbx-mdp3"
+
+[instrument_definitions]
+schema = "definition"
+output = "data/reference/glbx-mdp3/definition"
+point_in_time_required = true
+required_semantics = [
+  "provider instrument identity and raw symbol",
+  "activation and expiration timestamps",
+  "minimum price increment and contract multiplier",
+  "currency and settlement attributes",
+]
+blocks = [
+  "verified expiry dates",
+  "execution-instrument registration",
+  "time-to-expiry and roll state",
+  "terminal delivery-avoidance exit",
+]
+
+[trading_status]
+schema = "status"
+output = "data/reference/glbx-mdp3/status"
+point_in_time_required = true
+required_semantics = [
+  "trading-state changes",
+  "halts, pauses, and resumptions",
+  "session-validity intervals",
+]
+blocks = [
+  "trading-status features",
+  "eligible-session calendar",
+  "missing versus intentionally closed classification",
+]
+
+[qualification]
+full_content_sha256 = true
+exact_schema_contract = true
+point_in_time_mapping = true
+db_registration = true
+performance_use_before_pass = false
