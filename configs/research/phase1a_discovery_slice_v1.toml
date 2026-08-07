@@ -1,0 +1,99 @@
+[query]
+id = "phase1a_discovery_slice_v1"
+schema_version = 1
+source_dates_per_slice = 5
+signal_cadence_seconds = 300
+forward_horizons_bars = [1, 3, 6, 12]
+distribution_quantiles_ppm = [0, 50000, 250000, 500000, 750000, 950000, 1000000]
+cross_source_date_forward_fill = false
+forward_path_requires_contiguous_valid_bars = true
+forward_price_reference = "CURRENT_BAR_CLOSE"
+excursion_includes_entry_zero = true
+performance_based_early_stop = false
+emit_zero_support_queries = true
+retain_all_occurrences = true
+retain_all_query_variables = true
+retain_per_occurrence_forward_results = true
+screening_only = true
+maximum_authority = "OPEN_OBSERVATION"
+
+[eligibility]
+required_field = "source_local_signal_input_valid"
+required_value = true
+definition_status_required = false
+signal_input_valid_field_must_remain_false = true
+missing_source_date_behavior = "RECORDED_NO_ENTRY"
+unresolved_forward_behavior = "RETAIN_UNRESOLVED"
+
+[units]
+raw_price_scale = "1e-9"
+tick_size_raw = 50000
+mid_move_unit = "x2_ticks"
+signed_ratio_scale_ppm = 1000000
+integer_division = "TRUNCATE_TOWARD_ZERO"
+
+[[candidate_queries]]
+id = "p2_01_l1_persistent_continuation"
+parent_hypothesis_ids = ["p2_01_l1_imbalance_persistence"]
+direction_rule = "SIGN_L1_LAST"
+conditions = ["abs(l1_last_ppm)>=400000", "l1_persistence_ppm>=750000", "l1_sign_changes<=20", "last_spread_ticks<=2"]
+
+[[candidate_queries]]
+id = "p2_02_multilevel_agreement_continuation"
+parent_hypothesis_ids = ["p2_02_multilevel_imbalance_agreement"]
+direction_rule = "COMMON_SIGN_L1_L3_L5_L10"
+conditions = ["all_abs_last_ppm>=250000", "all_same_nonzero_sign", "min_persistence_ppm>=600000", "last_spread_ticks<=2"]
+
+[[candidate_queries]]
+id = "p2_05_stable_l5_low_flip_continuation"
+parent_hypothesis_ids = ["p2_05_stable_imbalance_low_flip"]
+direction_rule = "SIGN_L5_MEAN"
+conditions = ["abs(l5_mean_ppm)>=250000", "l5_sign_changes<=8", "l5_persistence_ppm>=800000", "last_spread_ticks<=2"]
+
+[[candidate_queries]]
+id = "p3_01_flow_price_confirmation_continuation"
+parent_hypothesis_ids = ["p3_03_flow_price_confirmation"]
+direction_rule = "SIGN_SIGNED_FLOW"
+conditions = ["abs(signed_flow_ppm)>=300000", "same_sign_bar_move", "abs(bar_move_x2_ticks)>=4", "last_spread_ticks<=2"]
+
+[[candidate_queries]]
+id = "p3_02_flow_absorption_reversal"
+parent_hypothesis_ids = ["p3_01_buy_flow_absorption_reversal", "p3_02_sell_flow_absorption_reversal"]
+direction_rule = "OPPOSITE_SIGN_SIGNED_FLOW"
+conditions = ["abs(signed_flow_ppm)>=400000", "bar_move_opposes_flow_or_abs<=2", "l10_opposes_flow_or_abs<100000", "last_spread_ticks<=2"]
+
+[[candidate_queries]]
+id = "p1_01_depth_supported_move_continuation"
+parent_hypothesis_ids = ["p1_01_supported_move_continuation"]
+direction_rule = "SIGN_BAR_MOVE"
+conditions = ["abs(bar_move_x2_ticks)>=16", "same_sign_l5_last", "abs(l5_last_ppm)>=250000", "trade_volume>0", "last_spread_ticks<=2"]
+
+[[candidate_queries]]
+id = "p1_05_unconfirmed_move_reversal"
+parent_hypothesis_ids = ["p1_05_unconfirmed_move_reversal"]
+direction_rule = "OPPOSITE_SIGN_BAR_MOVE"
+conditions = ["abs(bar_move_x2_ticks)>=16", "abs(signed_flow_ppm)<100000", "abs(l5_mean_ppm)<100000", "last_spread_ticks<=2"]
+
+[[candidate_queries]]
+id = "p1_03_spread_shock_recovery_reversal"
+parent_hypothesis_ids = ["p1_03_spread_shock_recovery_reversal"]
+direction_rule = "OPPOSITE_SIGN_BAR_MOVE"
+conditions = ["spread_max_ticks>=4", "last_spread_ticks<=2", "abs(bar_move_x2_ticks)>=8"]
+
+[[candidate_queries]]
+id = "p4_01_opposite_depth_depletion_continuation"
+parent_hypothesis_ids = ["p4_01_ask_depletion_upward_continuation", "p4_02_bid_depletion_downward_continuation"]
+direction_rule = "SIGN_BAR_MOVE"
+conditions = ["abs(bar_move_x2_ticks)>=8", "opposite_l5_depth_depleted", "supporting_l5_depth_not_depleted", "last_spread_ticks<=2"]
+
+[[candidate_queries]]
+id = "p4_02_depth_resistance_reversal"
+parent_hypothesis_ids = ["p4_03_depletion_replenishment_reversal"]
+direction_rule = "OPPOSITE_SIGN_BAR_MOVE"
+conditions = ["abs(bar_move_x2_ticks)>=8", "opposite_l5_depth_replenished", "supporting_l5_depth_depleted", "last_spread_ticks<=2"]
+
+[[candidate_queries]]
+id = "p5_01_range_expansion_flow_continuation"
+parent_hypothesis_ids = ["p5_03_volatility_expansion_continuation"]
+direction_rule = "SIGN_BAR_MOVE"
+conditions = ["bar_range_x2_ticks>=32", "abs(bar_move_x2_ticks)>=8", "same_sign_signed_flow", "last_spread_ticks<=2"]
