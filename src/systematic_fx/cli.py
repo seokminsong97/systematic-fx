@@ -594,6 +594,64 @@ def _phase1a_slice_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def _phase1a_p5_outcomes_command(args: argparse.Namespace) -> int:
+    from systematic_fx.research.phase1a_outcome_pipeline import (
+        Phase1AOutcomePipelineError,
+        run_phase1a_p5_outcomes,
+    )
+
+    settings = Settings.from_env()
+    database_url = args.database_url or settings.database_url
+    if not database_url:
+        print("database URL is required via --database-url or SYSTEMATIC_FX_DATABASE_URL")
+        return 2
+    mode = "PLAN_ONLY" if args.plan_only else "CACHE_ONLY" if args.cache_only else "RUN"
+
+    def report_progress(progress: object) -> None:
+        payload = progress.as_dict()
+        stage = payload["stage"]
+        completed = int(payload["completed"])
+        total = int(payload["total"])
+        if stage == "CACHE" and completed not in {1, total} and completed % 10 != 0:
+            return
+        if stage == "CACHE":
+            message = (
+                f"cache: {completed}/{total} "
+                f"created={payload['cache_created_count']} "
+                f"reused={payload['cache_reused_count']}"
+            )
+            if payload["source_date"] is not None:
+                message += f" date={payload['source_date']} symbol={payload['raw_symbol']}"
+        else:
+            message = (
+                f"checkpoint: {completed}/{total} date={payload['source_date']} "
+                f"events={payload['source_event_count']} "
+                f"detail_rows={payload['detail_record_count']}"
+            )
+        print(message, file=sys.stderr, flush=True)
+
+    try:
+        report = run_phase1a_p5_outcomes(
+            project_root=Path.cwd(),
+            data_root=settings.data_root,
+            database_url=database_url,
+            mode=mode,
+            max_cache_workers=args.max_cache_workers,
+            progress_callback=report_progress,
+        )
+    except Phase1AOutcomePipelineError as error:
+        print(error)
+        return 2
+
+    payload = report.as_dict()
+    if args.json:
+        print(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        for name, value in payload.items():
+            print(f"{name}: {value}")
+    return 0
+
+
 def _register_pilot_lineage_command(args: argparse.Namespace) -> int:
     from systematic_fx.db.derived_registry import (
         DerivedRegistryError,
@@ -1081,6 +1139,31 @@ def build_parser() -> argparse.ArgumentParser:
     phase1a_slice_parser.add_argument("--database-url")
     phase1a_slice_parser.add_argument("--json", action="store_true", help="emit JSON")
     phase1a_slice_parser.set_defaults(handler=_phase1a_slice_command)
+
+    phase1a_outcome_parser = research_commands.add_parser(
+        "phase1a-p5-outcomes",
+        help="plan, cache, run, or exactly resume the governed p5 shared outcome replay",
+    )
+    phase1a_outcome_mode = phase1a_outcome_parser.add_mutually_exclusive_group()
+    phase1a_outcome_mode.add_argument(
+        "--plan-only",
+        action="store_true",
+        help="verify the exact 99-slice/1,111-signal/485-partition plan without building caches",
+    )
+    phase1a_outcome_mode.add_argument(
+        "--cache-only",
+        action="store_true",
+        help="build and verify immutable daily caches without starting the economic replay",
+    )
+    phase1a_outcome_parser.add_argument(
+        "--max-cache-workers",
+        type=_positive_int,
+        choices=range(1, 5),
+        help="parallel raw-cache builders (1-4; defaults to the governed config)",
+    )
+    phase1a_outcome_parser.add_argument("--database-url")
+    phase1a_outcome_parser.add_argument("--json", action="store_true", help="emit JSON")
+    phase1a_outcome_parser.set_defaults(handler=_phase1a_p5_outcomes_command)
 
     exposure_parser = research_commands.add_parser(
         "exposure",
