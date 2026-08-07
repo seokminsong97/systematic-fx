@@ -1,0 +1,178 @@
+[feature_set]
+id = "phase1a_mbp10_screening_v1"
+schema_version = 1
+implementation = "systematic_fx.features.screening"
+source_schema = "GLBX.MDP3/mbp-10"
+screening_only = true
+research_eligible = false
+definition_status_available = false
+code_snapshot_sha256_required = true
+price_encoding = "fixed_int64"
+price_scale = "1e-9"
+undefined_price = 9223372036854775807
+tick_size_raw = 50000
+depth_levels = [1, 3, 5, 10]
+
+[selection]
+input_type = "ContractSelectionResult"
+eligible_source_date_must_match = true
+selected_footer_mapping_must_match = true
+selection_sha256_must_verify = true
+previous_volume_sha256_must_verify = true
+positive_previous_trade_rows_required = true
+positive_previous_trade_volume_required = true
+expiry_month_candidate_allowed = false
+
+[qualification]
+input_type = "Phase1AScreeningCalendar"
+calendar_relative_path = "derived/manifests/phase1a_screening_source_date_calendar_v1.json"
+source_manifest_relative_path = "derived/manifests/mbp10_source_sha256_v1.jsonl"
+qc_manifest_relative_path = "derived/manifests/mbp10_structural_qc_v1.jsonl"
+qc_config_path = "configs/data/mbp10_structural_qc_v1.toml"
+source_date_must_be_calendar_eligible = true
+source_record_must_match_raw = true
+qc_record_must_be_complete_pass = true
+schema_fingerprint_must_match = true
+calendar_sha256_must_verify = true
+
+[availability]
+event_clock = "ts_recv"
+input_order = "physical Parquet row order across sequential row groups"
+one_second_width_ns = 1000000000
+five_minute_width_ns = 300000000000
+close_rule = "right_closed"
+late_event_policy = "ignore rows whose 1s bucket precedes the open bucket"
+emit_unobserved_seconds = false
+forward_fill = false
+closed_bucket_rewrite = false
+decision_quote_fresh_max_age_ms = 1000
+source_start_boundary_policy = "exclude partial right-closed 1s bucket ending at source start"
+source_end_boundary_policy = "exclude right-closed 1s and 5m buckets ending at source end as UNPROVEN_CLOSED_BOUNDARY"
+
+[one_second]
+book_snapshot = "last selected physical row in the observed second"
+depth_change = "only versus the immediately adjacent prior valid observed second"
+recovery_policy = "source starts unknown; MAYBE_BAD_BOOK persists until a valid snapshot or structurally valid empty reset; the marker second is invalid and only the exactly adjacent clean base-valid observed second rearms at close"
+imbalance_levels = [1, 3, 5, 10]
+imbalance_numerator = "bid_cumulative_size - ask_cumulative_size"
+imbalance_denominator = "bid_cumulative_size + ask_cumulative_size"
+imbalance_signed_ppm = "truncate_toward_zero(1000000 * numerator / denominator); null at zero denominator"
+price_on_tick_grid_required_for_valid_second = true
+
+[five_minute]
+source = "proven-boundary closed observed one-second Phase1A rows only"
+integer_mean = "truncate_toward_zero(sum(values) / count(values))"
+imbalance_sign_changes = "adjacent changes after zero signs are removed"
+imbalance_persistence = "terminal equal-sign run divided by valid sign observations in integer ppm"
+missing_seconds = "300 - observed_seconds"
+source_local_signal_input_valid = "complete 300-second source-local valid and fresh window"
+signal_input_valid = "source_local_signal_input_valid AND definition_status_available"
+
+[output]
+one_second_root = "data/derived/features_1s"
+five_minute_root = "data/derived/research_5m"
+partition = "version=<feature_version>/contract=<symbol>/source_date=YYYY-MM-DD/part-000.parquet"
+publication = "same-directory fsynced temporary file plus atomic no-overwrite hard link"
+existing_identical = "REUSE"
+existing_different = "REJECT"
+report_artifact = false
+
+[[formulas]]
+name = "selection"
+definition = "verified ContractSelectionResult with frozen previous-source-only information boundary, eligible date, selected footer ID/symbol, canonical hashes, and positive prior volume"
+
+[[formulas]]
+name = "qualification"
+definition = "canonical Phase1AScreeningCalendar and its source/QC manifests bind the eligible source date, raw bytes, QC PASS/config, and schema fingerprint"
+
+[[formulas]]
+name = "event_order"
+definition = "ts_recv interpreted in physical Parquet row order across sequential row groups"
+
+[[formulas]]
+name = "one_second_bucket"
+definition = "ceil(ts_recv_ns / 1000000000) * 1000000000; interval (end-1s,end]"
+
+[[formulas]]
+name = "source_boundary_exclusion"
+definition = "exclude the partial 1s bucket ending at source start and exclude 1s/5m buckets ending at source end as UNPROVEN_CLOSED_BOUNDARY"
+
+[[formulas]]
+name = "late_event"
+definition = "ignore a selected row when its one-second bucket precedes the current open bucket"
+
+[[formulas]]
+name = "no_forward_fill"
+definition = "emit only observed selected-contract seconds and never synthesize or rewrite a row"
+
+[[formulas]]
+name = "book_snapshot"
+definition = "BBO and depth are the last selected physical row in each observed second"
+
+[[formulas]]
+name = "tick_units"
+definition = "one 6E tick equals 50000 raw 1e-9 price units; non-divisible prices are off-grid"
+
+[[formulas]]
+name = "imbalance_numerator"
+definition = "bid cumulative size minus ask cumulative size at L1,L3,L5,L10"
+
+[[formulas]]
+name = "imbalance_denominator"
+definition = "bid cumulative size plus ask cumulative size at L1,L3,L5,L10"
+
+[[formulas]]
+name = "imbalance_signed_ppm"
+definition = "truncate toward zero of numerator times 1000000 divided by denominator; null when denominator is zero"
+
+[[formulas]]
+name = "depth_change"
+definition = "current minus prior cumulative depth only when both seconds are valid and bucket ends differ by exactly one second"
+
+[[formulas]]
+name = "recovery_state"
+definition = "state starts unknown; MAYBE_BAD_BOOK or invalid recovery persists; a valid snapshot or structurally valid empty reset is an invalid marker second, and only an exactly adjacent clean base-valid observed second rearms at its close"
+
+[[formulas]]
+name = "valid_second"
+definition = "proven-boundary defined uncrossed unlocked on-tick BBO, safe arithmetic, no bad flags or recovery marker, and recovery state rearmed"
+
+[[formulas]]
+name = "quote_age"
+definition = "floor((bucket_end_ns - last_valid_selected_row_ts_recv_ns) / 1000000) without carrying book fields"
+
+[[formulas]]
+name = "five_minute_bucket"
+definition = "ceil(one_second_bucket_end_ns / 300000000000) * 300000000000; interval (end-5m,end]"
+
+[[formulas]]
+name = "integer_mean"
+definition = "truncate toward zero of the exact Python integer sum divided by the observation count"
+
+[[formulas]]
+name = "imbalance_sign_changes"
+definition = "remove zero numerator signs then count adjacent positive-negative flips"
+
+[[formulas]]
+name = "imbalance_persistence"
+definition = "terminal equal-sign run length and truncate toward zero of run times 1000000 divided by valid sign count"
+
+[[formulas]]
+name = "missing_seconds"
+definition = "300 minus distinct emitted observed seconds in the right-closed five-minute bucket"
+
+[[formulas]]
+name = "source_local_signal_input_valid"
+definition = "complete source window with 300 observed valid seconds, no stale/recovery-required/locked/crossed state, and fresh decision quote"
+
+[[formulas]]
+name = "signal_input_valid"
+definition = "source_local_signal_input_valid and definition_status_available; definition_status_available is false in Phase1A"
+
+[[formulas]]
+name = "artifact_identity"
+definition = "raw/config/formula/selection/calendar/source-manifest/QC-manifest/QC-config/schema and caller-verified lowercase code snapshot SHA-256 are recorded in report and Parquet metadata"
+
+[[formulas]]
+name = "parquet_encoding"
+definition = "PyArrow Parquet with zstd compression, dictionary disabled, statistics enabled, and row_group_size 65536"
