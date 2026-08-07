@@ -1,13 +1,17 @@
 import os
 import subprocess
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from systematic_fx.db.migrations import (
     MigrationError,
     _prepare_database_target,
     _run_psql,
+    discover_migrations,
 )
+
+ROOT = Path(__file__).resolve().parents[2]
 
 
 class DatabaseTargetSecurityTest(unittest.TestCase):
@@ -107,6 +111,76 @@ class DatabaseTargetSecurityTest(unittest.TestCase):
             arguments,
         )
         self.assertEqual(environment["PGPASSWORD"], secret)
+
+
+class RepositoryMigrationContractTest(unittest.TestCase):
+    def test_phase1a_artifact_lineage_guard_covers_every_owner(self) -> None:
+        migrations = discover_migrations(ROOT / "migrations")
+        migration = {item.version: item for item in migrations}[9]
+
+        self.assertEqual(migration.name, "phase1a_artifact_lineage_integrity")
+        sql = migration.path.read_text(encoding="utf-8")
+        for trigger in (
+            "artifacts_protect_phase1a_lineage",
+            "campaigns_protect_phase1a_identity",
+            "research_run_attempts_protect_phase1a_artifact_links",
+            "derived_partitions_protect_phase1a_lineage",
+            "derived_partition_sources_protect_phase1a_lineage",
+            "source_files_protect_phase1a_lineage",
+        ):
+            self.assertIn(f"CREATE TRIGGER {trigger}", sql)
+        for owner in (
+            "discovery_exposures",
+            "research_run_attempts",
+            "pattern_ledger",
+            "PHASE1A_FEATURE_BUILD_MANIFEST",
+        ):
+            self.assertIn(owner, sql)
+
+        artifact_guard = sql.split(
+            "CREATE FUNCTION systematic_fx.reject_phase1a_artifact_mutation()",
+            maxsplit=1,
+        )[1].split("CREATE TRIGGER artifacts_protect_phase1a_lineage", maxsplit=1)[0]
+        self.assertIn("OLD.artifact_id", artifact_guard)
+        self.assertIn("IF TG_OP = 'DELETE'", artifact_guard)
+        self.assertIn("RETURN OLD", artifact_guard)
+
+    def test_execution_atomicity_guards_active_runs_and_ai_visibility(self) -> None:
+        migrations = {item.version: item for item in discover_migrations(ROOT / "migrations")}
+        migration = migrations[10]
+        self.assertEqual(migration.name, "research_execution_atomicity")
+        sql = migration.path.read_text(encoding="utf-8")
+        self.assertIn("CREATE UNIQUE INDEX research_run_attempts_one_active", sql)
+        self.assertIn("WHERE status IN ('QUEUED', 'RUNNING')", sql)
+        self.assertIn(
+            "CREATE TRIGGER research_run_attempts_require_duplicate_success",
+            sql,
+        )
+        self.assertIn(
+            "CREATE TRIGGER discovery_exposures_require_phase1a_success",
+            sql,
+        )
+        self.assertIn("status = 'SUCCEEDED'", sql)
+        self.assertIn("result_artifact_id = NEW.result_artifact_id", sql)
+
+    def test_phase1a_control_and_provenance_artifacts_are_immutable(self) -> None:
+        migrations = {item.version: item for item in discover_migrations(ROOT / "migrations")}
+        migration = migrations[11]
+        self.assertEqual(migration.name, "phase1a_control_artifact_immutability")
+        sql = migration.path.read_text(encoding="utf-8")
+        self.assertIn(
+            "CREATE OR REPLACE FUNCTION systematic_fx.phase1a_artifact_is_protected",
+            sql,
+        )
+        for artifact_type in (
+            "PHASE1A_ELIGIBLE_CALENDAR",
+            "PHASE1A_CAMPAIGN_SPLIT",
+            "PHASE1A_CODE_SNAPSHOT",
+            "PHASE1A_SCREENING_REGISTRY",
+        ):
+            self.assertIn(artifact_type, sql)
+        self.assertIn("experiment.registration_artifact_id", sql)
+        self.assertIn("phase1a_conservative_screening_v1", sql)
 
 
 if __name__ == "__main__":

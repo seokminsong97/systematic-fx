@@ -33,3 +33,60 @@ Ad-hoc schema edits are not permitted.
 adds freeze/lineage checks needed before experiments can become evidence. A
 prior migration remains immutable; all future changes receive a new ordered
 file.
+
+`0003_research_run_ledger.sql` adds an immutable canonical run-spec ledger and
+append-preserved execution attempts. The SHA-256 fingerprint covers every
+versioned data, split, feature, outcome, cost, execution, code, environment,
+seed, signal, entry, barrier, terminal, and model input. A successful
+fingerprint can exist only once; later identical requests are recorded as
+duplicate skips instead of repeating the research.
+
+`0004_code_snapshot_provenance.sql` requires every new run specification to
+bind its base Git object to an exact content-addressed snapshot of runtime code,
+configs, migrations, and research policy files. This preserves reproducibility
+even while the working tree contains intentional uncommitted research changes.
+
+`0005_campaign_level_run_ownership.sql` permits common feature, outcome, and AI
+exposure runs to belong honestly to the campaign without inventing a hypothesis
+owner. Strategy and performance runs remain required to reference their exact
+experiment.
+
+`0006_publication_outbox.sql` is the shared, checksum-identical migration used
+by the research-site publisher. It coalesces private control-plane mutations
+into a durable one-way publication request.
+
+`0007_governed_discovery_exposures.sql` requires every Phase 1A AI-visible
+exposure to reference the matching campaign-level RunSpec and makes those
+exposures append-preserved. This keeps every query and slice tied to its complete
+variable fingerprint.
+
+`0008_phase1a_pattern_rollup_integrity.sql` prevents deletion or identity
+rewrites of Phase 1A pattern roll-ups, requires their immutable context artifact,
+and permits only monotonic support/time/status updates. Append-preserved QUERY
+exposures, RunSpecs, and result artifacts remain the slice-level source of truth.
+
+`0009_phase1a_artifact_lineage_integrity.sql` makes that source-of-truth claim
+database-enforced. Artifacts referenced by Phase 1A Discovery exposures, run
+attempt results or trade ledgers, pattern context, and feature-build manifests
+cannot be updated or deleted. Governed feature partitions, their exact raw-source
+links, and the linked source-file identity are likewise frozen; source-link
+inserts must agree with the partition's recorded current/previous provenance.
+The guards key through the Phase 1A campaign or feature-manifest lineage so
+unrelated campaigns, pilot partitions, and artifacts keep their prior lifecycle.
+
+`0010_research_execution_atomicity.sql` permits at most one active executor for
+an immutable RunSpec and requires every duplicate skip to reference that same
+RunSpec's completed success. It also makes Phase 1A AI visibility atomic with
+the matching successful attempt and exact result artifact, so an append-preserved
+exposure cannot survive a failed or half-committed execution.
+
+`0011_phase1a_control_artifact_immutability.sql` extends the Phase 1A artifact
+guard to the exact eligible calendar, sealed split, reconstructible code
+snapshot, and screening registration document. It also protects experiment
+registration artifacts through their campaign ownership, so provenance inputs
+cannot be rewritten or deleted after registration.
+
+`0012_campaign_level_validation_runs.sql` permits dedicated immutable
+campaign-level validation/control RunSpecs. This gives partial-recovery audits a
+truthful owner without pretending that control work belongs to a strategy
+experiment or to a result-producing research query.
