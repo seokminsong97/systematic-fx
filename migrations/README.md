@@ -90,3 +90,26 @@ cannot be rewritten or deleted after registration.
 campaign-level validation/control RunSpecs. This gives partial-recovery audits a
 truthful owner without pretending that control work belongs to a strategy
 experiment or to a result-producing research query.
+
+`0013_phase1a_outcome_replay.sql` keeps the generic RunSpec and attempt ledger as
+the execution authority for the Phase 1A p5 MBP-10 outcome replay. It adds an
+append-preserved replay manifest, an append-only `SOURCE_DATE_COMPLETE`
+checkpoint artifact hash chain, and normalized summaries for every combination
+of three frozen cost/execution scenarios, both directions, and all 484 TP/SL
+cells. A success transition is rejected unless all 2,904 summaries and the exact
+content-addressed result artifact commit atomically with the matching generic
+attempt. Checkpoint and result artifacts remain beneath `data/derived`, and all
+replay state is bound to the campaign-level canonical run fingerprint.
+
+`0014_phase1a_outcome_completion_hardening.sql` adds the fail-closed completion
+boundary for that replay without rewriting the applied `0013` history. New
+cells must retain the frozen LONG/SHORT signal counts and per-fill scenario
+costs. A success transition additionally requires all 485 source-date
+checkpoints through `2023-08-31`, a finished and fully bound final checkpoint,
+and exactly 1,613,172 detail rows whose cache, shard, input, result, and attempt
+lineage hashes agree.
+
+`0015_phase1a_outcome_constraints_validated.sql` performs the immediate legacy
+scan for the signal-count and scenario-cost constraints introduced by `0014`.
+Migration stops on any pre-existing weak cell rather than carrying it forward
+as unvalidated research evidence.
