@@ -171,10 +171,63 @@ The default AI slice is five active trading sessions. A larger slice is allowed
 only when the active context can retain the data dictionary, constraints,
 pattern ledger, and analysis output without truncation.
 
+Five-session slices execute strictly in source-time order. Slice `N > 0` may
+not create a run attempt until PostgreSQL verifies that slice `N - 1` has its
+exact AI exposure, all frozen query exposures, successful artifact linkage,
+and one matching pattern observation per query. Missing, partial, mismatched,
+or out-of-order predecessor state is a hard failure.
+
 Do not accumulate all raw slices in conversation history. Persist the exact
 numeric state in files and provide AI with compact ledgers plus the current
 slice. Automatic or manual context summaries are not authoritative numeric
 records.
+
+### All-variable run ledger
+
+Every computation that creates a derived input, exposes numbers to AI, or
+evaluates a candidate must be registered before execution with one canonical
+`RunSpec`. The specification records, without implicit defaults:
+
+- The campaign and, for candidate-specific work, exact owning experiment
+- Every raw, manifest, selection, and derived-input SHA-256
+- Calendar and split versions and hashes
+- Complete feature, outcome, cost, execution, signal, entry, barrier, and
+  terminal policies
+- Every threshold, horizon, grid axis, direction, seed, and no-entry rule
+- The Git base commit, exact dirty-worktree code/config snapshot, dependency
+  lock, and non-secret runtime environment
+
+The canonical JSON SHA-256 is the run fingerprint. Run specifications are
+immutable, attempts are append-preserved, and an already successful exact
+fingerprint is recorded as `SKIPPED_DUPLICATE` instead of being executed again.
+Changing any variable creates a different fingerprint and therefore a distinct
+research run. Campaign-common feature/outcome builds use campaign ownership;
+strategy and performance runs must name their exact experiment.
+
+Every AI-visible slice or query links directly to the `RunSpec` that produced
+it and to an immutable result artifact. The pattern ledger is a compact roll-up;
+its slice-level source of truth remains the append-preserved query exposure,
+RunSpec, and artifact. Zero-support, no-entry, unresolved, failed, and rejected
+results are retained under the same rule as favorable results.
+
+Large per-row or per-occurrence variable records remain in immutable,
+content-addressed artifacts below `data/derived`; PostgreSQL stores their exact
+SHA-256, URI, producing RunSpec, attempt, and source lineage. This is part of the
+run ledger, not an exemption from the all-variable requirement.
+
+If execution stops after an immutable AI artifact is published, a later code
+revision must not rebuild or silently relabel that analysis. Recovery first
+records a campaign-level `VALIDATION` RunSpec and a content-addressed manifest
+containing the complete original FEATURE/AI/QUERY prefix, every query-definition
+and query-result hash, the remaining actions, and the new code, dependency, and
+runtime identities. Existing analysis remains attributed to its original code;
+only missing query projections and pattern registrations are attributed to the
+recovery executor. Active, successful, artifact-linked, or mixed feature-only
+state without a governed AI exposure is ambiguous and fails closed. A terminal
+failed-feature-only state is retryable as a fresh governed execution only when
+all matching attempts are `FAILED`, their result/reuse/trade-ledger links are
+null, and no AI exposure or pattern observation exists; the failed attempts
+remain append-preserved.
 
 ### Pattern ledger
 
