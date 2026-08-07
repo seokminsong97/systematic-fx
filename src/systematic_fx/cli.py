@@ -526,6 +526,7 @@ def _record_exposure_command(args: argparse.Namespace) -> int:
             research_eligible=spec["research_eligible"],
             code_commit=spec["code_version"],
             config_sha256=spec["config_sha256"],
+            run_fingerprint=spec.get("run_fingerprint"),
             **result_artifact_arguments,
         )
     except (FileNotFoundError, KeyError, TypeError, json.JSONDecodeError, ValueError) as error:
@@ -541,6 +542,7 @@ def _record_exposure_command(args: argparse.Namespace) -> int:
         "created_exposure": result.created_exposure,
         "discovery_exposure_id": result.discovery_exposure_id,
         "exposure_key": result.exposure_key,
+        "research_run_spec_id": result.research_run_spec_id,
         "result_artifact_id": result.result_artifact_id,
     }
     if args.json:

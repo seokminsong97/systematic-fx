@@ -42,6 +42,7 @@ class ExposureCliTests(unittest.TestCase):
             created_exposure=True,
             discovery_exposure_id=2,
             exposure_key="phase1:test-exposure",
+            research_run_spec_id=None,
             result_artifact_id=3,
         )
 
@@ -108,6 +109,16 @@ class ExposureCliTests(unittest.TestCase):
         call = register.call_args
         self.assertNotIn("result_artifact_path", call.kwargs)
         self.assertNotIn("artifacts_root", call.kwargs)
+        self.assertIsNone(call.kwargs["run_fingerprint"])
+
+    def test_optional_run_fingerprint_is_forwarded(self) -> None:
+        with tempfile.TemporaryDirectory() as directory_name:
+            spec = self._spec()
+            spec["run_fingerprint"] = "a" * 64
+            exit_code, register = self._invoke(Path(directory_name), spec)
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(register.call_args.kwargs["run_fingerprint"], "a" * 64)
 
 
 if __name__ == "__main__":
