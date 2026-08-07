@@ -1,6 +1,6 @@
 # Conservative Phase 1A Screening Policy
 
-- Document version: 1.0.0
+- Document version: 1.1.0
 - Status: `FROZEN_SCREENING_POLICY`
 - Scope: MBP-10 Phase 1A screening only
 - Campaign: `phase1a_conservative_screening_v1`
@@ -124,6 +124,9 @@ The entry is a one-contract IOC marketable limit at the delayed best ask for a
 buy or delayed best bid for a sell, with zero ticks of price-cap expansion. It
 cannot walk to a worse level, assume queue priority, partially fill, or retry.
 Insufficient size or a price outside the cap is `ENTRY_NOT_FILLED`.
+The moderate and severe entry-adversity adjustments remain subject to this
+same frozen cap; if the stressed fill price would cross it, that scenario is
+recorded as `ENTRY_NOT_FILLED` rather than walking or clipping the fill.
 
 ## Buying, target, and loss prices
 
@@ -184,6 +187,66 @@ early pruning is prohibited. No-signal, no-fill, censored, cost-floor,
 execution-failure, negative, and excluded-source outcomes remain in the trial
 ledger. A missing or duplicate cell is a hard run failure.
 
+## Shared chronological outcome architecture
+
+The complete surface is not permission to run 484 independent raw-data
+backtests. Raw MBP-10 files must never be scanned once per occurrence, stress
+scenario, direction, or cell. A bounded date/contract worker pool first builds
+immutable, content-addressed date/contract event partitions under:
+
+```text
+data/derived/backtest_event_cache/<cache_version>/
+```
+
+Each exact version/date/contract key is built once and records the raw SHA-256,
+decoder/schema identity, event-order bounds, row count, byte size, and partition
+SHA-256 in the cache manifest. Parallelism ends at independent cache-key
+construction and verification; worker count and the one-cache-key-per-worker
+scheduling rule are recorded in the RunSpec.
+
+For `phase1a_p5_outcome_replay_v1`, both the worker ceiling and maximum number
+of in-flight partitions are four. The operator may select one through four
+workers. A semantic request index binds each exact cache request to the verified
+content-addressed artifact so an ordinary exact rerun reuses it without opening
+the raw source again.
+
+The screening runner consumes the verified cache once in strict chronological
+order and fans the same event stream out to:
+
+```text
+BASELINE | MODERATE_COMBINED | SEVERE_DIAGNOSTIC
+    x LONG | SHORT
+    x execution contract
+    x 484 independent cell-occupancy states
+```
+
+Threshold arithmetic may be vectorized, but occupancy may not be shared
+between cells: a different exit time changes whether a later signal is skipped.
+Independent time-range, occurrence, or cell replays are prohibited. A
+scenario, direction, or contract may not create an independent replay shard;
+all such states update inside the same single logical chronological pass. Pure
+vectorized arithmetic within one ordered event step is allowed.
+
+Source dates advance strictly. Within one source date, the canonical total
+order is `(ts_recv_ns, sequence, event_index, contract_key)`. The runner rejects
+a duplicate or regression rather than selecting a convenient barrier order.
+
+The contract dimension above is logical occupancy, not the compact summary key.
+For the frozen p5 inputs, every signal produces one result identity under every
+scenario and barrier cell, for 1,613,172 detail rows (`1,111 x 3 x 484`). Those
+rows retain `signal_id`, direction, and futures contract. The immutable
+Discovery occurrence addressed by `signal_id` remains the source of all
+original research variables, avoiding 1,452 duplicate variable objects per
+signal while preserving exact reconstruction.
+The final surface has 2,904 summaries (`3 x 2 x 484`) keyed by scenario,
+direction, take-profit, and stop-loss and aggregated across the seven contracts.
+
+The 20-active-session first-touch clock is distinct from portfolio
+continuation. An unresolved observation freezes as `CENSORED`; its cell remains
+occupied, continues to log skipped signals, and follows later cached events to
+take-profit, stop, or terminal roll/expiry exit. The eventual portfolio exit
+does not rewrite the first-touch label.
+
 ## Reproducible run identity
 
 Phase 1A does not permit an unregistered exploratory calculation. Before a
@@ -219,6 +282,21 @@ It may start a new governed attempt only when every matching RunSpec is
 are null, and no AI exposure or pattern observation exists. The failed history
 is retained. Any active, successful, artifact-linked, or mixed prefix still
 fails closed.
+
+Outcome replay checkpoints are published only after a complete source-date
+barrier. Each checkpoint is content addressed and binds the RunSpec, cache
+manifest, last consumed partition, complete scenario/direction/contract/cell
+state, prior checkpoint, and producing attempt. Resume continues only that same
+active attempt and must reproduce the uninterrupted canonical result bytes;
+attempt and checkpoint history remains append-preserved, and a terminal failed
+attempt cannot be reopened or continued after any input/hash drift.
+
+The first governed outcome candidate is
+`p5_01_range_expansion_flow_continuation`. Only after its complete 484-cell
+surfaces, checkpoint-resume equivalence, and DB/artifact lineage audit succeed
+may `p1_05_unconfirmed_move_reversal` reserve an outcome attempt. Cache
+partitions may be reused by verified content hash, but candidate RunSpecs,
+attempts, checkpoints, and result artifacts remain separate.
 
 ## Adjacent stability
 
@@ -260,9 +338,13 @@ a promotion gate. Even after all of these conditions pass, the result is only
 
 ## What this policy does not claim
 
-These files freeze assumptions; they do not claim that the current data build,
-outcome engine, backtest, walk-forward folds, or sealed holdout is complete. The
-runner must reject a survivor decision when a required input or any of the 484
-cell records is absent. A later backtest must add point-in-time
+The shared cache/replay software is implemented and covered by automated tests.
+That implementation status is not an executed research result. The frozen
+485-source-date p5 cache and event replay have not run, and neither `p5_01` nor
+`p1_05` has a barrier result, PnL, or survivor conclusion. Walk-forward folds
+and the sealed holdout have not run either. The runner must reject a survivor
+decision when a required input, cache binding, checkpoint equivalence result,
+lineage link, any of the 1,613,172 detail records, or any of the 2,904 aggregate
+summaries is absent. A later backtest must add point-in-time
 definition/status, actual cost evidence, its own registered campaign, numeric
 validation gates, and explicit authorization.

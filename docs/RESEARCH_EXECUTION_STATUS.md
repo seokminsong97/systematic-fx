@@ -1,17 +1,23 @@
 # Phase 1 Research Execution Status
 
 - Started: 2026-08-03
-- Campaign: `phase1_discovery_v1`
-- Campaign state: `DRAFT`, `research_eligible = false`
+- Updated: 2026-08-06
+- Campaigns: `phase1_discovery_v1` and
+  `phase1a_conservative_screening_v1`
+- Campaign mode: `SCREENING_ONLY`
+- Maximum positive label: `SCREENING_SURVIVOR`, `research_eligible = false`
 - Governing plan: [`RESEARCH_PLAN.md`](RESEARCH_PLAN.md)
 - Numeric gates: [`VALIDATION.md`](VALIDATION.md)
 
 ## 1. Current Authorization Boundary
 
-The campaign may perform data qualification, build non-economic pipeline
-pilots, and preregister a-priori parent hypotheses. It may not calculate or
-interpret strategy performance until the raw-data, contract/roll, quality,
-calendar/split, numeric cost, and numeric execution gates are complete.
+The original `phase1_discovery_v1` campaign remains a non-economic control-plane
+and pilot record. Phase 1A additionally permits governed conservative screening,
+whose maximum positive label is `SCREENING_SURVIVOR`; it cannot produce
+`PASS_BACKTEST`, Paper, or Live authority. The governed event-level runner may
+execute to produce the cache, checkpoint, and result evidence required by
+`VALIDATION.md`; no outcome may be interpreted and no survivor may be declared
+until every applicable hard gate passes.
 
 A-priori proposals belong in `experiments` with no `pattern_id`. Only patterns
 actually observed in a registered Discovery exposure belong in
@@ -25,6 +31,8 @@ All row-level derived data is written below the ignored data root:
 data/derived/features_1s/...
 data/derived/research_5m/...
 data/derived/outcomes/...
+data/derived/backtest_event_cache/...
+data/derived/outcomes/checkpoints/...
 data/derived/manifests/...
 ```
 
@@ -41,16 +49,24 @@ The implementation order is fixed:
 
 1. Compute every raw file's full-content SHA-256. **COMPLETE**
 2. Register the source catalog and immutable hashes. **COMPLETE**
-3. Verify actual-expiry metadata and freeze a contemporaneous active-contract,
-   roll-cutoff, and terminal-exit policy.
+3. Freeze point-in-time active-contract, roll-cutoff, and terminal-exit policy.
+   **COMPLETE FOR SCREENING ONLY; definition/status remain required for
+   PASS_BACKTEST**
 4. Scan every row group for ordering, sequence, reset/snapshot, sentinel,
    mapping, and book-validity quality. **COMPLETE; FAIL**
-5. Build the campaign-common eligible calendar.
-6. Generate and seal the performance-independent split.
+5. Build the Phase 1A campaign-common source-date proxy calendar. **COMPLETE**
+6. Generate and seal the performance-independent split. **COMPLETE**
 7. Freeze exact research one-second, five-minute, outcome, cost, and execution
-   versions. The bounded `mbp10_pilot_v1` contract does not satisfy this gate.
+   versions. **COMPLETE FOR SCREENING; SHARED CACHE/REPLAY IMPLEMENTED;
+   AUTOMATED TESTS PASS; REAL P5 CACHE/REPLAY NOT RUN**
 8. Expose Discovery only in chronological, non-overlapping five-session slices.
+   **COMPLETE: 99 OF 99**
 9. Register every query, observation, counterexample, variant, and barrier cell.
+   **DISCOVERY QUERY/PATTERN STATE COMPLETE; 484-CELL GRID FROZEN; REAL OUTCOME
+   DETAIL AND SUMMARY ROWS PENDING**
+10. Prove cache integrity, one-pass replay equivalence, complete 484-cell state,
+    and exact checkpoint/resume before interpreting outcomes. **AUTOMATED
+    IMPLEMENTATION TESTS COMPLETE; 485-DATE REAL-DATA EVIDENCE PENDING**
 
 ## 4. Verified External Contracts
 
@@ -99,9 +115,11 @@ counts used to identify the dominant outright for builder development. This
 interval is not independent validation evidence for this campaign or any
 descendant that uses those observations.
 
-No strategy PnL, barrier result, or pattern support has been calculated. These
-exposures create no `pattern_ledger` row and cannot later be presented as
-independent validation evidence.
+For these four historical non-research exposures, no strategy PnL, barrier
+result, or pattern support was calculated. They create no `pattern_ledger` row
+and cannot later be presented as independent validation evidence. Later Phase
+1A Discovery observations are governed separately in Section 10 and do not
+change the authority of these four records.
 
 The explicit `6EH2` / provider instrument `28727` pilot produced 48,540
 observed-second rows and 281 five-minute rows from 1,158,550 selected events.
@@ -224,9 +242,10 @@ PostgreSQL exposure `9` (`EVENT_WINDOW`) links the JSONL as artifact `29`, with
 the same SHA-256 and `research_eligible=false`. Re-registering it created no
 new exposure or artifact.
 
-## 8. Governed Control-Plane State
+## 8. Historical `phase1_discovery_v1` Control-Plane Snapshot
 
-The current PostgreSQL state is intentionally bounded:
+The following bounded snapshot belongs to the original campaign and pilot. It
+must not be read as the later Phase 1A Discovery state:
 
 - Campaign `phase1_discovery_v1` is `DRAFT`, with a 240-strategy-variant budget
   and at most 10 sealed-holdout finalists.
@@ -256,39 +275,152 @@ The current PostgreSQL state is intentionally bounded:
 The canonical pilot lineage manifest SHA-256 is
 `b93c9551f279b3e717fc9920780ee4b9316ca17ae30ff1576b4fc4511bdf1245`.
 
-## 9. Blocking Inputs
+## 9. `PASS_BACKTEST` Blocking Inputs
 
-The following values remain intentionally unresolved:
+Phase 1A's conservative assumptions do not resolve the following inputs needed
+for `PASS_BACKTEST` or Paper eligibility:
 
 - root-cause classification and governed resolution of the 11 structural
   violations without weakening the frozen gate
 - point-in-time `definition` data for verified expiry and instrument terms
 - point-in-time `status` data for halts, sessions, and eligible-day classification
 - matching MBO book reconstruction for any proposed anomaly reclassification
-- campaign-common eligible calendar and performance-independent sealed split
-- broker/FCM commission and exchange/regulatory/routing charges
-- monthly market-data, API, platform, license, account, and operating costs
-- baseline routing delay and entry order/expiry policy
-- partial/passive fill and stop-order policy
-- stop slippage and same-timestamp event tie-break policy
-- exact roll lead time and terminal-exit execution rule
+- independently qualified definition/status calendar and sealed validation split
+- actual broker/FCM commission and exchange/regulatory/routing charges
+- actual monthly market-data, API, platform, license, account, and operating costs
+- measured routing delay, fill, reject, and stop-slippage evidence
+- Production-capable roll lead time and terminal-exit execution evidence
+- completed shared chronological outcome-engine implementation and validation
+- completed walk-forward, stress, and sealed-holdout evidence
 
-`cost_pending_v1` and `execution_pending_v1` preserve these blockers in
-machine-readable form. Neither configuration may run an economic screen.
+`cost_pending_v1` and `execution_pending_v1` preserve the original campaign's
+blockers in machine-readable form. Neither configuration may run an economic
+screen. Phase 1A instead uses explicitly frozen conservative screening
+assumptions, which do not constitute actual cost or execution evidence and do
+not satisfy this section.
 The missing reference-data contract is recorded in
 `configs/data/phase1_reference_inputs_v1.toml`; MBP-10 rows cannot be used to
 invent either instrument definitions or trading-status events.
 
-## 10. Current Transition Boundary
+## 10. Completed Phase 1A Discovery State
 
-The database campaign status remains `DRAFT`. No eligible-day calendar,
-campaign split, research outcome partition, experiment trial, strategy, or
-backtest result has been registered. The next work is structural-failure
-resolution plus reference-data qualification, followed by an eligible calendar
-and performance-independent split freeze. The existing source summaries, pilot
-outputs, and a-priori proposals do not permit skipping those gates. Numeric
-cost and execution configurations also remain pending.
+The governed Phase 1A Discovery prefix covers 495 requested source dates from
+2022-01-02 through 2023-08-01. It contains:
 
-Campaign-common eligible days are determined without a strategy result.
-Candidate-specific active-entry days are evidence counts evaluated later and
-cannot move the common split boundaries.
+```text
+five-date AI slices:                 99
+successful built source dates:     490
+governed no-entry source dates:       5
+fixed query exposures:            1,089
+accumulated fixed-query patterns:    11
+```
+
+All 99 AI result artifacts and their query lineage are immutable and registered.
+This completed Discovery state contains source-local feature observations and
+fixed-query support, not executable first-touch outcomes. No Phase 1A barrier
+surface, strategy PnL, screening survivor, walk-forward result, or sealed
+holdout result has been computed or claimed.
+
+## 11. Implemented Outcome Engine; p5 Execution Not Run
+
+The content-addressed date/contract event cache, shared chronological runner,
+checkpoint/resume chain, append-only PostgreSQL registry, and operator CLI are
+implemented and covered by passing automated tests. Raw MBP-10 may be read by
+at most four independent cache-key workers, with at most four partitions in
+flight and one cache key per worker. It is never read once per occurrence,
+scenario, direction, or barrier cell. After cache publication, one ordered
+economic pass updates every registered logical occupancy state:
+
+```text
+scenario x direction x contract x 484 cell-occupancy states
+```
+
+Late resume and final verification do not load the cumulative detail ledger at
+once. They validate, consume, and release one source-date shard at a time, so
+record-object memory remains bounded while the full lineage is still checked.
+Even a lineage-only path streams each referenced artifact through SHA-256.
+Raw/cache Parquet hashing and decoding use the same held descriptor, cache
+metadata uses portable `data/`-relative source URIs, and descriptor-relative
+no-follow publication rejects pathname or inode replacement.
+
+Source dates advance strictly, and the within-date total order is
+`(ts_recv_ns, sequence, event_index, contract_key)`. The cache worker count may
+be lowered to one through four, but economic state evaluation is never split by
+worker. The configured ceiling and actual runtime value are both recorded.
+
+The runner keeps the 20-active-session first-touch censor clock distinct from
+portfolio continuation, checkpoints only at completed-date barriers, and binds
+every cache, checkpoint, resumed attempt, and final artifact immutably in
+PostgreSQL. Parallelism is limited to independent bounded cache-key builds and
+verification. Economic state evaluation remains one logical chronological
+pass; it is not parallelized by scenario, direction, contract, occurrence,
+time range, or cell.
+
+The frozen `p5_01_range_expansion_flow_continuation` input plan is:
+
+```text
+Discovery artifacts:                   99
+p5 signals:                          1,111
+LONG / SHORT signals:           529 / 582
+signal source dates:                    238
+futures contracts:                        7
+unique replay source dates:              485
+date/contract cache partitions:           485
+first replay source date:          2022-01-03
+final replay source date:          2023-08-31
+expected detail rows:                1,613,172
+expected aggregate summaries:           2,904
+```
+
+The event plan continues after the final Discovery signal on 2023-08-01 so a
+position censored at 20 active sessions remains occupied until a real barrier
+or mandatory terminal quote. The p5 cache-request plan is therefore a bounded
+Discovery screen through the nominal 2023-08-31 pre-expiry boundary, not a full
+2022-01-02 through 2026-07-31 backtest. The executable terminal date is resolved
+only after cache reports exist by reverse-scanning each contract to its last
+valid-quote partition; its versioned selection hash is bound to the RunSpec and
+all checkpoint/final input lineage. This implementation rule is not a claim
+that the real cache reports or terminal selections have already been produced.
+Each detail row is keyed by `signal_id`, scenario, and one of 484 TP/SL cells
+and retains direction and contract. `signal_id` losslessly resolves to the
+immutable Discovery occurrence containing every original research variable;
+those variables are not redundantly copied into all 1,452 outcome rows for the
+same signal. The 2,904 compact summaries are keyed by scenario, direction,
+take-profit, and stop-loss and are aggregated across contracts.
+
+`p5_01_range_expansion_flow_continuation` is first. Its complete surface,
+checkpoint/resume equivalence, and artifact/DB lineage audit must pass before
+`p1_05_unconfirmed_move_reversal` starts. This is an approved work order, not a
+completed outcome result. At this status revision, neither candidate's
+event-level outcome research has run.
+
+## 12. Operator Sequence
+
+Apply all migrations through
+`0015_phase1a_outcome_constraints_validated.sql`, then execute the modes in
+order. Every command requires `SYSTEMATIC_FX_DATABASE_URL` or an explicit
+`--database-url`.
+
+```bash
+uv run --locked --all-extras systematic-fx db migrate
+uv run --locked --all-extras systematic-fx research phase1a-p5-outcomes --plan-only --json
+uv run --locked --all-extras systematic-fx research phase1a-p5-outcomes --cache-only --max-cache-workers 4 --json
+uv run --locked --all-extras systematic-fx research phase1a-p5-outcomes --max-cache-workers 4 --json
+```
+
+`--plan-only` is read-only. `--cache-only` creates or verifies immutable cache
+and manifest artifacts below `data/derived` without reserving an economic
+attempt. The command without a mode flag starts the governed replay; issuing
+the exact same command again verifies the latest source-date checkpoint and
+resumes the same active attempt. There is no separate `--resume` flag, and a
+terminal failed attempt cannot be reopened.
+
+Cache progress is printed to standard error after the first, every tenth, and
+final completed partition. Replay progress is printed after every source-date
+checkpoint. The final human-readable or `--json` report is printed to standard
+output. Progress, a successful plan audit, or a built cache is not a barrier,
+PnL, or survivor result.
+
+Current real-execution state: **NOT RUN**. No p5 cache manifest, checkpoint
+chain, 1,613,172-row detail ledger, 2,904-row summary artifact, PnL, or
+`SCREENING_SURVIVOR` decision is claimed by this revision.

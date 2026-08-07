@@ -1,6 +1,7 @@
 # Phase 1 Design: AI Research and Backtesting
 
-- Document version: 1.7.0-draft
+- Document version: 1.8.0-draft
+- Revised: 2026-08-06
 - Status: `DRAFT`
 - Parent document: [`DESIGN.md`](../DESIGN.md)
 - Input: Historical MBP-10 from the Data Source
@@ -310,6 +311,124 @@ Permitted initial models:
 An exact queue model is not accepted as Production evidence under the current
 scope.
 
+### Shared chronological replay architecture
+
+Raw MBP-10 is decoded into an immutable event cache before economic replay.
+Each cache partition has the immutable key `(source_date, raw_symbol)`, is
+content addressed by its canonical bytes, and is stored only below
+`data/derived`, for example:
+
+```text
+data/derived/backtest_event_cache/
+    <cache_version>/
+    sha256=<content_sha256>.parquet
+```
+
+Its manifest binds each partition to the raw source SHA-256, selected contract,
+schema and decoder versions, row count, event-order bounds, and content SHA-256.
+A bounded pool may process independent date/contract cache keys in parallel.
+Each exact cache key is built once; workers may not rescan raw data for
+individual occurrences, scenarios, directions, or grid cells. Publication is
+atomic, and an existing path is reused only after byte size and SHA-256 verify
+exactly.
+
+Cache identity is portable across workspace moves: request indexes and Parquet
+metadata retain a `data/`-relative source URI rather than an absolute path.
+The raw source and resulting cache are each hashed and read through the same
+held file descriptor. Directory traversal and hard-link publication use
+descriptor-relative no-follow operations and verify the final pathname inode,
+so path, symlink, or same-size byte replacement cannot be certified under the
+original hash.
+
+The Phase 1A p5 v1 cache builder has a governed ceiling of four worker
+processes and four in-flight partitions. One worker owns one cache key at a
+time. The operator may lower the worker count to any value from one through
+four, and the actual value is recorded in the RunSpec runtime identity. A
+content-addressed semantic request index maps the exact source/date/contract
+request to its already verified cache artifact so an ordinary exact rerun does
+not reopen raw MBP-10.
+
+Economic replay opens the verified cache partitions in strict source-time
+order once. The shared event stream fans out to the complete registered state
+space:
+
+```text
+stress scenario
+    x LONG | SHORT
+    x execution contract
+    x 484 take-profit/stop-loss cells
+```
+
+Every cell owns its own position-occupancy state because its exit time and
+therefore its skipped signals may differ. Threshold calculations may be shared
+or vectorized, but no cell may be pruned and cells may not be evaluated by
+independent raw-file replays. An event is applied in canonical order before the
+next event or source date is admitted.
+
+Source dates are processed in strictly increasing order. The canonical merge
+key within a source date is
+`(ts_recv_ns, sequence, event_index, contract_key)`. It is a strict total order;
+a duplicate or regression is a hard replay failure.
+
+The contract dimension above is portfolio occupancy state, not the identity of
+the final aggregate summary. For the frozen p5 input, the result ledger contains
+1,613,172 detail rows (`1,111 x 3 x 484`), one per signal, scenario, and barrier
+cell, with the signal's direction and futures contract retained in each row.
+The final compact surface contains 2,904 summaries (`3 x 2 x 484`), aggregated
+across the seven futures contracts and keyed by scenario, direction, take-profit
+ticks, and stop-loss ticks.
+
+The first-touch label clock and portfolio clock are separate state variables.
+If neither registered barrier executes inside 20 active sessions, the
+first-touch observation is permanently `CENSORED`. The corresponding portfolio
+position nevertheless stays occupied, continues to block new signals for that
+cell, and consumes later events until actual take-profit, stop, or mandatory
+terminal roll/expiry exit. A later portfolio exit must not rewrite the censored
+first-touch label.
+
+The nominal final pre-expiry cache date is not terminal authority. Once every
+required cache report is available, each contract is scanned in reverse to the
+latest partition with a valid executable quote and coherent last-valid
+event/time metadata. That versioned policy and full per-contract selection are
+hashed into the RunSpec, and the semantic hash is repeated in checkpoint and
+final-result input lineage. The cache-manifest identity binds the report facts
+used by the decision. Later invalid-only partitions remain verification inputs
+but are not post-terminal economic events; a contract with no pre-expiry
+executable quote fails closed.
+
+### Checkpoint, resume, and parallel boundaries
+
+Checkpoints are allowed only at deterministic completed-source-date barriers.
+Each content-addressed checkpoint records the last consumed cache partition,
+signal cursor, first-touch clocks, open bracket and occupancy state for every
+scenario/direction/contract/cell, accumulated counters, prior checkpoint hash,
+and the exact RunSpec and cache-manifest hashes. PostgreSQL stores the immutable
+artifact identity and attempt lineage. Resume verifies all bindings before
+reading the next date and continues only the same active attempt. Attempts and
+checkpoint rows remain append-preserved; a terminal failed attempt is never
+silently reopened. Every permitted resume must produce the same final artifact
+bytes as an uninterrupted run.
+
+Resume rebuilds compact economics by hash/schema-validating and consuming each
+prior daily detail shard in order, then releasing that shard before opening the
+next. Final artifact verification follows the same bounded-memory rule. The
+implementation must not retain the complete 1,613,172-row detail ledger as
+Python objects. A lineage-only load may omit Parquet decoding, but it must still
+stream and compare the complete artifact SHA-256.
+
+Safe parallelism is limited to:
+
+- Bounded independent date/contract cache construction, including that
+  partition's verification and hashing
+
+Unsafe parallelism includes time-slice replay, per-occurrence raw scans,
+scenario/direction/contract replay shards, per-cell raw scans, admitting a
+later date before all prior-date state commits, and merging independently
+simulated occupancy histories. Pure vectorized arithmetic inside one ordered
+event step is allowed, but it does not create another logical replay pass.
+Candidate campaigns also remain ordered when the research plan declares an
+explicit first and second candidate.
+
 ---
 
 ## 8. Cost Model
@@ -418,7 +537,9 @@ A strategy artifact that passes `VALIDATION.md` is handed to Phase 2 with:
 - AI data-exploration and hypothesis interface
 - One-second feature and five-minute research-table builders
 - Feature builder
+- Content-addressed date/contract event-cache builder and manifest
 - Deterministic event-driven backtester
+- Chronological replay checkpoints and exact-resume verifier
 - Execution and cost models
 - Validation runner
 - Strategy artifact builder
@@ -433,6 +554,15 @@ A strategy artifact that passes `VALIDATION.md` is handed to Phase 2 with:
 - Every backtest is reproducible.
 - Future-leakage tests pass.
 - Cost and execution models are applied.
+- Raw-source open-count tests prove that replay does not scan MBP-10 per
+  occurrence, scenario, direction, or barrier cell.
+- Cache construction, chronological replay, and checkpoint-resume equivalence
+  gates in `VALIDATION.md` pass.
+- Every registered scenario/direction/contract has all 484 logical occupancy
+  states. The detail ledger emits all 1,613,172 signal/scenario/cell records,
+  and the aggregate result emits exactly 2,904 unique
+  scenario/direction/take-profit/stop-loss summaries with complete occupancy
+  and censoring lineage.
 - MBO-only features do not enter the MBP-10 research path.
 - Failed trials are preserved.
 - At least one strategy becomes Paper-eligible, or every preregistered family
@@ -440,9 +570,10 @@ A strategy artifact that passes `VALIDATION.md` is handed to Phase 2 with:
 
 ---
 
-## 14. Implementation Questions
+## 14. Remaining Implementation Questions
 
-- Backtester partitioning
+- Measured per-worker peak memory and a machine-specific memory budget; the
+  current p5 worker and in-flight ceiling remains four
 - Feature storage schema
 - Whether an ML library is needed
 - Synthetic stress set

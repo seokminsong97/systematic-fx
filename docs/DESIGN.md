@@ -1,7 +1,7 @@
 # CME 6E Systematic Trading System
 
-- Document version: 1.6.0-draft
-- Revised: 2026-08-02
+- Document version: 1.7.0-draft
+- Revised: 2026-08-06
 - Status: `DRAFT`
 - Documentation language: English
 - Market: CME Euro FX Futures (`6E`), outright futures only
@@ -89,7 +89,9 @@ One-second features and five-minute research rows
     ↓
 AI-directed data exploration and registered bracket strategies
     ↓
-Event-level first-touch and execution backtesting
+Content-addressed date/contract event cache
+    ↓
+One shared chronological first-touch and execution backtest pass
     ↓
 IBKR/Rithmic Live-data and order-path comparison
     ↓
@@ -104,6 +106,58 @@ Promote / Scale / Reduce / Pause / Retire
 
 Risk management is cross-cutting. A minimum Risk Engine must be complete
 before Paper Trading and strengthened before Live trading and scaling.
+
+### Historical replay invariant
+
+Phase 1 raw MBP-10 files are qualification and cache-construction inputs, not
+per-signal replay inputs. A raw source file must never be rescanned once per
+signal occurrence, stress scenario, direction, or barrier cell. Bounded
+workers may build each required immutable, content-addressed date/contract
+cache key below `data/derived` once and all later consumers reuse it by hash.
+The Phase 1A p5 implementation additionally publishes a semantic request index
+for each exact cache request. Its governed ceiling is four cache workers and
+four in-flight cache keys, with exactly one cache key owned by each worker.
+Raw-source identity in that index and in cache metadata is a portable
+`data/`-relative URI, never an absolute workstation path. Source and cache
+Parquet bytes are hashed and decoded through the same held file descriptor;
+artifact paths are traversed with no-follow descriptor-relative opens and are
+rechecked against their held inode before acceptance. A path replacement,
+symlink swap, request/report mismatch, or same-size content change therefore
+fails closed instead of becoming replay evidence.
+
+The backtester then consumes the verified cache in one source-time-ordered pass
+and updates every registered scenario, direction, contract, and barrier-cell
+state from the same ordered events. Only independent date/contract cache
+construction is parallel; economic replay remains one logical chronological
+pass and is not sharded by time, scenario, direction, contract, occurrence, or
+cell. A checkpoint or resumed attempt must remain bound to the exact RunSpec,
+cache manifest, preceding checkpoint, code snapshot, and append-only result
+artifacts in PostgreSQL.
+
+Checkpoint recovery and final validation stream immutable daily detail shards
+one at a time. They may not materialize the cumulative 1,613,172-row ledger in
+memory; peak retained detail state is bounded by one source-date shard plus the
+compact economic accumulators. Skipping shard decoding never skips integrity:
+lineage-only and finalization paths still stream every referenced artifact
+through SHA-256 using constant memory.
+
+Source dates are admitted strictly in increasing order. Within one completed
+source date, the canonical cross-contract event key is
+`(ts_recv_ns, sequence, event_index, contract_key)`. This ordering, the worker
+ceiling, and the actual runtime worker count are part of governed run lineage;
+changing process scheduling must not change cache or result bytes.
+
+The frozen calendar's nominal last pre-expiry partition is only a cache-request
+boundary, not proof that it contains an executable terminal quote. After the
+complete cache report set exists, the runner reverse-scans each contract's
+eligible partitions and selects the latest partition with a valid executable
+quote; absence of one anywhere before the expiry month is a hard failure. The
+versioned resolution policy, complete per-contract selection, and its semantic
+SHA-256 are recorded in the RunSpec. That SHA-256 is copied into every
+checkpoint/final-result input lineage, while the cache-manifest hash binds the
+valid-count and last-valid-event facts from which it was derived. Partitions
+after a fallback terminal are still fully read for integrity verification, but
+their invalid-only observations are excluded from the economic stream.
 
 ---
 
@@ -353,7 +407,8 @@ reactivation, and capital increases require user approval.
 - Parquet with Polars/PyArrow
 - PostgreSQL for metadata and trading state
 - AWS S3 for historical storage
-- A deterministic custom event-driven backtester
+- A deterministic custom event-driven backtester with a content-addressed
+  date/contract cache and one shared chronological replay pass
 - Reproducible Docker environments
 - pytest, golden fixtures, and property tests
 

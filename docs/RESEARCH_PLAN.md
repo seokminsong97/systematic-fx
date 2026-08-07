@@ -1,7 +1,7 @@
 # Phase 1 Research Plan
 
-- Document version: 1.0.0-draft
-- Revised: 2026-08-02
+- Document version: 1.1.0-draft
+- Revised: 2026-08-06
 - Status: `DRAFT`
 - Parent documents: [`DESIGN.md`](DESIGN.md),
   [`PHASE_1_DESIGN.md`](phases/PHASE_1_DESIGN.md)
@@ -148,6 +148,18 @@ TP_FIRST | STOP_FIRST | TERMINAL_EXIT | CENSORED
 Five-minute highs and lows cannot determine barrier order. A take-profit touch
 is not a fill unless the registered fill model permits it.
 
+Raw MBP-10 files are decoded only while constructing a versioned,
+content-addressed date/contract event cache below `data/derived`. Economic
+outcomes then consume that cache in one chronological shared pass. Raw sources
+must not be reopened per occurrence, stress scenario, direction, or barrier
+cell. This storage optimization does not change event order, entry eligibility,
+execution semantics, or the requirement to record every cell.
+
+Source dates advance strictly in increasing order. Within each source date,
+the frozen cross-contract order is
+`(ts_recv_ns, sequence, event_index, contract_key)`. Any duplicate or regression
+fails the replay; five-minute row order cannot substitute for this event order.
+
 ---
 
 ## 5. AI-Directed Discovery Workflow
@@ -214,6 +226,13 @@ Large per-row or per-occurrence variable records remain in immutable,
 content-addressed artifacts below `data/derived`; PostgreSQL stores their exact
 SHA-256, URI, producing RunSpec, attempt, and source lineage. This is part of the
 run ledger, not an exemption from the all-variable requirement.
+
+Outcome caches, date-boundary checkpoints, checkpoint-resume manifests, and
+final surface artifacts follow the same rule. A resumed process continues the
+same active attempt and references its original RunSpec, exact cache manifest,
+and last verified checkpoint. It may append missing work but may not reopen a
+terminal failed attempt, overwrite prior artifacts, reuse a checkpoint under
+changed inputs, or relabel a prior result.
 
 If execution stops after an immutable AI artifact is published, a later code
 revision must not rebuild or silently relabel that analysis. Recovery first
@@ -333,6 +352,32 @@ Session effects alone are not accepted without a market-state interaction and
 an economic rationale. Scheduled macro-event calendars are outside the initial
 MBP-10-only campaign and require a separately versioned data source.
 
+### Approved first outcome sequence
+
+The first shared-replay implementation and screening run is
+`p5_01_range_expansion_flow_continuation`. It must complete its cache binding,
+chronological replay, 484-cell surface, checkpoint/resume verification, and
+immutable lineage audit before `p1_05_unconfirmed_move_reversal` starts. The
+second candidate may reuse already verified cache partitions by content hash,
+but it receives a distinct RunSpec, attempts, checkpoints, and result
+artifacts. These two candidates are not run concurrently, and their order must
+not be changed after seeing economic results.
+
+This ordering authorizes implementation and later governed execution only. It
+does not state that either candidate's event-level outcome research or economic
+screen has completed.
+
+The frozen p5 execution plan consumes all 99 Discovery artifacts and 1,111 p5
+signals: 529 `LONG`, 582 `SHORT`, 238 signal dates, and seven futures contracts.
+Portfolio continuation extends the event plan beyond the final 2023-08-01
+Discovery signal date. It contains 485 unique source dates and 485
+date/contract cache partitions, with a nominal cache-request boundary of
+2023-08-31 before the final contract's expiry month. The effective terminal is
+not assumed to occur on that nominal date: after cache construction, each
+contract is reverse-scanned to the latest partition whose report proves a valid
+executable quote. This is a bounded Discovery screening run, not the later
+full-history walk-forward or sealed holdout test through 2026-07-31.
+
 ---
 
 ## 7. Permitted Strategy and Model Families
@@ -383,16 +428,18 @@ recorded as an economic rejection but cannot advance.
 
 ### 8.2 Absolute-distance surface
 
-The initial registered grid is:
+The Phase 1A registered grid is the complete 12-through-96-pip surface in
+four-pip steps:
 
 ```text
-ticks: 10 | 16 | 24 | 32 | 48 | 64 | 96 | 128 | 192
-pips:   5 |  8 | 12 | 16 | 24 | 32 | 48 |  64 |  96
+pips:  12 | 16 | 20 | ... | 88 | 92 | 96
+ticks: 24 | 32 | 40 | ... | 176 | 184 | 192
 ```
 
-Evaluate the complete take-profit/stop-loss Cartesian surface for each fixed
-signal candidate, subject to the cost floor. Each evaluated cell is recorded
-for multiplicity even when it does not become a strategy artifact.
+Each axis has 22 values. Evaluate the complete 22 by 22 take-profit/stop-loss
+Cartesian surface for each fixed signal candidate, subject to the cost floor.
+All 484 cells are recorded for multiplicity even when they do not become a
+strategy artifact.
 
 If the selected stable region touches 192 ticks, do not extrapolate. Register a
 new experiment with a wider bound.
@@ -436,6 +483,108 @@ a finite, non-leaking label procedure.
   position is open are mandatory outputs, not optimization targets.
 
 Changing the 20-session observation window creates a new registered experiment.
+
+### 9.1 Shared chronological evaluation contract
+
+A bounded worker pool may construct independent date/contract cache keys in
+parallel. Each exact key is built once, verifies row order and content hashes,
+and publishes only under `data/derived`; it is never rebuilt for individual
+occurrences or cells. The economic runner waits for the required immutable
+cache manifest, then reads its partitions once in source-time order.
+
+Cache request identity uses a portable `data/`-relative raw-source URI. Hashing
+and Parquet decoding share one held descriptor for both raw and derived cache
+files, while descriptor-relative no-follow traversal binds publication and
+reuse to the verified inode. Resume/finalization may skip detail-row decoding
+for bounded memory, but never the streaming SHA-256 check.
+
+For the p5 v1 run, `maximum_parallel_workers = 4` and
+`maximum_in_flight_partitions = 4`; each worker owns exactly one cache key. The
+operator may lower the cache worker count to one, two, or three, but may not
+raise it above four. The actual count is recorded in runtime lineage and cannot
+create an additional economic replay pass.
+
+For each ordered event the runner updates the complete state product:
+
+```text
+registered stress scenario
+    x direction
+    x execution contract
+    x 484 barrier-cell occupancy states
+```
+
+The 484 cells share decoded events but not position occupancy. Each cell logs
+its own filled entry, skipped signals while occupied, first-touch censor clock,
+actual exit, costs, and PnL. The 20-session first-touch state freezes as
+`CENSORED` when unresolved at the label boundary; its portfolio state remains
+open and continues chronologically until take-profit, stop, or terminal exit.
+
+For terminal resolution, the frozen plan's last pre-expiry calendar partition
+is only a candidate. The complete cache reports are grouped by contract and
+scanned in reverse; the first partition with a nonzero valid-quote count and
+matching last-valid event/time metadata becomes that contract's mandatory
+terminal partition. No executable quote before expiry is a hard failure.
+Trailing invalid-only partitions are consumed to complete cache verification
+but contribute no post-terminal economic events. The versioned policy, full
+per-contract result, and semantic SHA-256 are frozen in the RunSpec; the hash is
+also in every checkpoint and final-result input lineage, whose cache-manifest
+reference binds the underlying report facts.
+
+The futures-contract dimension belongs to chronological occupancy. Output
+cardinality is separately frozen: the append-only detail ledger has 1,613,172
+signal/scenario/barrier-cell rows (`1,111 x 3 x 484`), while the compact result
+has 2,904 scenario/direction/barrier-cell summaries (`3 x 2 x 484`) aggregated
+across all seven contracts. Every detail row retains its `signal_id`, direction,
+and contract. That `signal_id` losslessly resolves to the immutable Discovery
+occurrence where all original research variables remain recorded; the outcome
+ledger does not duplicate that variable object 1,452 times per signal.
+
+Checkpoints occur only after a complete source date. Resume must verify the
+RunSpec, code snapshot, dependency lock, cache manifest, preceding checkpoint,
+and complete scenario/direction/contract/cell state before continuing. An
+uninterrupted run and every permitted stop/resume schedule must produce
+byte-identical canonical final results.
+
+Prior detail evidence is recovered in daily-shard order and released after it
+updates the compact economic accumulators. Resume and final validation are
+therefore bounded to one detail shard in memory, not the cumulative
+1,613,172-row ledger.
+
+Do not parallelize independent time ranges, signal occurrences, or barrier
+cells as separate replays. Scenario, direction, and contract states are also
+updated inside the same single logical replay pass, not by independent replay
+workers. Pure vectorized arithmetic within one ordered event step is allowed.
+A later source date cannot commit before all state for the prior date has
+reached the checkpoint barrier.
+
+### 9.2 p5 operator sequence
+
+All checked-in migrations through
+`0015_phase1a_outcome_constraints_validated.sql` must be applied before the
+governed runner starts. The database URL is required in every mode through
+`SYSTEMATIC_FX_DATABASE_URL` or `--database-url`.
+
+```bash
+uv run --locked --all-extras systematic-fx db migrate
+uv run --locked --all-extras systematic-fx research phase1a-p5-outcomes --plan-only --json
+uv run --locked --all-extras systematic-fx research phase1a-p5-outcomes --cache-only --max-cache-workers 4 --json
+uv run --locked --all-extras systematic-fx research phase1a-p5-outcomes --max-cache-workers 4 --json
+```
+
+`--plan-only` is a read-only verification of the registered 99 artifacts,
+1,111 signals, and 485-partition plan. `--cache-only` may publish immutable
+cache and manifest artifacts below `data/derived`, but it does not reserve or
+start an economic replay attempt. With neither mode flag, the command runs the
+single chronological replay. Reissuing that exact full-run command is also the
+resume operation: it verifies the RunSpec, cache manifest, and latest
+source-date checkpoint and continues the same active attempt. There is no
+separate `--resume` mode, and a terminal failed attempt is never reopened.
+
+Progress is written to standard error: cache progress is shown at the first,
+every tenth, and final completed partition, and replay progress is shown after
+every source-date checkpoint. The compact report or `--json` document is
+written to standard output. These progress lines are operational visibility,
+not research results or survivor evidence.
 
 ---
 
@@ -519,10 +668,12 @@ exhausted, or data quality cannot support independent validation. Do not weaken
 - Immutable source-data manifest
 - One-second feature specification and version
 - Five-minute AI research-table specification and version
+- Content-addressed date/contract event-cache specification and manifest
 - AI query log and pattern ledger
 - Complete experiment and multiplicity registries
 - Failed-family archive
 - Barrier-surface reports
+- Chronological replay checkpoint and exact-resume evidence
 - Frozen finalist strategy artifacts
 - Validation requests that reveal no sealed-holdout data to AI
 

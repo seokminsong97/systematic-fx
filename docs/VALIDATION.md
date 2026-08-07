@@ -1,7 +1,7 @@
 # Validation and Promotion Criteria
 
-- Document version: 1.0.0-draft
-- Revised: 2026-08-02
+- Document version: 1.1.0-draft
+- Revised: 2026-08-06
 - Status: `DRAFT`
 - Parent document: [`DESIGN.md`](DESIGN.md)
 - Research scope: [`RESEARCH_PLAN.md`](RESEARCH_PLAN.md)
@@ -72,6 +72,13 @@ cost allocation. Costs already represented in fill prices are not added again.
 
 Barrier order determined from event-ordered, executable-side MBP-10 and the
 registered fill model. Five-minute high/low ordering is not evidence.
+
+### Portfolio continuation
+
+The actual cell-specific position state after entry. A first-touch observation
+may freeze as `CENSORED` after 20 active sessions while portfolio continuation
+remains occupied until take-profit, stop, or mandatory terminal exit. The later
+portfolio exit cannot retroactively change the first-touch label.
 
 ---
 
@@ -194,6 +201,69 @@ Any failure in this section is `FAIL` and blocks all economic interpretation.
 - Event-level barrier order is deterministic.
 - Costs and invalid/no-fill outcomes cannot be disabled by a strategy.
 
+### Shared-replay implementation gate
+
+Any failure below blocks outcome interpretation, including a screening-only
+survivor decision:
+
+- Every raw MBP source used by the outcome engine is bound by SHA-256 to one
+  complete cache-build manifest.
+- Cache partitions are immutable, content-addressed, date/contract scoped, and
+  stored below `data/derived`; filename, byte size, schema, row count, event
+  bounds, source hash, and actual content hash agree.
+- Raw-source and cache Parquet hashing and decoding use the same held file
+  descriptor. Request/report identity uses the same typed date, contract,
+  source SHA, event offset, and portable `data/`-relative source URI. Tests must
+  reject inode replacement, symlink/path-component swaps, and same-size content
+  changes before those bytes can enter replay or final evidence.
+- Instrumented source-open counts prove that raw MBP is not scanned per signal
+  occurrence, scenario, direction, or barrier cell. Each required
+  version/date/contract cache key is built at most once and reused by hash.
+- The chronological runner reads each required verified cache partition once
+  and applies events to every registered state. Source dates are strictly
+  increasing, and the exact within-date key is
+  `(ts_recv_ns, sequence, event_index, contract_key)`; duplicates and
+  regressions are hard failures.
+- A contract's nominal last pre-expiry calendar partition is never accepted as
+  terminal merely because it is last. Complete cache reports are reverse-
+  scanned to the latest partition with a valid executable quote and coherent
+  last-valid event/time metadata. A trailing zero-valid partition must fall
+  back, no valid partition must fail closed, and invalid-only partitions after
+  the resolved terminal must be verified without entering the economic stream.
+  The policy and full selection hash must agree across the RunSpec, checkpoint
+  input lineage, final result, and the cache-manifest report facts.
+- For every scenario, direction, and futures contract there are exactly 484
+  logical barrier-cell occupancy states. The p5 detail ledger contains exactly
+  1,613,172 signal/scenario/cell rows (`1,111 x 3 x 484`), retaining direction,
+  contract, and occurrence lineage. Its compact aggregate contains exactly
+  2,904 scenario/direction/cell summaries (`3 x 2 x 484`). Missing, duplicate,
+  preselected, or silently pruned states, detail rows, or summaries are hard
+  failures.
+- Each cell preserves its own occupancy, skipped signals, 20-session
+  first-touch clock, immutable censor label, and eventual portfolio exit.
+- A reviewed golden fixture produces identical entries, fill prices, barrier
+  order, censor labels, portfolio exits, skipped-signal counts, and costs under
+  the reference replay and shared chronological replay.
+- The configured cache ceiling is four workers and four in-flight partitions,
+  with one cache key per worker. The actual operator-selected count from one
+  through four is recorded. Changing that count cannot change canonical cache
+  bytes. Economic replay has exactly one logical chronological pass and no
+  scenario, direction, contract, occurrence, time-range, or cell replay shards.
+- Checkpoint artifacts are content addressed and lineage bound. Clean runs and
+  injected stops after every supported date boundary resume to byte-identical
+  final artifacts without duplicated or omitted events.
+- Resume and final verification process cumulative detail evidence one daily
+  shard at a time. A mode that omits record decoding must still stream-verify
+  every referenced shard SHA-256; filename, size, and read-only mode alone are
+  insufficient evidence. An instrumentation test rejects retention of the
+  complete 1,613,172-row ledger in memory.
+- No later-date state or checkpoint commits before the complete prior-date
+  barrier; independent time-range, per-occurrence, and per-cell replay are
+  prohibited.
+- `p1_05_unconfirmed_move_reversal` cannot reserve an outcome attempt until the
+  complete `p5_01_range_expansion_flow_continuation` run and its artifact/DB
+  lineage audit have succeeded.
+
 Required automated tests include:
 
 ```text
@@ -204,7 +274,23 @@ split-boundary mutation does not leak into prior fit state
 same-seed rerun is identical
 5-minute dual-touch order matches event-level first execution
 stop trigger and stop fill remain distinct
+raw-source open counts are independent of occurrence and cell counts
+single-worker and four-worker cache manifests are identical
+reference and shared replay produce identical golden outcomes
+20-session censor does not close or relabel portfolio continuation
+checkpoint at each supported date boundary resumes byte-identically
+terminal partition with zero valid quotes falls back to the prior executable partition
+contract with no pre-expiry executable quote fails closed
+terminal-resolution policy/result tampering breaks RunSpec or checkpoint lineage
+missing or duplicate scenario/direction/contract/cell state fails closed
+p1_05 reservation fails before the governed p5_01 predecessor completes
 ```
+
+Passing these automated implementation tests is necessary but does not prove
+that the frozen 485-source-date p5 cache or replay has run. The real-data cache
+manifest, all 485 checkpoints through 2023-08-31, 1,613,172 detail rows, 2,904
+summaries, and uninterrupted-versus-resumed artifact comparison must exist
+before any barrier, PnL, or `SCREENING_SURVIVOR` interpretation is allowed.
 
 ---
 
@@ -394,6 +480,10 @@ stop exit:                      2 additional ticks adverse
 routing delay:                  +500 milliseconds
 ```
 
+The stressed entry price remains subject to the frozen zero-offset IOC limit.
+If the full adverse adjustment would cross that limit, record
+`ENTRY_NOT_FILLED`; do not walk beyond the cap or clip away the stress.
+
 Moderate-stress gates:
 
 ```text
@@ -438,6 +528,13 @@ signals_skipped_while_occupied
 Do not estimate first-touch probability by dropping censored observations. Use
 a competing-risk or survival estimator and show the raw counts. Portfolio PnL
 uses actual simulated exits, including terminal roll exits.
+
+Once `censored_at_20_sessions` is recorded, a later take-profit, stop, or
+terminal portfolio exit is reported in the portfolio fields only. Reports must
+not replace the censored first-touch count with that later exit. Conversely,
+the portfolio cannot be treated as flat merely because its first-touch label
+was censored; occupancy and skipped-signal accounting continue until the
+actual exit.
 
 Every holdout entry must be reconciled by the end of its preselected outcome
 tail.
@@ -572,6 +669,8 @@ Every decision report includes:
 
 - Data manifest, eligible-day inventory, exact split dates, and outcome tail
 - Artifact, code, feature, cost, and execution versions
+- Event-cache manifest, source bindings, worker bound, and source-open audit
+- Checkpoint chain and uninterrupted-versus-resumed equivalence result
 - Full trial count and multiplicity adjustments
 - Per-fold and aggregate walk-forward results
 - Both sealed-holdout half-periods and aggregate result
