@@ -63,6 +63,16 @@ def _positive_int(value: str) -> int:
     return parsed
 
 
+def _nonnegative_int(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(f"expected a non-negative integer: {value}") from error
+    if parsed < 0:
+        raise argparse.ArgumentTypeError(f"expected a non-negative integer: {value}")
+    return parsed
+
+
 def _catalog_command(args: argparse.Namespace) -> int:
     from systematic_fx.data.catalog import scan_catalog
 
@@ -553,6 +563,37 @@ def _record_exposure_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def _phase1a_slice_command(args: argparse.Namespace) -> int:
+    from systematic_fx.research.phase1a_pipeline import (
+        Phase1APipelineError,
+        run_phase1a_discovery_slice,
+    )
+
+    settings = Settings.from_env()
+    database_url = args.database_url or settings.database_url
+    if not database_url:
+        print("database URL is required via --database-url or SYSTEMATIC_FX_DATABASE_URL")
+        return 2
+    try:
+        report = run_phase1a_discovery_slice(
+            project_root=Path.cwd(),
+            data_root=settings.data_root,
+            database_url=database_url,
+            slice_index=args.slice_index,
+        )
+    except Phase1APipelineError as error:
+        print(error)
+        return 2
+
+    payload = report.as_dict()
+    if args.json:
+        print(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        for name, value in payload.items():
+            print(f"{name}: {value}")
+    return 0
+
+
 def _register_pilot_lineage_command(args: argparse.Namespace) -> int:
     from systematic_fx.db.derived_registry import (
         DerivedRegistryError,
@@ -1026,6 +1067,20 @@ def build_parser() -> argparse.ArgumentParser:
     register_research_parser.add_argument("--database-url")
     register_research_parser.add_argument("--json", action="store_true", help="emit JSON")
     register_research_parser.set_defaults(handler=_register_research_command)
+
+    phase1a_slice_parser = research_commands.add_parser(
+        "phase1a-slice",
+        help="run or exactly resume one governed five-date Phase 1A Discovery slice",
+    )
+    phase1a_slice_parser.add_argument(
+        "--slice-index",
+        type=_nonnegative_int,
+        default=0,
+        help="zero-based Discovery slice index (default: 0; maximum: 98)",
+    )
+    phase1a_slice_parser.add_argument("--database-url")
+    phase1a_slice_parser.add_argument("--json", action="store_true", help="emit JSON")
+    phase1a_slice_parser.set_defaults(handler=_phase1a_slice_command)
 
     exposure_parser = research_commands.add_parser(
         "exposure",
