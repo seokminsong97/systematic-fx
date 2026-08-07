@@ -1,0 +1,142 @@
+[campaign]
+id = "phase1a_conservative_screening_v1"
+schema_version = 1
+policy_version = "1.0.0"
+name = "Phase 1A conservative MBP-10 screening"
+status = "FROZEN_SCREENING_POLICY"
+mode = "SCREENING_ONLY"
+dataset = "GLBX.MDP3"
+schema = "mbp-10"
+parent_symbol = "6E.FUT"
+source_start = 2022-01-02
+source_end = 2026-07-31
+signal_cadence_seconds = 300
+position_size_contracts = 1
+eligible_calendar_version = "phase1a_screening_source_date_calendar_v1"
+split_version = "phase1a_performance_free_split_v1"
+feature_version = "phase1a_mbp10_screening_v1"
+outcome_version = "phase1a_event_barrier_outcomes_v1"
+cost_model_version = "phase1a_conservative_cost_v1"
+execution_model_version = "phase1a_conservative_execution_v1"
+barrier_grid_version = "phase1a_barrier_grid_v1"
+documentation = "docs/CONSERVATIVE_SCREENING.md"
+
+[authority]
+maximum_authority = "SCREENING_SURVIVOR"
+allowed_terminal_screening_labels = ["SCREENING_REJECT", "SCREENING_SURVIVOR"]
+only_allowed_positive_label = "SCREENING_SURVIVOR"
+forbidden_labels = [
+  "PASS_BACKTEST",
+  "ENTER_PAPER",
+  "PAPER",
+  "REQUEST_LIVE_APPROVAL",
+  "LIVE",
+]
+pass_backtest_authority = false
+paper_authority = false
+live_authority = false
+automatic_promotion = false
+screening_survivor_is_backtest_pass = false
+screening_survivor_is_paper_eligible = false
+
+[data_policy]
+source_layer_immutable = true
+preserve_raw_qc_status = true
+raw_fail_status_immutable = true
+raw_fail_relabel_allowed = false
+derived_repair_may_replace_raw_status = false
+structural_qc_version = "mbp10_structural_qc_v1"
+structural_exclusion_version = "phase1_structural_exclusions_v1"
+failed_source_date_count = 6
+failed_source_date_scope = "ENTIRE_SOURCE_DATE_ALL_CONTRACTS_ALL_SESSIONS"
+failed_source_dates = [
+  2024-06-30,
+  2024-07-01,
+  2024-07-14,
+  2026-04-19,
+  2026-06-07,
+  2026-06-21,
+]
+failed_dates_may_enter_features = false
+failed_dates_may_enter_labels = false
+failed_dates_may_enter_screening = false
+failed_dates_may_enter_stress = false
+
+[data_policy.required_gates]
+source_content_sha256_verified = true
+structural_qc_pass_or_explicit_date_exclusion = true
+common_eligible_calendar_frozen = true
+split_manifest_frozen_before_results = true
+event_ordered_outcomes = true
+fully_loaded_cost_inputs_frozen = true
+missing_gate_behavior = "BLOCK_SCREENING_SURVIVOR"
+
+[data_policy.reference_boundary]
+definition_status_required_for_screening = false
+definition_status_required_for_pass_backtest = true
+missing_reference_label_ceiling = "SCREENING_SURVIVOR"
+observable_mbp10_state_may_substitute_for_screening_only = true
+observable_state_requirements = [
+  "VALID_POINT_IN_TIME_BOOK",
+  "FRESH_EXECUTABLE_BBO",
+  "NO_RESET_LOCK_CROSS_OR_UNDEFINED_PRICE",
+  "OBSERVED_MARKET_ACTIVITY",
+]
+ambiguous_session_behavior = "EXCLUDE_SESSION"
+missing_interval_behavior = "NO_ENTRY"
+invent_trading_status_allowed = false
+
+[contract_selection]
+instrument_class = "OUTRIGHT_ACTUAL_EXPIRY_6E"
+selection_frequency = "ONCE_PER_TRADING_SESSION"
+selection_information = "PREVIOUS_COMPLETED_SESSION_ONLY"
+same_session_information_allowed = false
+future_information_allowed = false
+lookback_completed_sessions = 1
+score = "PREVIOUS_SESSION_TRADE_VOLUME_CONTRACTS"
+score_source_clock = "ts_recv"
+tie_breakers = [
+  "NEAREST_SYMBOL_DERIVED_EXPIRY_MONTH_AFTER_CURRENT_SESSION",
+  "INSTRUMENT_ID_ASCENDING",
+]
+selection_frozen_for_current_session = true
+intraday_contract_switch_allowed = false
+missing_previous_session_behavior = "NO_ENTRY_ENTIRE_SESSION"
+ambiguous_mapping_behavior = "NO_ENTRY_ENTIRE_SESSION"
+spread_instruments_allowed = false
+continuous_contract_execution_allowed = false
+definition_schema_required = false
+contract_month_source = "RAW_OUTRIGHT_SYMBOL_MONTH_CODE_WITH_SOURCE_DATE_DECADE_DISAMBIGUATION"
+unparseable_contract_symbol_behavior = "NO_ENTRY_ENTIRE_SESSION"
+
+[contract_selection.expiry_month_exclusion]
+enabled = true
+rule = "EXCLUDE_FROM_FIRST_TRADING_SESSION_WHOSE_TRADE_DATE_MONTH_EQUALS_CONTRACT_EXPIRY_MONTH"
+new_entries_allowed_in_expiry_month = false
+open_position_terminal_exit = "LAST_VALID_EXECUTABLE_QUOTE_BEFORE_EXPIRY_MONTH_START"
+unknown_expiry_behavior = "NO_ENTRY"
+override_allowed = false
+
+[run_integrity]
+config_hashes_required = true
+source_manifest_hash_required = true
+split_manifest_hash_required = true
+cost_input_manifest_hash_required = true
+code_version_required = true
+all_grid_cells_registered_before_results = true
+failed_and_no_fill_cells_retained = true
+result_deletion_allowed = false
+post_result_policy_change_creates_new_version = true
+
+[screening_gate]
+required_grid_version = "phase1a_barrier_grid_v1"
+required_cost_scenarios = ["BASELINE", "MODERATE_COMBINED", "SEVERE_DIAGNOSTIC"]
+required_execution_scenarios = ["BASELINE", "MODERATE_COMBINED", "SEVERE_DIAGNOSTIC"]
+baseline_fully_loaded_net_ev_must_be_positive = true
+moderate_fully_loaded_net_pnl_must_be_positive = true
+moderate_profit_factor_min = "1.05"
+severe_is_diagnostic_only = true
+adjacent_stability_required = true
+complete_484_cell_surface_required = true
+gate_success_label = "SCREENING_SURVIVOR"
+gate_failure_label = "SCREENING_REJECT"

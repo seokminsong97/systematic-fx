@@ -1,0 +1,132 @@
+[barrier_grid]
+id = "phase1a_barrier_grid_v1"
+schema_version = 1
+policy_version = "1.0.0"
+status = "FROZEN_COMPLETE_CARTESIAN_SURFACE"
+scope = "phase1a_conservative_screening_v1"
+contract = "6E"
+tick_size = "0.00005"
+pip_size = "0.0001"
+ticks_per_pip = 2
+minimum_pips = 12
+maximum_pips = 96
+step_pips = 4
+minimum_ticks = 24
+maximum_ticks = 192
+step_ticks = 8
+take_profit_axis_count = 22
+stop_loss_axis_count = 22
+expected_cell_count = 484
+cartesian_product_required = true
+preselection_pruning_allowed = false
+distance_anchor = "ACTUAL_ENTRY_FILL_PRICE"
+take_profit_pips = [
+  12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52,
+  56, 60, 64, 68, 72, 76, 80, 84, 88, 92, 96,
+]
+stop_loss_pips = [
+  12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52,
+  56, 60, 64, 68, 72, 76, 80, 84, 88, 92, 96,
+]
+take_profit_ticks = [
+  24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104,
+  112, 120, 128, 136, 144, 152, 160, 168, 176, 184, 192,
+]
+stop_loss_ticks = [
+  24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104,
+  112, 120, 128, 136, 144, 152, 160, 168, 176, 184, 192,
+]
+
+[price_formulas.long]
+buying_price = "actual_entry_fill_price"
+sell_price = "actual_entry_fill_price + take_profit_ticks * tick_size"
+loss_trigger_price = "actual_entry_fill_price - stop_loss_ticks * tick_size"
+loss_fill_price = "execution_model.stop.long_fill_formula"
+
+[price_formulas.short]
+selling_entry_price = "actual_entry_fill_price"
+buy_to_cover_price = "actual_entry_fill_price - take_profit_ticks * tick_size"
+loss_trigger_price = "actual_entry_fill_price + stop_loss_ticks * tick_size"
+loss_fill_price = "execution_model.stop.short_fill_formula"
+
+[cell_identity]
+id_format = "tp{take_profit_ticks}_sl{stop_loss_ticks}"
+axis_order = ["take_profit_ticks", "stop_loss_ticks"]
+direction_is_separate_trial_dimension = true
+candidate_variant_is_separate_trial_dimension = true
+
+[complete_recording]
+record_scope = "EACH_CANDIDATE_VARIANT_X_DIRECTION_X_SPLIT_X_GRID_CELL"
+base_summary_records_per_candidate_direction_split = 484
+all_cells_registered_before_execution = true
+all_cells_emitted_before_selection = true
+missing_cell_is_hard_failure = true
+duplicate_cell_is_hard_failure = true
+record_no_signal_cells = true
+record_entry_not_filled_cells = true
+record_censored_cells = true
+record_cost_floor_rejections = true
+record_execution_failures = true
+record_negative_cells = true
+record_raw_fail_exclusions = true
+result_deletion_allowed = false
+required_stress_scenarios = ["BASELINE", "MODERATE_COMBINED", "SEVERE_DIAGNOSTIC"]
+required_fields = [
+  "campaign_id",
+  "candidate_variant_id",
+  "direction",
+  "split_id",
+  "grid_cell_id",
+  "take_profit_pips",
+  "take_profit_ticks",
+  "stop_loss_pips",
+  "stop_loss_ticks",
+  "signal_count",
+  "entry_fill_count",
+  "entry_not_filled_count",
+  "take_profit_first_count",
+  "stop_first_count",
+  "terminal_exit_count",
+  "censored_count",
+  "gross_ev_ticks",
+  "variable_cost_ticks",
+  "allocated_fixed_cost_ticks",
+  "fully_loaded_net_ev_ticks",
+  "fully_loaded_net_pnl_usd",
+  "profit_factor",
+  "maximum_drawdown_usd",
+  "stress_scenario_id",
+  "screening_label",
+  "rejection_reasons",
+]
+
+[adjacent_stability]
+required_for_screening_survivor = true
+neighbor_definition = "CHEBYSHEV_DISTANCE_ONE_IN_GRID_INDEX"
+selected_cell_in_nine_cell_window = true
+interior_window_cell_count = 9
+minimum_positive_fully_loaded_net_ev_cells = 7
+positive_cell_threshold_ticks = "0"
+required_scenarios = ["BASELINE", "MODERATE_COMBINED"]
+neighbor_median_ev_over_selected_ev_min = "0.50"
+selected_ev_over_positive_neighbor_median_max = "2.00"
+contiguous_positive_region_required = true
+boundary_cell_may_survive = false
+boundary_behavior = "SCREENING_REJECT_AND_REQUIRE_NEW_PREREGISTERED_WIDER_GRID"
+missing_neighbor_behavior = "SCREENING_REJECT"
+representative_primary = "REGION_MEDOID"
+representative_fallback = "LEAST_STOP_LOSS_CELL_WITHIN_10_PERCENT_OF_REGION_MEDIAN_EV"
+single_best_cell_selection_allowed = false
+
+[screening_decision]
+only_positive_label = "SCREENING_SURVIVOR"
+negative_label = "SCREENING_REJECT"
+forbidden_labels = ["PASS_BACKTEST", "ENTER_PAPER", "PAPER"]
+baseline_fully_loaded_net_ev_ticks_must_be_greater_than = "0"
+moderate_fully_loaded_net_pnl_usd_must_be_greater_than = "0"
+moderate_profit_factor_min = "1.05"
+severe_scenario_is_diagnostic_only = true
+complete_recording_must_pass_before_decision = true
+adjacent_stability_must_pass_before_decision = true
+screening_survivor_confers_promotion_rights = false
+

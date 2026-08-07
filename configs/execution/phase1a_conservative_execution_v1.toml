@@ -1,0 +1,147 @@
+[execution_model]
+id = "phase1a_conservative_execution_v1"
+schema_version = 1
+policy_version = "1.0.0"
+status = "FROZEN_SCREENING_ASSUMPTION"
+scope = "phase1a_conservative_screening_v1"
+contract = "6E"
+position_size_contracts = 1
+decision_interval_seconds = 300
+availability_clock = "ts_recv"
+barrier_order_source = "EVENT_ORDERED_MBP10"
+screening_only = true
+
+[latency]
+baseline_routing_delay_ms = 1000
+signal_time = "RIGHT_CLOSED_FIVE_MINUTE_DECISION_TS_RECV"
+entry_eligibility_time_formula = "signal_time + baseline_routing_delay_ms"
+stop_exit_eligibility_time_formula = "stop_trigger_ts_recv + baseline_routing_delay_ms"
+event_before_eligibility_may_fill = false
+first_event_at_or_after_eligibility = true
+same_timestamp_sequence_order_required = true
+
+[entry_gate]
+gate_times = ["DECISION_CLOSE", "ROUTING_INTERVAL", "ENTRY_ELIGIBILITY"]
+require_verified_active_contract = false
+require_screening_contract_selected_from_previous_session = true
+require_trading_status_active = false
+missing_status_behavior = "REQUIRE_OBSERVED_ACTIVITY_AND_VALID_FRESH_BOOK_OR_NO_ENTRY"
+require_book_valid = true
+max_executable_quote_age_ms = 1000
+stale_quote_allowed = false
+book_reset_state_allowed = false
+post_reset_rearm_consecutive_valid_seconds = 1
+locked_book_allowed = false
+crossed_book_allowed = false
+undefined_bbo_allowed = false
+missing_depth_allowed = false
+any_gate_failure_behavior = "NO_ENTRY"
+no_entry_status = "ENTRY_NOT_FILLED"
+no_entry_reason_required = true
+gate_override_allowed = false
+
+[entry_order]
+type = "MARKETABLE_LIMIT"
+time_in_force = "IOC"
+quantity_contracts = 1
+limit_reference_buy = "BEST_ASK_AT_ENTRY_ELIGIBILITY"
+limit_reference_sell = "BEST_BID_AT_ENTRY_ELIGIBILITY"
+limit_offset_ticks = 0
+walk_beyond_limit_allowed = false
+full_quantity_required = true
+partial_fill_allowed = false
+retry_allowed = false
+queue_assumption = "NONE"
+midpoint_fill_allowed = false
+zero_latency_fill_allowed = false
+insufficient_executable_size_behavior = "ENTRY_NOT_FILLED"
+price_outside_limit_behavior = "ENTRY_NOT_FILLED"
+
+[bracket]
+anchor = "ACTUAL_ENTRY_FILL_PRICE"
+oco_required = true
+one_open_position_per_strategy_contract = true
+occupied_signal_behavior = "LOG_AND_SKIP"
+alpha_imposed_max_holding_time = false
+first_touch_observation_active_sessions = 20
+unresolved_first_touch_status = "CENSORED"
+portfolio_position_continues_after_first_touch_censor = true
+
+[take_profit]
+order_type = "RESTING_LIMIT"
+touch_is_fill = false
+trade_through_ticks = 1
+trade_through_measure = "EXECUTABLE_SIDE_PRICE"
+long_fill_condition = "best_bid >= target_price + 1 * tick_size"
+short_fill_condition = "best_ask <= target_price - 1 * tick_size"
+fill_price = "TARGET_PRICE"
+favorable_price_improvement_allowed = false
+partial_fill_allowed = false
+
+[stop]
+order_type_after_trigger = "MARKET"
+trigger_is_fill = false
+trigger_and_fill_records_required = true
+long_trigger_condition = "best_bid <= stop_trigger_price"
+short_trigger_condition = "best_ask >= stop_trigger_price"
+baseline_minimum_adverse_ticks = 2
+long_fill_formula = "min(first_valid_executable_bid_after_stop_latency, stop_trigger_price - 2 * tick_size)"
+short_fill_formula = "max(first_valid_executable_ask_after_stop_latency, stop_trigger_price + 2 * tick_size)"
+gap_worse_than_two_ticks_is_preserved = true
+invalid_book_after_trigger_behavior = "WAIT_FOR_FIRST_VALID_EXECUTABLE_PRICE_AND_RECORD_GAP_DURATION"
+unresolved_exit_is_hard_failure = true
+
+[event_ordering]
+primary_order = ["ts_recv", "sequence", "source_row_ordinal"]
+same_timestamp_tie_break = "STOP_FIRST"
+same_event_key_tie_break = "STOP_FIRST"
+take_profit_and_stop_both_eligible = "STOP_FIRST"
+five_minute_high_low_order_allowed = false
+
+[terminal_exit]
+expiry_month_new_entry_allowed = false
+expiry_month_cutoff_source = "phase1a_conservative_screening_v1.contract_selection.expiry_month_exclusion"
+open_position_exit_deadline = "LAST_VALID_EXECUTABLE_QUOTE_BEFORE_EXPIRY_MONTH_START"
+terminal_exit_order_type = "MARKET"
+terminal_exit_uses_executable_depth = true
+terminal_exit_failure_is_hard_failure = true
+
+[[stress_scenarios]]
+id = "BASELINE"
+routing_delay_ms = 1000
+entry_additional_adverse_ticks = 0
+take_profit_trade_through_ticks = 1
+other_market_exit_additional_adverse_ticks = 0
+stop_total_minimum_adverse_ticks = 2
+required_for_screening_survivor = true
+
+[[stress_scenarios]]
+id = "MODERATE_COMBINED"
+routing_delay_ms = 1500
+entry_additional_adverse_ticks = 1
+take_profit_trade_through_ticks = 1
+other_market_exit_additional_adverse_ticks = 1
+stop_total_minimum_adverse_ticks = 4
+required_for_screening_survivor = true
+
+[[stress_scenarios]]
+id = "SEVERE_DIAGNOSTIC"
+routing_delay_ms = 2000
+entry_additional_adverse_ticks = 2
+take_profit_trade_through_ticks = 2
+other_market_exit_additional_adverse_ticks = 2
+stop_total_minimum_adverse_ticks = 6
+required_for_screening_survivor = false
+diagnostic_record_required = true
+
+[audit]
+entry_intent_ts_required = true
+entry_eligibility_ts_required = true
+entry_fill_or_no_fill_required = true
+entry_book_snapshot_required = true
+tp_eligibility_event_required = true
+stop_trigger_event_required = true
+stop_fill_event_required = true
+terminal_exit_event_required = true
+no_entry_reason_required = true
+skipped_occupied_signal_required = true

@@ -1,0 +1,122 @@
+[cost_model]
+id = "phase1a_conservative_cost_v1"
+schema_version = 1
+policy_version = "1.0.0"
+status = "FROZEN_CONSERVATIVE_SCREENING_ASSUMPTION"
+scope = "phase1a_conservative_screening_v1"
+currency = "USD"
+contract = "6E"
+contracts_per_entry = 1
+tick_size = "0.00005"
+tick_value_usd = "6.25"
+pip_size = "0.0001"
+ticks_per_pip = 2
+screening_only = true
+broker_verified_for_paper = false
+
+[variable_cost]
+round_trip_debit_ticks = 4
+round_trip_debit_usd_per_contract = "25.00"
+charge_event = "ONCE_PER_FILLED_AND_RECONCILED_ROUND_TRIP"
+charge_partial_round_trip_pro_rata = false
+consolidated_components = [
+  "broker_or_fcm_commission",
+  "exchange_and_regulatory_fees",
+  "platform_or_routing_fees",
+  "unmodeled_variable_cost_buffer",
+]
+spread_and_depth_effect = "EMBEDDED_IN_EXECUTABLE_ENTRY_AND_EXIT_FILL_PRICES"
+entry_adverse_ticks = "OWNED_BY_EXECUTION_MODEL"
+target_trade_through_ticks = "OWNED_BY_EXECUTION_MODEL"
+stop_adverse_ticks = "OWNED_BY_EXECUTION_MODEL"
+double_count_embedded_fill_effects = false
+
+[fully_loaded_fixed_allocation]
+required = true
+assumption_not_actual_broker_invoice = true
+monthly_pool_usd = "500.00"
+expected_filled_round_trips_per_month = 20
+allocated_fixed_cost_usd_per_round_trip = "25.00"
+allocated_fixed_cost_ticks_per_round_trip = 4
+allow_missing_input = false
+allow_unexplained_zero = false
+input_manifest_required = true
+input_manifest_must_be_frozen_before_results = true
+input_manifest_sha256_required = true
+allocation_scope = "CANDIDATE_AS_STANDALONE_STRATEGY"
+allocation_period = "UTC_CALENDAR_MONTH"
+monthly_pool_formula = "sum(all required monthly fixed-cost categories)"
+monthly_pnl_charge_formula = "full monthly fixed-cost pool, including months with zero fills"
+per_trade_reporting_formula = "monthly_fixed_cost_pool_usd / frozen_expected_filled_round_trips_per_month"
+per_trade_ticks_formula = "per_trade_fixed_cost_usd / tick_value_usd"
+denominator_source = "PREREGISTERED_RUN_MANIFEST"
+denominator_must_be_frozen_before_results = true
+realized_winner_count_as_denominator_allowed = false
+missing_or_zero_denominator_behavior = "BLOCK_SCREENING_SURVIVOR"
+fully_loaded_net_formula = "gross executable-fill pnl - 4 tick round-trip debits - allocated fixed costs"
+
+[fully_loaded_fixed_allocation.required_monthly_categories]
+market_data_and_api = true
+exchange_or_provider_license = true
+platform_and_routing_subscription = true
+broker_and_account = true
+connectivity_and_infrastructure = true
+research_compute_and_storage = true
+other_recurring_operating_cost = true
+
+[fully_loaded_fixed_allocation.screening_monthly_assumptions_usd]
+market_data_and_api = "150.00"
+exchange_or_provider_license = "50.00"
+platform_and_routing_subscription = "75.00"
+broker_and_account = "50.00"
+connectivity_and_infrastructure = "50.00"
+research_compute_and_storage = "100.00"
+other_recurring_operating_cost = "25.00"
+total = "500.00"
+
+[economic_floor]
+cost_ticks_definition = "4 variable + 4 allocated fixed = 8 baseline ticks per filled round trip"
+minimum_take_profit_formula = "max(10, ceil(3 * cost_ticks))"
+baseline_cost_ticks = 8
+baseline_minimum_take_profit_ticks = 24
+baseline_minimum_take_profit_pips = 12
+cells_below_floor_are_executed_for_complete_surface = true
+cells_below_floor_may_survive = false
+below_floor_label = "SCREENING_REJECT"
+below_floor_reason = "ECONOMIC_COST_FLOOR"
+
+[[stress_scenarios]]
+id = "BASELINE"
+round_trip_debit_ticks = 4
+variable_cost_multiplier = "1.00"
+fixed_cost_pool_multiplier = "1.00"
+required_for_screening_survivor = true
+
+[[stress_scenarios]]
+id = "MODERATE_COMBINED"
+round_trip_debit_ticks = 5
+variable_cost_multiplier = "1.25"
+fixed_cost_pool_multiplier = "1.25"
+rounding_policy = "CEIL_TO_WHOLE_TICK_PER_ROUND_TRIP"
+required_for_screening_survivor = true
+
+[[stress_scenarios]]
+id = "SEVERE_DIAGNOSTIC"
+round_trip_debit_ticks = 6
+variable_cost_multiplier = "1.50"
+fixed_cost_pool_multiplier = "1.50"
+rounding_policy = "CEIL_TO_WHOLE_TICK_PER_ROUND_TRIP"
+required_for_screening_survivor = false
+diagnostic_record_required = true
+
+[reporting]
+gross_pnl_required = true
+embedded_fill_cost_required = true
+variable_cost_ticks_required = true
+variable_cost_usd_required = true
+allocated_fixed_cost_usd_required = true
+allocated_fixed_cost_ticks_required = true
+fully_loaded_net_ev_required = true
+fully_loaded_net_pnl_required = true
+all_stress_scenarios_required = true
+missing_cost_field_behavior = "SCREENING_REJECT"
