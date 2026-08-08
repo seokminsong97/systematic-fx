@@ -1,0 +1,502 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://systematic-fx.example/contracts/research-snapshot.v2.schema.json",
+  "title": "Systematic FX public research projection v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "metadata",
+    "program",
+    "campaign",
+    "summary",
+    "dataQuality",
+    "gates",
+    "families",
+    "hypotheses",
+    "patterns",
+    "runLedger",
+    "outcomeCandidates",
+    "timeline"
+  ],
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "revision",
+        "dataAsOf",
+        "publishedAt",
+        "sourceRevision",
+        "disclosurePolicyVersion"
+      ],
+      "properties": {
+        "schemaVersion": { "const": "2.0.0" },
+        "revision": { "type": "integer", "minimum": 1 },
+        "dataAsOf": { "type": "string", "format": "date" },
+        "publishedAt": { "type": "string", "format": "date-time" },
+        "sourceRevision": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "disclosurePolicyVersion": { "const": "2.0.0" }
+      }
+    },
+    "program": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "policyState",
+        "maximumAuthority",
+        "backtestEligible",
+        "paperEligible",
+        "liveEligible",
+        "disclosure"
+      ],
+      "properties": {
+        "mode": { "const": "SCREENING_ONLY" },
+        "policyState": { "const": "FROZEN_SCREENING_POLICY" },
+        "maximumAuthority": { "const": "SCREENING_SURVIVOR" },
+        "backtestEligible": { "const": false },
+        "paperEligible": { "const": false },
+        "liveEligible": { "const": false },
+        "disclosure": { "type": "string", "minLength": 1, "maxLength": 1000 }
+      }
+    },
+    "campaign": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "name",
+        "status",
+        "stage",
+        "screeningAuthorized",
+        "researchEligible",
+        "strategyVariantBudget",
+        "sealedHoldoutFinalistBudget",
+        "summary"
+      ],
+      "properties": {
+        "key": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 300 },
+        "status": { "enum": ["DRAFT", "FROZEN", "RUNNING", "CLOSED", "ABORTED"] },
+        "stage": {
+          "enum": [
+            "DISCOVERY",
+            "OUTCOME_SCREENING",
+            "OUTCOME_REPLAY",
+            "OUTCOME_VALIDATION",
+            "ORDERED_SCREENING"
+          ]
+        },
+        "screeningAuthorized": { "type": "boolean" },
+        "researchEligible": { "type": "boolean" },
+        "strategyVariantBudget": { "type": "integer", "minimum": 1 },
+        "sealedHoldoutFinalistBudget": { "type": "integer", "minimum": 1 },
+        "summary": { "type": "string", "minLength": 1, "maxLength": 1500 }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "families",
+        "hypotheses",
+        "observedPatterns",
+        "discoverySlices",
+        "queryExposures",
+        "runSpecs",
+        "runAttempts",
+        "succeededRuns",
+        "runningRuns",
+        "failedRuns",
+        "reusedRuns",
+        "outcomeCandidates",
+        "evaluatedCandidates",
+        "screeningSurvivors",
+        "screeningRejected",
+        "pendingCandidates",
+        "blockedCandidates"
+      ],
+      "properties": {
+        "families": { "$ref": "#/$defs/nonnegativeInteger" },
+        "hypotheses": { "$ref": "#/$defs/nonnegativeInteger" },
+        "observedPatterns": { "$ref": "#/$defs/nonnegativeInteger" },
+        "discoverySlices": { "$ref": "#/$defs/nonnegativeInteger" },
+        "queryExposures": { "$ref": "#/$defs/nonnegativeInteger" },
+        "runSpecs": { "$ref": "#/$defs/nonnegativeInteger" },
+        "runAttempts": { "$ref": "#/$defs/nonnegativeInteger" },
+        "succeededRuns": { "$ref": "#/$defs/nonnegativeInteger" },
+        "runningRuns": { "$ref": "#/$defs/nonnegativeInteger" },
+        "failedRuns": { "$ref": "#/$defs/nonnegativeInteger" },
+        "reusedRuns": { "$ref": "#/$defs/nonnegativeInteger" },
+        "outcomeCandidates": { "$ref": "#/$defs/nonnegativeInteger" },
+        "evaluatedCandidates": { "$ref": "#/$defs/nonnegativeInteger" },
+        "screeningSurvivors": { "$ref": "#/$defs/nonnegativeInteger" },
+        "screeningRejected": { "$ref": "#/$defs/nonnegativeInteger" },
+        "pendingCandidates": { "$ref": "#/$defs/nonnegativeInteger" },
+        "blockedCandidates": { "$ref": "#/$defs/nonnegativeInteger" }
+      }
+    },
+    "dataQuality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "datasetStatus",
+        "sourceFiles",
+        "identifiedFiles",
+        "passedFiles",
+        "failedFiles",
+        "rowGroups",
+        "eventRows",
+        "hardViolations",
+        "warningSymbols",
+        "coverageStart",
+        "coverageEnd",
+        "eligibleDays",
+        "ineligibleDays",
+        "failedDates"
+      ],
+      "properties": {
+        "datasetStatus": { "enum": ["REGISTERED", "VALIDATING", "READY", "REJECTED", "RETIRED"] },
+        "sourceFiles": { "$ref": "#/$defs/nonnegativeInteger" },
+        "identifiedFiles": { "$ref": "#/$defs/nonnegativeInteger" },
+        "passedFiles": { "$ref": "#/$defs/nonnegativeInteger" },
+        "failedFiles": { "$ref": "#/$defs/nonnegativeInteger" },
+        "rowGroups": { "$ref": "#/$defs/nonnegativeInteger" },
+        "eventRows": { "$ref": "#/$defs/nonnegativeInteger" },
+        "hardViolations": { "$ref": "#/$defs/nonnegativeInteger" },
+        "warningSymbols": { "$ref": "#/$defs/nonnegativeInteger" },
+        "coverageStart": { "type": ["string", "null"], "format": "date" },
+        "coverageEnd": { "type": ["string", "null"], "format": "date" },
+        "eligibleDays": { "$ref": "#/$defs/nonnegativeInteger" },
+        "ineligibleDays": { "$ref": "#/$defs/nonnegativeInteger" },
+        "failedDates": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["date", "violations"],
+            "properties": {
+              "date": { "type": "string", "format": "date" },
+              "violations": { "type": "integer", "minimum": 1 }
+            }
+          }
+        }
+      }
+    },
+    "gates": {
+      "type": "array",
+      "maxItems": 30,
+      "items": { "$ref": "#/$defs/gate" }
+    },
+    "families": {
+      "type": "array",
+      "maxItems": 6,
+      "items": { "$ref": "#/$defs/family" }
+    },
+    "hypotheses": {
+      "type": "array",
+      "maxItems": 500,
+      "items": { "$ref": "#/$defs/hypothesis" }
+    },
+    "patterns": {
+      "type": "array",
+      "maxItems": 500,
+      "items": { "$ref": "#/$defs/pattern" }
+    },
+    "runLedger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["specs", "attempts", "reusedSuccesses", "byKind"],
+      "properties": {
+        "specs": { "$ref": "#/$defs/nonnegativeInteger" },
+        "attempts": { "$ref": "#/$defs/nonnegativeInteger" },
+        "reusedSuccesses": { "$ref": "#/$defs/nonnegativeInteger" },
+        "byKind": {
+          "type": "array",
+          "maxItems": 30,
+          "items": { "$ref": "#/$defs/runKindSummary" }
+        }
+      }
+    },
+    "outcomeCandidates": {
+      "type": "array",
+      "maxItems": 100,
+      "items": { "$ref": "#/$defs/outcomeCandidate" }
+    },
+    "timeline": {
+      "type": "array",
+      "maxItems": 200,
+      "items": { "$ref": "#/$defs/timelineRecord" }
+    }
+  },
+  "$defs": {
+    "nonnegativeInteger": { "type": "integer", "minimum": 0 },
+    "nullableNonnegativeInteger": { "type": ["integer", "null"], "minimum": 0 },
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "state", "scope", "detail"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "label": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "state": { "enum": ["PASS", "WARN", "FAIL", "PENDING", "BLOCKED"] },
+        "scope": { "enum": ["SCREENING", "BACKTEST", "BOTH"] },
+        "detail": { "type": "string", "minLength": 1, "maxLength": 1000 }
+      }
+    },
+    "family": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "question", "description", "hypothesisCount"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^P[1-6]$" },
+        "title": { "type": "string", "maxLength": 300 },
+        "question": { "type": "string", "maxLength": 1000 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "hypothesisCount": { "$ref": "#/$defs/nonnegativeInteger" }
+      }
+    },
+    "hypothesis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "family",
+        "title",
+        "direction",
+        "modelFamily",
+        "hypothesis",
+        "entryCondition",
+        "economicRationale",
+        "features",
+        "status",
+        "decision",
+        "observedPatternIds",
+        "supportCount",
+        "updatedAt",
+        "visibility"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "family": { "type": "string", "pattern": "^P[1-6]$" },
+        "title": { "type": "string", "maxLength": 300 },
+        "direction": { "enum": ["LONG", "SHORT", "BOTH"] },
+        "modelFamily": { "type": "string", "maxLength": 200 },
+        "hypothesis": { "type": "string", "maxLength": 2000 },
+        "entryCondition": { "type": "string", "maxLength": 2000 },
+        "economicRationale": { "type": "string", "maxLength": 2000 },
+        "features": {
+          "type": "array",
+          "maxItems": 100,
+          "items": { "type": "string", "maxLength": 200 }
+        },
+        "status": {
+          "enum": ["PROPOSED", "REGISTERED", "RUNNING", "RETAINED", "FROZEN", "REJECTED", "FAILED"]
+        },
+        "decision": {
+          "enum": [
+            "NOT_OBSERVED",
+            "DISCOVERY_OBSERVED",
+            "BLOCKED",
+            "OUTCOME_RUNNING",
+            "SCREENING_REJECT",
+            "SCREENING_SURVIVOR",
+            "MIXED",
+            "FAILED"
+          ]
+        },
+        "observedPatternIds": {
+          "type": "array",
+          "maxItems": 100,
+          "items": { "type": "string", "maxLength": 200 }
+        },
+        "supportCount": { "$ref": "#/$defs/nonnegativeInteger" },
+        "updatedAt": { "type": ["string", "null"], "format": "date-time" },
+        "visibility": { "enum": ["PUBLIC_NOW", "PUBLIC_AFTER_FREEZE", "PUBLIC_AFTER_CAMPAIGN_CLOSE"] }
+      }
+    },
+    "candidateStage": {
+      "enum": [
+        "DISCOVERY_OBSERVED",
+        "BLOCKED",
+        "NOT_STARTED",
+        "REPLAY_QUEUED",
+        "REPLAY_RUNNING",
+        "VALIDATION_RUNNING",
+        "DECISION_PENDING",
+        "SCREENING_REJECTED",
+        "SCREENING_SURVIVOR",
+        "MIXED_DECISION",
+        "FAILED"
+      ]
+    },
+    "pattern": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "family",
+        "title",
+        "status",
+        "direction",
+        "description",
+        "parentHypothesisIds",
+        "counterexampleCount",
+        "supportCount",
+        "observedSlices",
+        "evidenceState",
+        "screeningDecision",
+        "updatedAt"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "family": { "type": "string", "pattern": "^P[1-6]$" },
+        "title": { "type": "string", "maxLength": 500 },
+        "status": { "enum": ["OPEN", "REGISTERED", "REJECTED", "PROMOTED"] },
+        "direction": { "enum": ["LONG", "SHORT", "BOTH", "NONE"] },
+        "description": { "type": "string", "maxLength": 5000 },
+        "parentHypothesisIds": {
+          "type": "array",
+          "maxItems": 100,
+          "items": { "type": "string", "maxLength": 200 }
+        },
+        "counterexampleCount": { "$ref": "#/$defs/nonnegativeInteger" },
+        "supportCount": { "$ref": "#/$defs/nonnegativeInteger" },
+        "observedSlices": { "$ref": "#/$defs/nonnegativeInteger" },
+        "evidenceState": { "$ref": "#/$defs/candidateStage" },
+        "screeningDecision": {
+          "enum": ["PENDING", "SCREENING_REJECT", "SCREENING_SURVIVOR", "MIXED"]
+        },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "runKindSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "total", "succeeded", "running", "queued", "failed", "rejected", "cancelled"],
+      "properties": {
+        "kind": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "total": { "$ref": "#/$defs/nonnegativeInteger" },
+        "succeeded": { "$ref": "#/$defs/nonnegativeInteger" },
+        "running": { "$ref": "#/$defs/nonnegativeInteger" },
+        "queued": { "$ref": "#/$defs/nonnegativeInteger" },
+        "failed": { "$ref": "#/$defs/nonnegativeInteger" },
+        "rejected": { "$ref": "#/$defs/nonnegativeInteger" },
+        "cancelled": { "$ref": "#/$defs/nonnegativeInteger" }
+      }
+    },
+    "replay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "completedDates",
+        "plannedDates",
+        "sourceSlices",
+        "sourceOccurrences",
+        "scenarioCount",
+        "directionCount",
+        "cellsPerSurface",
+        "summaryCells",
+        "expectedSummaryCells",
+        "detailRecords",
+        "surfaceComplete",
+        "startedAt",
+        "finishedAt"
+      ],
+      "properties": {
+        "status": { "enum": ["NOT_STARTED", "BLOCKED", "QUEUED", "RUNNING", "SUCCEEDED", "FAILED"] },
+        "completedDates": { "$ref": "#/$defs/nonnegativeInteger" },
+        "plannedDates": { "$ref": "#/$defs/nullableNonnegativeInteger" },
+        "sourceSlices": { "$ref": "#/$defs/nullableNonnegativeInteger" },
+        "sourceOccurrences": { "$ref": "#/$defs/nullableNonnegativeInteger" },
+        "scenarioCount": { "$ref": "#/$defs/nullableNonnegativeInteger" },
+        "directionCount": { "$ref": "#/$defs/nullableNonnegativeInteger" },
+        "cellsPerSurface": { "$ref": "#/$defs/nullableNonnegativeInteger" },
+        "summaryCells": { "$ref": "#/$defs/nonnegativeInteger" },
+        "expectedSummaryCells": { "$ref": "#/$defs/nullableNonnegativeInteger" },
+        "detailRecords": { "$ref": "#/$defs/nullableNonnegativeInteger" },
+        "surfaceComplete": { "type": "boolean" },
+        "startedAt": { "type": ["string", "null"], "format": "date-time" },
+        "finishedAt": { "type": ["string", "null"], "format": "date-time" }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "status", "updatedAt"],
+      "properties": {
+        "kind": { "const": "UNINTERRUPTED_RESUME_BYTE_EQUIVALENCE" },
+        "status": { "enum": ["PENDING", "RUNNING", "PASSED", "FAILED"] },
+        "updatedAt": { "type": ["string", "null"], "format": "date-time" }
+      }
+    },
+    "screeningDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["direction", "label", "positiveRegionSize", "reasonCategories"],
+      "properties": {
+        "direction": { "enum": ["LONG", "SHORT"] },
+        "label": { "enum": ["PENDING", "SCREENING_REJECT", "SCREENING_SURVIVOR"] },
+        "positiveRegionSize": { "$ref": "#/$defs/nullableNonnegativeInteger" },
+        "reasonCategories": {
+          "type": "array",
+          "maxItems": 30,
+          "items": { "type": "string", "maxLength": 500 }
+        }
+      }
+    },
+    "outcomeCandidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "order",
+        "title",
+        "family",
+        "parentHypothesisIds",
+        "stage",
+        "discoveryOccurrences",
+        "replay",
+        "validation",
+        "decisions",
+        "authorityNote"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "order": { "type": "integer", "minimum": 1 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "family": { "type": "string", "pattern": "^P[1-6]$" },
+        "parentHypothesisIds": {
+          "type": "array",
+          "maxItems": 100,
+          "items": { "type": "string", "maxLength": 200 }
+        },
+        "stage": { "$ref": "#/$defs/candidateStage" },
+        "discoveryOccurrences": { "$ref": "#/$defs/nonnegativeInteger" },
+        "replay": { "$ref": "#/$defs/replay" },
+        "validation": { "$ref": "#/$defs/validation" },
+        "decisions": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": { "$ref": "#/$defs/screeningDecision" }
+        },
+        "authorityNote": { "type": "string", "minLength": 1, "maxLength": 1000 }
+      }
+    },
+    "timelineRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["date", "state", "title", "detail"],
+      "properties": {
+        "date": { "type": "string", "format": "date" },
+        "state": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "detail": { "type": "string", "minLength": 1, "maxLength": 1500 }
+      }
+    }
+  }
+}

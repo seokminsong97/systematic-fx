@@ -42,6 +42,10 @@ make db-stop
 See [`RESEARCH_ENVIRONMENT.md`](docs/RESEARCH_ENVIRONMENT.md) for setup,
 configuration, command, PostgreSQL lifecycle, and recovery details.
 
+The external research ledger lives in [`web/`](web/README.md). Its one-way,
+sanitized publication boundary and worker operations are documented in
+[`publication/`](publication/README.md).
+
 Environment readiness is not research-data eligibility. All 1,434 source files
 are fully hashed and registered as `HASHED` in PostgreSQL, but the dataset
 remains `VALIDATING`. The DRAFT campaign contains 60 registered a-priori parent
@@ -94,3 +98,5 @@ boundaries.
 - [`Validation`](docs/VALIDATION.md)
 - [`Research environment`](docs/RESEARCH_ENVIRONMENT.md)
 - [`Research execution status`](docs/RESEARCH_EXECUTION_STATUS.md)
+- [`Public research site`](web/README.md)
+- [`Public projection operations`](publication/README.md)

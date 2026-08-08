@@ -30,6 +30,9 @@ research = [
     "scipy",
     "statsmodels",
 ]
+publication = [
+    "jsonschema[format-nongpl]",
+]
 notebook = [
     "ipykernel",
     "jupyterlab",
@@ -37,6 +40,7 @@ notebook = [
 
 [project.scripts]
 systematic-fx = "systematic_fx.cli:main"
+systematic-fx-publisher = "systematic_fx.publication.worker:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

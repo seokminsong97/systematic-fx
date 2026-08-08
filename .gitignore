@@ -228,3 +228,12 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Next.js public research site
+/web/node_modules/
+/web/.next/
+/web/coverage/
+/web/.env*
+!/web/.env.example
+!/web/src/lib/
+!/web/src/lib/**

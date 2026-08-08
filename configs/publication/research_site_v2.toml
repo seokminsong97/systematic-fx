@@ -1,0 +1,54 @@
+[publication]
+schema_version = "2.0.0"
+disclosure_policy_version = "2.0.0"
+campaign_key = "phase1a_conservative_screening_v1"
+scope_key = "public-research"
+program_mode = "SCREENING_ONLY"
+policy_state = "FROZEN_SCREENING_POLICY"
+maximum_authority = "SCREENING_SURVIVOR"
+discovery_slice_target = 99
+
+[[outcome_candidates]]
+id = "p5_01_range_expansion_flow_continuation"
+order = 1
+
+[[outcome_candidates]]
+id = "p1_05_unconfirmed_move_reversal"
+order = 2
+predecessor_id = "p5_01_range_expansion_flow_continuation"
+
+[[families]]
+id = "P1"
+title = "Price response"
+question = "Does a move continue or reverse once liquidity and participation are considered?"
+description = "Liquidity-conditioned continuation, reversal, resilience, and price-response states."
+
+[[families]]
+id = "P2"
+title = "Depth imbalance"
+question = "Does persistent order-book imbalance predict the next executable barrier?"
+description = "Magnitude, duration, stability, replenishment, and cross-level depth structure."
+
+[[families]]
+id = "P3"
+title = "Flow absorption"
+question = "Does aggressive flow without matching price response reveal absorption or exhaustion?"
+description = "Aggressor-flow divergence, absorption, exhaustion, and delayed continuation."
+
+[[families]]
+id = "P4"
+title = "Liquidity gaps"
+question = "Do depletion, replenishment, and book gaps alter executable first-touch outcomes?"
+description = "Short-lived book fragility, recovery, gap formation, and asymmetric depth loss."
+
+[[families]]
+id = "P5"
+title = "Volatility states"
+question = "Do compression and expansion states produce stable breakouts or failed breakouts?"
+description = "Volatility transitions conditioned on intensity, depth, and executable liquidity."
+
+[[families]]
+id = "P6"
+title = "Scheduled context"
+question = "Are the first five effects stable across session, weekday, and contract lifecycle?"
+description = "Preregistered interaction tests across market sessions and scheduled states."

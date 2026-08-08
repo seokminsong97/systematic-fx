@@ -43,6 +43,7 @@ systematic-fx/
 ├── .venv/                      # ignored: uv-managed environment
 ├── Makefile                    # canonical setup, check, and lifecycle commands
 ├── configs/                    # versioned campaign/feature/cost/execution inputs
+├── contracts/                  # versioned public projection contracts
 ├── data/                       # ignored: all raw, reference, and derived market data
 │   ├── mbp-10/                 # immutable daily source files (existing layout)
 │   ├── reference/              # point-in-time definition/status inputs (pending)
@@ -50,6 +51,7 @@ systematic-fx/
 ├── docs/                       # design, data-contract, and environment documents
 │   └── phases/                 # Phase 1-5 implementation contracts
 ├── migrations/                 # checksum-verified ordered PostgreSQL SQL
+├── publication/                # isolated public-DB migrations and operations
 ├── reports/
 │   └── generated/              # ignored: rendered research output
 ├── artifacts/                  # ignored: run manifests and frozen artifacts
@@ -62,8 +64,15 @@ systematic-fx/
 │   ├── backtest/               # event replay, fills, OCO, costs, and metrics
 │   ├── validation/             # splitter, walk-forward, stress, and holdout
 │   ├── db/                     # migration, bootstrap, and private-cluster control
+│   ├── publication/            # one-way, allowlisted public projection worker
 │   ├── environment.py          # deterministic local-readiness checks
 │   └── cli.py                  # composition root; no domain logic
+├── web/                        # dynamic Next.js + React public research ledger
+│   └── src/
+│       ├── app/                # request-time routes and sanitized API handler
+│       ├── features/           # overview, research, hypothesis, pattern, data UI
+│       ├── domain/             # public contract types and status semantics
+│       └── server/             # server-only public projection DB access
 ├── tests/
     ├── unit/                   # pure and fast
     ├── integration/            # tiny Parquet/PostgreSQL boundaries
@@ -111,6 +120,15 @@ PostgreSQL is the control plane. Store:
 Do not copy event rows or wide one-second/five-minute feature tables into
 PostgreSQL. Store their immutable Parquet URI and checksum instead.
 
+### Public PostgreSQL
+
+The external site reads a second, isolated PostgreSQL database containing only
+schema-validated, append-only JSONB projection revisions. A transactional
+outbox signals the publication worker; the worker reads the private database
+in one consistent snapshot and writes through a separate credential. The
+website role can select the latest-projection view only. Browser code never
+receives either database URL.
+
 The workstation cluster lives under ignored `.local/postgres/` and
 uses only its mode-`0700` Unix socket with PostgreSQL port identifier `55432`.
 It enforces `listen_addresses = ''`, so it has no TCP listener and does not
@@ -140,6 +158,10 @@ generated files remain out of Git.
   either.
 - `validation` orchestrates frozen backtests over deterministic splits.
 - `db` persists identities and state through explicit repository interfaces.
+- `publication` may read `db` and `research` definitions, but only emits fields
+  allowlisted by the public JSON Schema into the isolated database.
+- `web/src/server` may read only the public projection view; client components
+  receive the validated document through server rendering or the Route Handler.
 - `cli.py` wires packages together and is the only layer allowed to know all of
   them.
 

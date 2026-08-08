@@ -94,9 +94,8 @@ source date.
 
 ## 4. PostgreSQL Control Plane
 
-Migrations `0001_research_control_plane.sql` and
-`0002_research_governance.sql` create schema `systematic_fx` and 20 tables
-grouped by responsibility:
+Migrations `0001`-`0007` create schema `systematic_fx` and its research-control
+and publication-outbox tables, grouped by responsibility:
 
 - Source/catalog: `datasets`, `source_files`, `instruments`,
   `instrument_mappings`, `quality_checks`
@@ -106,6 +105,7 @@ grouped by responsibility:
 - Research governance: `pattern_ledger`, `experiments`, `experiment_trials`,
   `discovery_exposures`
 - Executable evidence: `strategies`, `backtest_runs`, `backtest_metrics`
+- Public projection signal: `publication_outbox`
 - Migration integrity: `schema_migrations`
 
 The migration runner records the SQL SHA-256, refuses edited or missing applied

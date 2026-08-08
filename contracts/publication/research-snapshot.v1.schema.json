@@ -1,0 +1,169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://systematic-fx.example/contracts/research-snapshot.v1.schema.json",
+  "title": "Systematic FX public research projection",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["metadata", "campaign", "summary", "dataQuality", "gates", "families", "hypotheses", "patterns", "timeline"],
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "revision", "dataAsOf", "publishedAt", "sourceRevision", "disclosurePolicyVersion"],
+      "properties": {
+        "schemaVersion": { "const": "1.0.0" },
+        "revision": { "type": "integer", "minimum": 1 },
+        "dataAsOf": { "type": "string", "format": "date" },
+        "publishedAt": { "type": "string", "format": "date-time" },
+        "sourceRevision": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "disclosurePolicyVersion": { "type": "string", "minLength": 1 }
+      }
+    },
+    "campaign": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "name", "status", "stage", "researchEligible", "strategyVariantBudget", "sealedHoldoutFinalistBudget", "summary"],
+      "properties": {
+        "key": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["DRAFT", "FROZEN", "RUNNING", "CLOSED", "ABORTED"] },
+        "stage": { "type": "string", "minLength": 1 },
+        "researchEligible": { "type": "boolean" },
+        "strategyVariantBudget": { "type": "integer", "minimum": 1 },
+        "sealedHoldoutFinalistBudget": { "type": "integer", "minimum": 1 },
+        "summary": { "type": "string", "minLength": 1 }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["families", "hypotheses", "patterns", "trials", "strategies", "backtests", "passed", "rejected"],
+      "properties": {
+        "families": { "type": "integer", "minimum": 0 },
+        "hypotheses": { "type": "integer", "minimum": 0 },
+        "patterns": { "type": "integer", "minimum": 0 },
+        "trials": { "type": "integer", "minimum": 0 },
+        "strategies": { "type": "integer", "minimum": 0 },
+        "backtests": { "type": "integer", "minimum": 0 },
+        "passed": { "type": "integer", "minimum": 0 },
+        "rejected": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "dataQuality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["datasetStatus", "sourceFiles", "identifiedFiles", "passedFiles", "failedFiles", "rowGroups", "eventRows", "hardViolations", "warningSymbols", "coverageStart", "coverageEnd", "failedDates"],
+      "properties": {
+        "datasetStatus": { "enum": ["REGISTERED", "VALIDATING", "READY", "REJECTED", "RETIRED"] },
+        "sourceFiles": { "type": "integer", "minimum": 0 },
+        "identifiedFiles": { "type": "integer", "minimum": 0 },
+        "passedFiles": { "type": "integer", "minimum": 0 },
+        "failedFiles": { "type": "integer", "minimum": 0 },
+        "rowGroups": { "type": "integer", "minimum": 0 },
+        "eventRows": { "type": "integer", "minimum": 0 },
+        "hardViolations": { "type": "integer", "minimum": 0 },
+        "warningSymbols": { "type": "integer", "minimum": 0 },
+        "coverageStart": { "type": ["string", "null"], "format": "date" },
+        "coverageEnd": { "type": ["string", "null"], "format": "date" },
+        "failedDates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["date", "violations"],
+            "properties": {
+              "date": { "type": "string", "format": "date" },
+              "violations": { "type": "integer", "minimum": 1 }
+            }
+          }
+        }
+      }
+    },
+    "gates": { "type": "array", "items": { "$ref": "#/$defs/statusRecord" } },
+    "families": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "title", "question", "description", "hypothesisCount"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^P[1-6]$" },
+          "title": { "type": "string" },
+          "question": { "type": "string" },
+          "description": { "type": "string" },
+          "hypothesisCount": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "hypotheses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "family", "title", "direction", "modelFamily", "hypothesis", "entryCondition", "economicRationale", "features", "status", "decision", "trialBudget", "trialsRegistered", "updatedAt", "visibility"],
+        "properties": {
+          "id": { "type": "string" },
+          "family": { "type": "string", "pattern": "^P[1-6]$" },
+          "title": { "type": "string" },
+          "direction": { "enum": ["LONG", "SHORT", "BOTH"] },
+          "modelFamily": { "type": "string" },
+          "hypothesis": { "type": "string" },
+          "entryCondition": { "type": "string" },
+          "economicRationale": { "type": "string" },
+          "features": { "type": "array", "items": { "type": "string" } },
+          "status": { "enum": ["PROPOSED", "REGISTERED", "RUNNING", "RETAINED", "FROZEN", "REJECTED", "FAILED"] },
+          "decision": { "enum": ["NOT_EVALUATED", "RETAINED", "INCONCLUSIVE", "REJECTED", "PASS_BACKTEST", "FAILED"] },
+          "trialBudget": { "type": "integer", "minimum": 0 },
+          "trialsRegistered": { "type": "integer", "minimum": 0 },
+          "updatedAt": { "type": ["string", "null"], "format": "date-time" },
+          "visibility": { "enum": ["PUBLIC_NOW", "PUBLIC_AFTER_FREEZE", "PUBLIC_AFTER_CAMPAIGN_CLOSE"] }
+        }
+      }
+    },
+    "patterns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "status", "direction", "entryCondition", "economicRationale", "counterexampleCount", "supportCount", "updatedAt"],
+        "properties": {
+          "id": { "type": "string" },
+          "status": { "enum": ["OPEN", "REGISTERED", "REJECTED", "PROMOTED"] },
+          "direction": { "enum": ["LONG", "SHORT", "BOTH", "NONE"] },
+          "entryCondition": { "type": "string" },
+          "economicRationale": { "type": "string" },
+          "counterexampleCount": { "type": "integer", "minimum": 0 },
+          "supportCount": { "type": "integer", "minimum": 0 },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+    "timeline": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["date", "state", "title", "detail"],
+        "properties": {
+          "date": { "type": "string", "format": "date" },
+          "state": { "type": "string" },
+          "title": { "type": "string" },
+          "detail": { "type": "string" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "statusRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "state", "detail"],
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "state": { "enum": ["PASS", "WARN", "FAIL", "PENDING", "BLOCKED"] },
+        "detail": { "type": "string" }
+      }
+    }
+  }
+}

@@ -388,7 +388,7 @@ These are intentionally different milestones:
 | Boundary | Current status | Meaning |
 |---|---|---|
 | Locked Python/scientific runtime | PASS | Python 3.12.13 and locked extras import correctly |
-| Private PostgreSQL bootstrap | PASS | PostgreSQL 18.4 migrations `0001`-`0002` cover separate `systematic_fx` research and `systematic_fx_test` integration databases |
+| Private PostgreSQL bootstrap | PASS | PostgreSQL 18.4 migrations `0001`-`0007` cover separate `systematic_fx` research and `systematic_fx_test` integration databases, including immutable run provenance, governed Discovery exposure, and the publication outbox |
 | Full footer catalog | PASS | All 1,434 footers satisfy the current raw contract |
 | Full source SHA-256 manifest | PASS | All 1,434 files hashed; unchanged checkpoint rerun reproduced the manifest |
 | Source control-plane registration | PASS | Dataset `VALIDATING`; all 1,434 sources `HASHED` |

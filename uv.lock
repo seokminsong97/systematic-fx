@@ -2321,6 +2321,9 @@ notebook = [
     { name = "ipykernel" },
     { name = "jupyterlab" },
 ]
+publication = [
+    { name = "jsonschema", extra = ["format-nongpl"] },
+]
 research = [
     { name = "matplotlib" },
     { name = "scikit-learn" },
@@ -2332,6 +2335,7 @@ research = [
 requires-dist = [
     { name = "hypothesis", marker = "extra == 'dev'" },
     { name = "ipykernel", marker = "extra == 'notebook'" },
+    { name = "jsonschema", extras = ["format-nongpl"], marker = "extra == 'publication'" },
     { name = "jupyterlab", marker = "extra == 'notebook'" },
     { name = "matplotlib", marker = "extra == 'research'" },
     { name = "numpy" },
@@ -2346,7 +2350,7 @@ requires-dist = [
     { name = "scipy", marker = "extra == 'research'" },
     { name = "statsmodels", marker = "extra == 'research'" },
 ]
-provides-extras = ["dev", "research", "notebook"]
+provides-extras = ["dev", "research", "publication", "notebook"]
 
 [[package]]
 name = "terminado"

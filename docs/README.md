@@ -14,6 +14,9 @@
   PostgreSQL lifecycle, readiness commands, and recovery
 - [`RESEARCH_EXECUTION_STATUS.md`](RESEARCH_EXECUTION_STATUS.md): active Phase 1
   campaign boundary, gate order, data paths, verified contracts, and blockers
+- [`../web/README.md`](../web/README.md): dynamic public research site structure
+- [`../publication/README.md`](../publication/README.md): isolated projection
+  database, worker, and disclosure boundary
 
 ## Phase Designs
 

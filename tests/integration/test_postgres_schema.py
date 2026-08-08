@@ -23,7 +23,15 @@ EXPECTED_TABLES = {
     "instruments",
     "jobs",
     "pattern_ledger",
+    "phase1a_outcome_cell_summaries",
+    "phase1a_outcome_replay_checkpoints",
+    "phase1a_outcome_replay_equivalence_audits",
+    "phase1a_outcome_replay_manifests",
+    "phase1a_outcome_screening_decisions",
+    "publication_outbox",
     "quality_checks",
+    "research_run_attempts",
+    "research_run_specs",
     "schema_migrations",
     "source_files",
     "strategies",
@@ -32,12 +40,17 @@ EXPECTED_TABLES = {
 EXPECTED_CONSTRAINTS = {
     "backtest_metrics_exactly_one_value",
     "campaign_splits_fold_valid",
+    "discovery_exposures_campaign_run_spec_fk",
     "discovery_exposures_interval_order",
     "experiments_frozen_registration_required",
     "instrument_mappings_class_valid",
     "instrument_mappings_date_order",
     "instruments_execution_requires_outright",
     "quality_checks_exactly_one_target",
+    "research_run_attempts_identity",
+    "research_run_specs_code_snapshot_sha256_valid",
+    "research_run_specs_experiment_ownership",
+    "research_run_specs_fingerprint_valid",
     "source_files_dataset_fk",
     "strategies_take_profit_positive",
 }
@@ -79,8 +92,8 @@ class PostgreSQLSchemaIntegrationTest(unittest.TestCase):
     def test_migration_is_repeatable_and_expected_tables_exist(self) -> None:
         report = apply_migrations(self.database_url, psql_binary=self.psql)
         self.assertEqual(report.applied, ())
-        self.assertIn(1, report.skipped)
-        self.assertIn(2, report.skipped)
+        for version in range(1, 21):
+            self.assertIn(version, report.skipped)
 
         result = self._run_sql(
             "SELECT tablename FROM pg_catalog.pg_tables "
@@ -122,6 +135,25 @@ class PostgreSQLSchemaIntegrationTest(unittest.TestCase):
         )
         self.assertNotEqual(missing_parent.returncode, 0)
         self.assertIn("source_files_dataset_fk", missing_parent.stderr)
+
+    def test_live_publication_progress_triggers_exist(self) -> None:
+        result = self._run_sql(
+            "SELECT t.tgname FROM pg_catalog.pg_trigger t "
+            "JOIN pg_catalog.pg_class c ON c.oid = t.tgrelid "
+            "JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace "
+            "WHERE n.nspname = 'systematic_fx' AND NOT t.tgisinternal "
+            "ORDER BY t.tgname"
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        triggers = set(result.stdout.splitlines())
+        self.assertTrue(
+            {
+                "research_run_specs_publication_refresh",
+                "research_run_attempts_publication_refresh",
+                "phase1a_outcome_checkpoints_publication_refresh",
+            }
+            <= triggers
+        )
 
 
 if __name__ == "__main__":
