@@ -91,3 +91,33 @@ def test_migration_0024_fails_closed_on_lineage_consensus_and_terminal_pair() ->
     assert "'{logical_identity,finalist_model_binding_sha256}'" in sql
     assert "'[\"MAXIMUM_FINALIST_LIMIT\"]'::jsonb" in sql
     assert "jsonb_object_length" not in sql
+
+
+def test_migration_0025_only_rebinds_the_dataset_row_to_the_raw_manifest() -> None:
+    migrations = {item.version: item for item in discover_migrations(ROOT / "migrations")}
+    governance = migrations[24]
+    migration = migrations[25]
+    assert migration.name == "bar_state_raw_dataset_lineage_fix"
+
+    old_sql = governance.path.read_text(encoding="utf-8")
+    new_sql = migration.path.read_text(encoding="utf-8")
+    old_start = "CREATE FUNCTION systematic_fx.bar_state_run_spec_matches_trial("
+    new_start = "CREATE OR REPLACE FUNCTION systematic_fx.bar_state_run_spec_matches_trial("
+    old_end = "CREATE FUNCTION systematic_fx.bar_state_catalog_preregistered("
+    new_end = "INSERT INTO systematic_fx.schema_migrations"
+    old_function = old_sql.split(old_start, maxsplit=1)[1].split(old_end, maxsplit=1)[0]
+    new_function = new_sql.split(new_start, maxsplit=1)[1].split(new_end, maxsplit=1)[0]
+    old_predicate = "dataset.manifest_sha256 = campaign.data_manifest_sha256"
+    new_predicate = "dataset.manifest_sha256 = trial.parameters #>> '{raw_source_manifest_sha256}'"
+
+    assert old_function.count(old_predicate) == 1
+    assert new_predicate not in old_function
+    assert "pg_get_functiondef" not in new_sql
+    assert (
+        new_function.strip()
+        == old_function.replace(
+            old_predicate,
+            new_predicate,
+        ).strip()
+    )
+    assert "VALUES (25, 'bar_state_raw_dataset_lineage_fix', :'migration_checksum')" in new_sql

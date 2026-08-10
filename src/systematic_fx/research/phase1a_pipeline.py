@@ -123,7 +123,7 @@ FOOTER_MANIFEST_KEY: Final = "mbp10_footer_manifest_v1"
 MISSING_PREVIOUS_REASON: Final = "MISSING_PREVIOUS_COMPLETED_SESSION"
 UNQUALIFIED_PREVIOUS_REASON: Final = "PREVIOUS_COMPLETED_SOURCE_NOT_QUALIFIED"
 _QUERY_RESULT_LIMIT: Final = 20
-_SUPPORTED_SCHEMA_MIGRATION_VERSIONS: Final = tuple(range(1, 25))
+_SUPPORTED_SCHEMA_MIGRATION_VERSIONS: Final = tuple(range(1, 26))
 
 
 class Phase1APipelineError(RuntimeError):
@@ -299,7 +299,7 @@ def _postgres_runtime(
     expected_versions = tuple(migration.version for migration in expected)
     if expected_versions != _SUPPORTED_SCHEMA_MIGRATION_VERSIONS:
         raise Phase1APipelineError(
-            "Phase1A requires the checked-in PostgreSQL migrations 0001 through 0024 exactly"
+            "Phase1A requires the checked-in PostgreSQL migrations 0001 through 0025 exactly"
         )
 
     with psycopg.connect(database_url, row_factory=dict_row) as connection:
@@ -342,7 +342,7 @@ def _postgres_runtime(
     )
     if applied != expected_identity:
         raise Phase1APipelineError(
-            "PostgreSQL schema migrations do not exactly match checked-in versions 0001-0024"
+            "PostgreSQL schema migrations do not exactly match checked-in versions 0001-0025"
         )
 
     migration_document = list(applied)

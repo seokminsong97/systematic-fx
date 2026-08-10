@@ -575,7 +575,7 @@ def register_bar_state_campaign(
                 row=dataset,
                 expected={
                     "dataset_key": dataset_key,
-                    "manifest_sha256": BAR_STATE_BAR_DATASET_MANIFEST_SHA256,
+                    "manifest_sha256": BAR_STATE_RAW_SOURCE_MANIFEST_SHA256,
                 },
             )
             if dataset["status"] in {"REJECTED", "RETIRED"}:

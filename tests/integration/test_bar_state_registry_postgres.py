@@ -43,6 +43,7 @@ from systematic_fx.db.run_registry import reserve_run_attempt, start_run_attempt
 from systematic_fx.research.bar_state_artifacts import (
     BAR_STATE_ARTIFACT_SCHEMA_BY_KIND,
     BAR_STATE_BAR_DATASET_MANIFEST_SHA256,
+    BAR_STATE_RAW_SOURCE_MANIFEST_SHA256,
     BarStateArtifactError,
     BarStateArtifactLineage,
     bar_state_candidate_selection_projection,
@@ -77,6 +78,7 @@ from systematic_fx.validation.bar_state_splits import (
 ROOT = Path(__file__).resolve().parents[2]
 DATABASE_ENV = "SYSTEMATIC_FX_BAR_STATE_GATE_DATABASE_URL"
 EXPECTED_MIGRATION_0024_SHA256 = "4aa845757f1a220c8d5595d4db6053f6374d99d067ab7e20c3e40ea22d610010"
+EXPECTED_MIGRATION_0025_SHA256 = "e08aa486bf9a65b2875e92866ae5e939fc56dc5d871010dfdb4b9085550749dd"
 SAFE_DATABASE_NAME = re.compile(r"systematic_fx_bar_state_gate_[0-9a-f]{12}")
 
 
@@ -190,7 +192,12 @@ def _provenance(database_url: str) -> BarStateRunProvenance:
     )
 
 
-def _seed_dataset(database_url: str, artifact_root: Path) -> None:
+def _seed_dataset(
+    database_url: str,
+    artifact_root: Path,
+    *,
+    manifest_sha256: str,
+) -> None:
     with psycopg.connect(database_url) as connection:
         connection.execute(
             """
@@ -202,7 +209,7 @@ def _seed_dataset(database_url: str, artifact_root: Path) -> None:
             (
                 BAR_STATE_DATASET_KEY,
                 artifact_root.as_posix(),
-                BAR_STATE_BAR_DATASET_MANIFEST_SHA256,
+                manifest_sha256,
             ),
         )
 
@@ -1046,15 +1053,16 @@ def _publish_candidate_evidence(
 def test_bar_state_v2_postgresql_release_gate(tmp_path: Path) -> None:
     database_url = _disposable_database_url()
     migrations = discover_migrations(ROOT / "migrations")
-    assert tuple(item.version for item in migrations) == tuple(range(1, 25))
-    assert migrations[-1].checksum == EXPECTED_MIGRATION_0024_SHA256
+    assert tuple(item.version for item in migrations) == tuple(range(1, 26))
+    assert migrations[-2].checksum == EXPECTED_MIGRATION_0024_SHA256
+    assert migrations[-1].checksum == EXPECTED_MIGRATION_0025_SHA256
 
     first = apply_migrations(
         database_url,
         directory=ROOT / "migrations",
         psql_binary=os.environ.get("SYSTEMATIC_FX_PSQL"),
     )
-    assert first.applied == tuple(range(1, 25))
+    assert first.applied == tuple(range(1, 26))
     assert first.skipped == ()
     repeated = apply_migrations(
         database_url,
@@ -1062,7 +1070,7 @@ def test_bar_state_v2_postgresql_release_gate(tmp_path: Path) -> None:
         psql_binary=os.environ.get("SYSTEMATIC_FX_PSQL"),
     )
     assert repeated.applied == ()
-    assert repeated.skipped == tuple(range(1, 25))
+    assert repeated.skipped == tuple(range(1, 26))
 
     with psycopg.connect(database_url, row_factory=dict_row) as connection:
         latest = connection.execute(
@@ -1094,9 +1102,9 @@ def test_bar_state_v2_postgresql_release_gate(tmp_path: Path) -> None:
             """
         ).fetchone()
     assert latest == {
-        "version": 24,
-        "name": "bar_state_conditional_governance",
-        "checksum": EXPECTED_MIGRATION_0024_SHA256,
+        "version": 25,
+        "name": "bar_state_raw_dataset_lineage_fix",
+        "checksum": EXPECTED_MIGRATION_0025_SHA256,
     }
     assert trigger_count == 1
     assert canonical_index_guard == {
@@ -1120,7 +1128,29 @@ def test_bar_state_v2_postgresql_release_gate(tmp_path: Path) -> None:
         specs,
         code_artifact,
     )
-    _seed_dataset(database_url, tmp_path)
+    _seed_dataset(
+        database_url,
+        tmp_path,
+        manifest_sha256=BAR_STATE_BAR_DATASET_MANIFEST_SHA256,
+    )
+    with pytest.raises(
+        BarStateRegistryDriftError,
+        match="dataset glbx_mdp3_mbp_10_6e_fut_v1 field 'manifest_sha256' drifted",
+    ):
+        register_bar_state_campaign(
+            database_url,
+            tmp_path,
+            definition=prepared.registry_definition,
+            split_plan=prepared.outer_split_plan,
+            code_commit=provenance.code_commit,
+            registration_artifact=registration_artifact,
+            expected_registration_document=registration_document,
+        )
+    with psycopg.connect(database_url) as connection:
+        connection.execute(
+            "UPDATE systematic_fx.datasets SET manifest_sha256 = %s WHERE dataset_key = %s",
+            (BAR_STATE_RAW_SOURCE_MANIFEST_SHA256, BAR_STATE_DATASET_KEY),
+        )
     campaign = register_bar_state_campaign(
         database_url,
         tmp_path,
@@ -1131,6 +1161,22 @@ def test_bar_state_v2_postgresql_release_gate(tmp_path: Path) -> None:
         expected_registration_document=registration_document,
     )
     assert campaign.created_trials == 12
+    with psycopg.connect(database_url, row_factory=dict_row) as connection:
+        lineage = connection.execute(
+            """
+            SELECT dataset.manifest_sha256 AS raw_source_manifest_sha256,
+                   campaign.data_manifest_sha256 AS bar_dataset_manifest_sha256
+            FROM systematic_fx.campaigns AS campaign
+            JOIN systematic_fx.datasets AS dataset
+              ON dataset.dataset_id = campaign.dataset_id
+            WHERE campaign.campaign_key = %s
+            """,
+            ("bar_state_conditional_v2",),
+        ).fetchone()
+    assert lineage == {
+        "raw_source_manifest_sha256": BAR_STATE_RAW_SOURCE_MANIFEST_SHA256,
+        "bar_dataset_manifest_sha256": BAR_STATE_BAR_DATASET_MANIFEST_SHA256,
+    }
     register_published_bar_artifact(database_url, tmp_path, code_artifact)
 
     registrations = {}

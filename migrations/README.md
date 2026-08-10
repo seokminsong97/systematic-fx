@@ -165,3 +165,8 @@ the twelve-candidate preregistration boundary; and requires one atomic
 successful-attempt and terminal-trial pair for each completed candidate. It
 also refreshes the durable public-projection outbox whenever those governed
 artifact links change and requests one immediate refresh on installation.
+
+`0025_bar_state_raw_dataset_lineage_fix.sql` corrects the governed bar-state
+RunSpec matcher so the control-plane dataset row is bound to the raw MBP-10
+source manifest, while the derived selected-trade-bar manifest remains
+independently bound in the candidate trial and RunSpec parameters.
