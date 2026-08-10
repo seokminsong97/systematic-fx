@@ -32,7 +32,9 @@ from systematic_fx.db.outcome_registry import (
 )
 from systematic_fx.research import outcome_artifacts as artifact_module
 from systematic_fx.research.outcome_artifacts import (
+    P5_OUTCOME_ARTIFACT_IDENTITY,
     OutcomeArtifactError,
+    OutcomeArtifactIdentity,
     find_cache_manifest,
     load_cache_manifest,
     load_detail_shard,
@@ -49,6 +51,14 @@ PLAN_SHA256 = "b" * 64
 INPUT_SHA256 = "c" * 64
 SOURCE_MANIFEST_SHA256 = "d" * 64
 DAY = date(2024, 1, 2)
+P1_IDENTITY = OutcomeArtifactIdentity(
+    query_id="p1_05_unconfirmed_move_reversal",
+    outcome_config_id="phase1a_p1_05_outcome_replay_v1",
+    outcome_artifact_schema="systematic_fx.phase1a_p1_05_outcome_replay.v1",
+    source_slice_count=99,
+    source_occurrence_count=943,
+    summary_row_count=2_904,
+)
 
 
 def _layout(root: Path) -> Path:
@@ -187,16 +197,22 @@ def _record() -> ReplayResultRecord:
     )
 
 
-def _summaries() -> tuple[OutcomeCellSummary, ...]:
+def _summaries(
+    *,
+    long_signal_count: int = 529,
+    short_signal_count: int = 582,
+) -> tuple[OutcomeCellSummary, ...]:
     return tuple(
         OutcomeCellSummary(
             scenario_id=scenario,
             direction=direction,
             take_profit_ticks=take_profit,
             stop_loss_ticks=stop_loss,
-            signal_count=529 if direction == "LONG" else 582,
+            signal_count=(long_signal_count if direction == "LONG" else short_signal_count),
             entry_fill_count=0,
-            entry_not_filled_count=529 if direction == "LONG" else 582,
+            entry_not_filled_count=(
+                long_signal_count if direction == "LONG" else short_signal_count
+            ),
             skipped_occupied_count=0,
             take_profit_first_count=0,
             stop_first_count=0,
@@ -260,6 +276,48 @@ class OutcomeDetailArtifactTests(unittest.TestCase):
             self.assertTrue(populated.path.is_relative_to(data / "derived"))
             self.assertEqual(populated.path.stat().st_mode & 0o222, 0)
 
+    def test_candidate_identity_is_registry_bound_and_uses_a_distinct_namespace(self) -> None:
+        with self.assertRaisesRegex(OutcomeArtifactError, "registry query profile"):
+            OutcomeArtifactIdentity(
+                query_id=P1_IDENTITY.query_id,
+                outcome_config_id=P5_OUTCOME_ARTIFACT_IDENTITY.outcome_config_id,
+                outcome_artifact_schema=P1_IDENTITY.outcome_artifact_schema,
+                source_slice_count=P1_IDENTITY.source_slice_count,
+                source_occurrence_count=P1_IDENTITY.source_occurrence_count,
+                summary_row_count=P1_IDENTITY.summary_row_count,
+            )
+
+        with tempfile.TemporaryDirectory() as directory:
+            data = _layout(Path(directory))
+            p5 = publish_detail_shard(
+                [],
+                data_root=data,
+                run_fingerprint=RUN_FINGERPRINT,
+                shard_sequence=1,
+                source_date=DAY,
+            )
+            p1 = publish_detail_shard(
+                [],
+                data_root=data,
+                run_fingerprint=RUN_FINGERPRINT,
+                shard_sequence=1,
+                source_date=DAY,
+                identity=P1_IDENTITY,
+            )
+
+            self.assertEqual(p1.sha256, p5.sha256)
+            self.assertEqual(
+                p1.path.parent.relative_to(data / "derived").as_posix(),
+                "outcomes/phase1a_p1_05_outcome_replay_v1/detail_shards",
+            )
+            self.assertNotEqual(p1.path, p5.path)
+            self.assertEqual(
+                load_detail_shard(p1, data_root=data, identity=P1_IDENTITY).records,
+                (),
+            )
+            with self.assertRaisesRegex(OutcomeArtifactError, "candidate namespace"):
+                load_detail_shard(p1, data_root=data)
+
     def test_detail_load_rejects_permission_drift(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             data = _layout(Path(directory))
@@ -308,6 +366,93 @@ class OutcomeDetailArtifactTests(unittest.TestCase):
 
 
 class OutcomeManifestTests(unittest.TestCase):
+    def test_p1_checkpoint_and_final_manifest_roundtrip_use_p1_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            data = _layout(Path(directory))
+            report = _write_cache(data)
+            cache = publish_cache_manifest(
+                [report],
+                data_root=data,
+                cache_plan_sha256=PLAN_SHA256,
+                input_manifest_sha256=INPUT_SHA256,
+            )
+            shard = publish_detail_shard(
+                [],
+                data_root=data,
+                run_fingerprint=RUN_FINGERPRINT,
+                shard_sequence=1,
+                source_date=DAY,
+                identity=P1_IDENTITY,
+            )
+            replay = SharedReplay([])
+            replay.complete_source_date(DAY)
+            replay.finish()
+            self.assertEqual(replay.drain_result_records(), ())
+            checkpoint = publish_outcome_checkpoint(
+                data_root=data,
+                outcome_replay_manifest_id=8,
+                run_fingerprint=RUN_FINGERPRINT,
+                checkpoint_sequence=1,
+                completed_source_date_count=1,
+                last_completed_source_date=DAY,
+                source_event_count=0,
+                predecessor_checkpoint_sha256=None,
+                replay_state=replay.checkpoint(),
+                detail_shards=[shard],
+                cache_manifest=cache,
+                input_lineage={"input_manifest_sha256": INPUT_SHA256},
+                identity=P1_IDENTITY,
+            )
+            loaded_checkpoint = load_outcome_checkpoint(
+                checkpoint,
+                data_root=data,
+                identity=P1_IDENTITY,
+            )
+            final = publish_final_result_manifest(
+                data_root=data,
+                run_fingerprint=RUN_FINGERPRINT,
+                source_artifact_manifest_sha256=SOURCE_MANIFEST_SHA256,
+                cell_summaries=_summaries(
+                    long_signal_count=446,
+                    short_signal_count=497,
+                ),
+                detail_shards=[shard],
+                cache_manifest=cache,
+                input_lineage={"input_manifest_sha256": INPUT_SHA256},
+                final_checkpoint=loaded_checkpoint,
+                identity=P1_IDENTITY,
+            )
+            loaded_final = load_final_result_manifest(
+                final,
+                data_root=data,
+                verify_cache_content=False,
+                identity=P1_IDENTITY,
+            )
+
+            self.assertEqual(
+                checkpoint.path.parent.relative_to(data / "derived").as_posix(),
+                "outcomes/checkpoints/phase1a_p1_05_outcome_replay_v1",
+            )
+            self.assertEqual(
+                final.path.parent.relative_to(data / "derived").as_posix(),
+                "outcomes/phase1a_p1_05_outcome_replay_v1",
+            )
+            self.assertEqual(loaded_final.document["query_id"], P1_IDENTITY.query_id)
+            self.assertEqual(
+                loaded_final.document["outcome_config_id"],
+                P1_IDENTITY.outcome_config_id,
+            )
+            self.assertEqual(
+                loaded_final.document["artifact_schema"],
+                P1_IDENTITY.outcome_artifact_schema,
+            )
+            self.assertEqual(loaded_final.document["source_occurrence_count"], 943)
+            self.assertEqual(loaded_final.document["source_slice_count"], 99)
+            with self.assertRaisesRegex(OutcomeArtifactError, "outcome config drift"):
+                load_outcome_checkpoint(checkpoint, data_root=data)
+            with self.assertRaisesRegex(OutcomeArtifactError, "registry field drift"):
+                load_final_result_manifest(final, data_root=data)
+
     def test_lineage_only_checkpoint_rejects_same_size_detail_bit_flip(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             data = _layout(Path(directory))

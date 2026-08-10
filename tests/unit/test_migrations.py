@@ -182,6 +182,97 @@ class RepositoryMigrationContractTest(unittest.TestCase):
         self.assertIn("experiment.registration_artifact_id", sql)
         self.assertIn("phase1a_conservative_screening_v1", sql)
 
+    def test_bar_pattern_registry_governance_is_fail_closed(self) -> None:
+        migrations = {item.version: item for item in discover_migrations(ROOT / "migrations")}
+        migration = migrations[22]
+        self.assertEqual(migration.name, "bar_pattern_registry_governance")
+        sql = migration.path.read_text(encoding="utf-8")
+        for trigger in (
+            "experiment_trials_protect_bar_pattern_lifecycle",
+            "artifacts_protect_bar_pattern_lineage",
+        ):
+            self.assertIn(f"CREATE TRIGGER {trigger}", sql)
+        self.assertIn(
+            "CREATE TRIGGER research_run_attempts_enforce_bar_pattern_immediate",
+            sql,
+        )
+        for trigger in (
+            "research_run_attempts_require_bar_pattern_terminal_pair",
+            "experiment_trials_require_bar_pattern_terminal_pair",
+        ):
+            self.assertIn(f"CREATE CONSTRAINT TRIGGER {trigger}", sql)
+        self.assertIn("DEFERRABLE INITIALLY DEFERRED", sql)
+        immediate_guard = sql.split(
+            "CREATE FUNCTION systematic_fx.enforce_bar_pattern_attempt_immediate()",
+            maxsplit=1,
+        )[1].split(
+            "CREATE TRIGGER research_run_attempts_enforce_bar_pattern_immediate",
+            maxsplit=1,
+        )[0]
+        self.assertNotIn("DEFERRABLE", immediate_guard)
+        self.assertIn("IF NOT FOUND THEN\n        RETURN NEW;", immediate_guard)
+        self.assertIn("must be inserted as QUEUED or SKIPPED_DUPLICATE", immediate_guard)
+        self.assertIn("OLD.status = 'QUEUED'", immediate_guard)
+        self.assertIn("OLD.status = 'RUNNING'", immediate_guard)
+        self.assertIn("IF NOT FOUND", sql)
+        self.assertIn("lacks a canonical candidate key", sql)
+        self.assertIn("IS DISTINCT FROM OLD.research_run_spec_id", sql)
+        self.assertIn("candidate_run_fingerprint", sql)
+        self.assertIn("bar_pattern_run_spec_matches_trial", sql)
+        self.assertIn("canonical_jsonb_sha256(run_spec.canonical_spec)", sql)
+        self.assertIn("jsonb_has_exact_keys", sql)
+        self.assertIn("terminal bar-pattern RunSpec requires one atomic exact", sql)
+        for artifact_type in (
+            "bar_registration",
+            "bar_code_snapshot",
+            "bar_discovery_matches_shard",
+            "bar_discovery_replays_shard",
+            "bar_discovery_evidence_manifest",
+            "bar_global_discovery_result",
+            "bar_terminal_result",
+        ):
+            self.assertIn(f"'{artifact_type}'", sql)
+        artifact_guard = sql.split(
+            "CREATE FUNCTION systematic_fx.protect_bar_pattern_artifact_lineage()",
+            maxsplit=1,
+        )[1].split("CREATE TRIGGER artifacts_protect_bar_pattern_lineage", maxsplit=1)[0]
+        self.assertLess(
+            artifact_guard.index("IF TG_OP = 'DELETE'"),
+            artifact_guard.index("new_protected :="),
+        )
+
+    def test_bar_pattern_raw_dataset_lineage_fix_is_explicit_and_narrow(self) -> None:
+        migrations = {item.version: item for item in discover_migrations(ROOT / "migrations")}
+        governance = migrations[22]
+        migration = migrations[23]
+        self.assertEqual(migration.name, "bar_pattern_raw_dataset_lineage_fix")
+
+        old_sql = governance.path.read_text(encoding="utf-8")
+        new_sql = migration.path.read_text(encoding="utf-8")
+        old_start = "CREATE FUNCTION systematic_fx.bar_pattern_run_spec_matches_trial("
+        new_start = "CREATE OR REPLACE FUNCTION systematic_fx.bar_pattern_run_spec_matches_trial("
+        old_end = "CREATE FUNCTION systematic_fx.protect_bar_pattern_campaign_identity()"
+        new_end = "INSERT INTO systematic_fx.schema_migrations"
+        old_function = old_sql.split(old_start, maxsplit=1)[1].split(old_end, maxsplit=1)[0]
+        new_function = new_sql.split(new_start, maxsplit=1)[1].split(new_end, maxsplit=1)[0]
+        old_predicate = (
+            "dataset.manifest_sha256 = trial.parameters #>> '{bar_dataset_manifest_sha256}'"
+        )
+        new_predicate = (
+            "dataset.manifest_sha256 = trial.parameters #>> '{raw_source_manifest_sha256}'"
+        )
+
+        self.assertIn(old_predicate, old_function)
+        self.assertNotIn(new_predicate, old_function)
+        self.assertNotIn("pg_get_functiondef", new_sql)
+        self.assertEqual(
+            new_function.strip(), old_function.replace(old_predicate, new_predicate).strip()
+        )
+        self.assertIn(
+            "VALUES (23, 'bar_pattern_raw_dataset_lineage_fix', :'migration_checksum')",
+            new_sql,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

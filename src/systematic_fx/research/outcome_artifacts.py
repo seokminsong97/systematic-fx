@@ -1,4 +1,4 @@
-"""Immutable artifacts for the Phase 1A shared p5 outcome replay.
+"""Immutable artifacts for a governed Phase 1A shared outcome replay.
 
 All publications are canonical, content addressed, read-only, and confined to
 ``data/derived``.  Daily Parquet shards retain the complete
@@ -50,6 +50,7 @@ from systematic_fx.db.outcome_registry import (
     SCENARIO_IDS,
     OutcomeCellSummary,
     OutcomeRegistryError,
+    outcome_query_profile,
     validate_complete_cell_summaries,
 )
 from systematic_fx.research.hypotheses import canonical_json_bytes, canonical_sha256
@@ -60,13 +61,14 @@ CACHE_MANIFEST_SCHEMA: Final = "systematic_fx.phase1a_outcome_cache_manifest.v1"
 CACHE_MANIFEST_VERSION: Final = "phase1a_outcome_cache_manifest_v1"
 CHECKPOINT_PROGRESS_SCHEMA: Final = "systematic_fx.phase1a_outcome_progress.v1"
 
-_DETAIL_DIRECTORY: Final = Path("outcomes/phase1a_p5_outcome_replay_v1/detail_shards")
 _CACHE_MANIFEST_DIRECTORY: Final = Path(
     "backtest_event_cache/phase1a_daily_executable_cache_v1/manifests"
 )
-_CHECKPOINT_DIRECTORY: Final = Path("outcomes/checkpoints/phase1a_p5_outcome_replay_v1")
-_RESULT_DIRECTORY: Final = Path("outcomes/phase1a_p5_outcome_replay_v1")
 _SHA256: Final = re.compile(r"[0-9a-f]{64}")
+_CANONICAL_ID: Final = re.compile(r"[a-z][a-z0-9]*(?:_[a-z0-9]+)*")
+_ARTIFACT_SCHEMA_ID: Final = re.compile(
+    r"systematic_fx\.[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*\.v[1-9][0-9]*"
+)
 _WRITE_BITS: Final = stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH
 _SCENARIO_RANK: Final = {value: index for index, value in enumerate(SCENARIO_IDS)}
 _DIRECTION_RANK: Final = {value: index for index, value in enumerate(DIRECTION_IDS)}
@@ -222,6 +224,94 @@ _DETAIL_SCHEMA: Final = pa.schema(
 
 class OutcomeArtifactError(ValueError):
     """An immutable outcome artifact or lineage chain is invalid."""
+
+
+@dataclass(frozen=True, slots=True)
+class OutcomeArtifactIdentity:
+    """Candidate-specific immutable identity and derived artifact namespace.
+
+    The directory layout is deliberately derived from ``outcome_config_id``
+    instead of accepting arbitrary caller-controlled paths.  This keeps every
+    candidate in a distinct content-addressed namespace below ``data/derived``
+    while making the query/config/schema/count bindings explicit in every
+    checkpoint and final manifest.
+    """
+
+    query_id: str
+    outcome_config_id: str
+    outcome_artifact_schema: str
+    source_slice_count: int
+    source_occurrence_count: int
+    summary_row_count: int
+
+    def __post_init__(self) -> None:
+        for value, label in (
+            (self.query_id, "query_id"),
+            (self.outcome_config_id, "outcome_config_id"),
+        ):
+            if not isinstance(value, str) or _CANONICAL_ID.fullmatch(value) is None:
+                raise OutcomeArtifactError(
+                    f"{label} must be a lowercase underscore-delimited identifier"
+                )
+        if (
+            not isinstance(self.outcome_artifact_schema, str)
+            or _ARTIFACT_SCHEMA_ID.fullmatch(self.outcome_artifact_schema) is None
+        ):
+            raise OutcomeArtifactError(
+                "outcome_artifact_schema must be a canonical systematic_fx schema ID"
+            )
+        for value, label in (
+            (self.source_slice_count, "source_slice_count"),
+            (self.source_occurrence_count, "source_occurrence_count"),
+            (self.summary_row_count, "summary_row_count"),
+        ):
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                raise OutcomeArtifactError(f"{label} must be a positive integer")
+        expected_summary_count = len(SCENARIO_IDS) * len(DIRECTION_IDS) * len(BARRIER_TICKS) ** 2
+        if self.summary_row_count != expected_summary_count:
+            raise OutcomeArtifactError(
+                "summary_row_count differs from the frozen scenario/direction/barrier grid"
+            )
+        try:
+            profile = outcome_query_profile(self.query_id)
+        except OutcomeRegistryError as error:
+            raise OutcomeArtifactError("query_id is not an approved outcome candidate") from error
+        expected_profile = (
+            profile.outcome_config_id,
+            profile.outcome_artifact_schema,
+            profile.source_slice_count,
+            profile.source_occurrence_count,
+        )
+        observed_profile = (
+            self.outcome_config_id,
+            self.outcome_artifact_schema,
+            self.source_slice_count,
+            self.source_occurrence_count,
+        )
+        if observed_profile != expected_profile:
+            raise OutcomeArtifactError("artifact identity differs from its registry query profile")
+
+    @property
+    def result_directory(self) -> Path:
+        return Path("outcomes") / self.outcome_config_id
+
+    @property
+    def detail_directory(self) -> Path:
+        return self.result_directory / "detail_shards"
+
+    @property
+    def checkpoint_directory(self) -> Path:
+        return Path("outcomes/checkpoints") / self.outcome_config_id
+
+
+P5_OUTCOME_ARTIFACT_IDENTITY: Final = OutcomeArtifactIdentity(
+    query_id=P5_QUERY_ID,
+    outcome_config_id=OUTCOME_CONFIG_ID,
+    outcome_artifact_schema=OUTCOME_ARTIFACT_SCHEMA,
+    source_slice_count=EXPECTED_SOURCE_SLICE_COUNT,
+    source_occurrence_count=EXPECTED_SOURCE_OCCURRENCE_COUNT,
+    summary_row_count=EXPECTED_SUMMARY_COUNT,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -1014,9 +1104,12 @@ def publish_detail_shard(
     run_fingerprint: str,
     shard_sequence: int,
     source_date: date,
+    identity: OutcomeArtifactIdentity = P5_OUTCOME_ARTIFACT_IDENTITY,
 ) -> DetailShardArtifact:
     """Publish one deterministic daily result shard, including empty days."""
 
+    if not isinstance(identity, OutcomeArtifactIdentity):
+        raise OutcomeArtifactError("identity must be an OutcomeArtifactIdentity")
     if isinstance(records, (str, bytes)) or not isinstance(records, Sequence):
         raise OutcomeArtifactError("records must be a sequence")
     fingerprint = _sha256(run_fingerprint, label="run_fingerprint")
@@ -1045,7 +1138,7 @@ def publish_detail_shard(
     )
     table = pa.Table.from_pylist([_parquet_record(record) for record in ordered], schema=schema)
     _, derived = _data_layout(data_root)
-    output = _ensure_directory(derived, _DETAIL_DIRECTORY)
+    output = _ensure_directory(derived, identity.detail_directory)
     descriptor, name = tempfile.mkstemp(dir=output, prefix=".detail.", suffix=".parquet.tmp")
     os.close(descriptor)
     temporary = Path(name)
@@ -1063,7 +1156,7 @@ def publish_detail_shard(
         path, digest, byte_size, disposition, relative_uri = _publish_temporary(
             temporary,
             data_root=data_root,
-            output_relative=_DETAIL_DIRECTORY,
+            output_relative=identity.detail_directory,
             suffix=".parquet",
         )
     finally:
@@ -1086,9 +1179,12 @@ def load_detail_shard(
     artifact: DetailShardArtifact,
     *,
     data_root: Path | str,
+    identity: OutcomeArtifactIdentity = P5_OUTCOME_ARTIFACT_IDENTITY,
 ) -> LoadedDetailShard:
     """Hash, schema, metadata, ordering, and lossless-record validate one shard."""
 
+    if not isinstance(identity, OutcomeArtifactIdentity):
+        raise OutcomeArtifactError("identity must be an OutcomeArtifactIdentity")
     if not isinstance(artifact, DetailShardArtifact):
         raise OutcomeArtifactError("artifact must be a DetailShardArtifact")
     held = _open_held(
@@ -1105,6 +1201,8 @@ def load_detail_shard(
         ).relative_uri
         if observed_relative_uri != artifact.relative_uri:
             raise OutcomeArtifactError("detail shard relative URI drift")
+        if Path(observed_relative_uri).parent != identity.detail_directory:
+            raise OutcomeArtifactError("detail shard candidate namespace drift")
         with os.fdopen(os.dup(held.descriptor), "rb") as handle:
             parquet = pq.ParquetFile(handle)
             if parquet.schema_arrow.remove_metadata() != _DETAIL_SCHEMA:
@@ -1638,7 +1736,12 @@ def _cache_artifact_from_mapping(
     )
 
 
-def _shard_from_mapping(value: object, *, data_root: Path) -> DetailShardArtifact:
+def _shard_from_mapping(
+    value: object,
+    *,
+    data_root: Path,
+    identity: OutcomeArtifactIdentity,
+) -> DetailShardArtifact:
     expected = {
         "artifact_relative_uri",
         "artifact_sha256",
@@ -1652,6 +1755,8 @@ def _shard_from_mapping(value: object, *, data_root: Path) -> DetailShardArtifac
     if not isinstance(value, dict) or set(value) != expected:
         raise OutcomeArtifactError("detail shard lineage schema drift")
     relative_uri = _text(value.get("artifact_relative_uri"), label="shard relative URI")
+    if Path(relative_uri).parent != identity.detail_directory:
+        raise OutcomeArtifactError("detail shard candidate namespace drift")
     return DetailShardArtifact(
         path=data_root / "derived" / relative_uri,
         relative_uri=relative_uri,
@@ -1673,6 +1778,7 @@ def _validated_shards(
     *,
     run_fingerprint: str,
     data_root: Path | str,
+    identity: OutcomeArtifactIdentity,
 ) -> tuple[DetailShardArtifact, ...]:
     if isinstance(shards, (str, bytes)) or not isinstance(shards, Sequence) or not shards:
         raise OutcomeArtifactError("detail_shards must be a non-empty cumulative sequence")
@@ -1698,6 +1804,8 @@ def _validated_shards(
         )
         if relative_uri != shard.relative_uri:
             raise OutcomeArtifactError("detail shard relative URI drift")
+        if Path(relative_uri).parent != identity.detail_directory:
+            raise OutcomeArtifactError("detail shard candidate namespace drift")
         if shard.sha256 in identities:
             raise OutcomeArtifactError("detail shard lineage repeats an artifact")
         identities.add(shard.sha256)
@@ -1780,9 +1888,12 @@ def publish_outcome_checkpoint(
     detail_shards: Sequence[DetailShardArtifact],
     cache_manifest: CacheManifestArtifact | LoadedCacheManifest,
     input_lineage: Mapping[str, object],
+    identity: OutcomeArtifactIdentity = P5_OUTCOME_ARTIFACT_IDENTITY,
 ) -> CheckpointArtifact:
     """Publish one registry-compatible SOURCE_DATE_COMPLETE checkpoint."""
 
+    if not isinstance(identity, OutcomeArtifactIdentity):
+        raise OutcomeArtifactError("identity must be an OutcomeArtifactIdentity")
     manifest_id = _integer(
         outcome_replay_manifest_id, label="outcome_replay_manifest_id", minimum=1
     )
@@ -1807,6 +1918,7 @@ def publish_outcome_checkpoint(
         detail_shards,
         run_fingerprint=fingerprint,
         data_root=data_root,
+        identity=identity,
     )
     if len(shards) != completed_count or shards[-1].source_date != day:
         raise OutcomeArtifactError("checkpoint count/date differs from cumulative shards")
@@ -1853,12 +1965,12 @@ def publish_outcome_checkpoint(
         "input_lineage": inputs,
         "input_lineage_sha256": input_sha256,
         "last_completed_source_date": day.isoformat(),
-        "outcome_config_id": OUTCOME_CONFIG_ID,
+        "outcome_config_id": identity.outcome_config_id,
         "outcome_replay_manifest_id": manifest_id,
         "predecessor_checkpoint_sha256": predecessor,
         "progress_metadata": progress,
         "progress_metadata_sha256": canonical_sha256(progress),
-        "query_id": P5_QUERY_ID,
+        "query_id": identity.query_id,
         "replay_state": state,
         "replay_state_sha256": state_sha256,
         "run_fingerprint": fingerprint,
@@ -1867,7 +1979,7 @@ def publish_outcome_checkpoint(
     path, digest, byte_size, disposition, relative = _publish_json(
         document,
         data_root=data_root,
-        output_relative=_CHECKPOINT_DIRECTORY,
+        output_relative=identity.checkpoint_directory,
     )
     return CheckpointArtifact(
         path=path,
@@ -1892,6 +2004,7 @@ def load_outcome_checkpoint(
     verify_cache_content: bool = True,
     verify_detail_content: bool = True,
     retain_detail_records: bool = True,
+    identity: OutcomeArtifactIdentity = P5_OUTCOME_ARTIFACT_IDENTITY,
 ) -> LoadedCheckpoint:
     """Strictly restore replay state and validate cumulative lineage.
 
@@ -1908,6 +2021,8 @@ def load_outcome_checkpoint(
     cache-manifest verification.
     """
 
+    if not isinstance(identity, OutcomeArtifactIdentity):
+        raise OutcomeArtifactError("identity must be an OutcomeArtifactIdentity")
     for value, label in (
         (verify_cache_manifest, "verify_cache_manifest"),
         (verify_cache_content, "verify_cache_content"),
@@ -1942,9 +2057,9 @@ def load_outcome_checkpoint(
             raise OutcomeArtifactError("checkpoint top-level schema drift")
         if document.get("artifact_schema") != CHECKPOINT_ARTIFACT_SCHEMA:
             raise OutcomeArtifactError("checkpoint artifact schema drift")
-        if document.get("outcome_config_id") != OUTCOME_CONFIG_ID:
+        if document.get("outcome_config_id") != identity.outcome_config_id:
             raise OutcomeArtifactError("checkpoint outcome config drift")
-        if document.get("query_id") != P5_QUERY_ID:
+        if document.get("query_id") != identity.query_id:
             raise OutcomeArtifactError("checkpoint query drift")
         sequence = _integer(
             document.get("checkpoint_sequence"), label="checkpoint_sequence", minimum=1
@@ -1987,11 +2102,14 @@ def load_outcome_checkpoint(
         raw_shards = document.get("detail_shards")
         if not isinstance(raw_shards, list):
             raise OutcomeArtifactError("checkpoint detail_shards must be a list")
-        shards = tuple(_shard_from_mapping(value, data_root=root) for value in raw_shards)
+        shards = tuple(
+            _shard_from_mapping(value, data_root=root, identity=identity) for value in raw_shards
+        )
         shards = _validated_shards(
             shards,
             run_fingerprint=fingerprint,
             data_root=data_root,
+            identity=identity,
         )
         if len(shards) != completed_count or shards[-1].source_date != day:
             raise OutcomeArtifactError("checkpoint shard count/date drift")
@@ -2006,7 +2124,11 @@ def load_outcome_checkpoint(
         if verify_detail_content:
             detail_rows = 0
             for shard in shards:
-                loaded_shard = load_detail_shard(shard, data_root=data_root)
+                loaded_shard = load_detail_shard(
+                    shard,
+                    data_root=data_root,
+                    identity=identity,
+                )
                 detail_rows += len(loaded_shard.records)
                 if retain_detail_records:
                     loaded_shard_values.append(loaded_shard)
@@ -2069,6 +2191,8 @@ def load_outcome_checkpoint(
         if progress != expected_progress:
             raise OutcomeArtifactError("checkpoint progress metadata content drift")
         relative = held.path.relative_to(derived).as_posix()
+        if Path(relative).parent != identity.checkpoint_directory:
+            raise OutcomeArtifactError("checkpoint candidate namespace drift")
         result_artifact = CheckpointArtifact(
             path=held.path,
             relative_uri=relative,
@@ -2105,22 +2229,29 @@ def publish_final_result_manifest(
     cache_manifest: CacheManifestArtifact | LoadedCacheManifest,
     input_lineage: Mapping[str, object],
     final_checkpoint: CheckpointArtifact | LoadedCheckpoint,
+    identity: OutcomeArtifactIdentity = P5_OUTCOME_ARTIFACT_IDENTITY,
 ) -> FinalResultArtifact:
-    """Publish all 2,904 summaries bound to one finished replay checkpoint."""
+    """Publish the complete summary grid bound to one finished checkpoint."""
 
+    if not isinstance(identity, OutcomeArtifactIdentity):
+        raise OutcomeArtifactError("identity must be an OutcomeArtifactIdentity")
     fingerprint = _sha256(run_fingerprint, label="run_fingerprint")
     source_manifest_sha256 = _sha256(
         source_artifact_manifest_sha256,
         label="source_artifact_manifest_sha256",
     )
     try:
-        summaries, summaries_sha256 = validate_complete_cell_summaries(cell_summaries)
+        summaries, summaries_sha256 = validate_complete_cell_summaries(
+            cell_summaries,
+            query_id=identity.query_id,
+        )
     except OutcomeRegistryError as error:
         raise OutcomeArtifactError("final cell summaries are not a complete frozen grid") from error
     shards = _validated_shards(
         detail_shards,
         run_fingerprint=fingerprint,
         data_root=data_root,
+        identity=identity,
     )
     shard_lineage = [shard.as_dict() for shard in shards]
     shard_manifest_sha256 = canonical_sha256(shard_lineage)
@@ -2155,6 +2286,7 @@ def publish_final_result_manifest(
         verify_cache_content=False,
         verify_detail_content=False,
         retain_detail_records=False,
+        identity=identity,
     )
     if loaded_checkpoint.document.get("run_fingerprint") != fingerprint:
         raise OutcomeArtifactError("final checkpoint run fingerprint drift")
@@ -2186,7 +2318,7 @@ def publish_final_result_manifest(
         raise OutcomeArtifactError("final checkpoint progress lineage drift")
     checkpoint = loaded_checkpoint.artifact
     document = {
-        "artifact_schema": OUTCOME_ARTIFACT_SCHEMA,
+        "artifact_schema": identity.outcome_artifact_schema,
         "cache_manifest": cache.as_dict(),
         "cell_summaries": [summary.payload for summary in summaries],
         "cell_summaries_sha256": summaries_sha256,
@@ -2198,19 +2330,19 @@ def publish_final_result_manifest(
         "final_checkpoint": checkpoint.as_dict(),
         "input_lineage": inputs,
         "input_lineage_sha256": input_lineage_sha256,
-        "outcome_config_id": OUTCOME_CONFIG_ID,
-        "query_id": P5_QUERY_ID,
+        "outcome_config_id": identity.outcome_config_id,
+        "query_id": identity.query_id,
         "run_fingerprint": fingerprint,
         "scenario_ids": list(SCENARIO_IDS),
         "source_artifact_manifest_sha256": source_manifest_sha256,
-        "source_occurrence_count": EXPECTED_SOURCE_OCCURRENCE_COUNT,
-        "source_slice_count": EXPECTED_SOURCE_SLICE_COUNT,
-        "summary_row_count": EXPECTED_SUMMARY_COUNT,
+        "source_occurrence_count": identity.source_occurrence_count,
+        "source_slice_count": identity.source_slice_count,
+        "summary_row_count": identity.summary_row_count,
     }
     path, digest, byte_size, disposition, relative = _publish_json(
         document,
         data_root=data_root,
-        output_relative=_RESULT_DIRECTORY,
+        output_relative=identity.result_directory,
     )
     return FinalResultArtifact(
         path=path,
@@ -2235,9 +2367,12 @@ def load_final_result_manifest(
     expected_byte_size: int | None = None,
     verify_cache_content: bool = True,
     verify_detail_content: bool = True,
+    identity: OutcomeArtifactIdentity = P5_OUTCOME_ARTIFACT_IDENTITY,
 ) -> LoadedFinalResult:
     """Strictly validate a registry-compatible final result and all its lineage."""
 
+    if not isinstance(identity, OutcomeArtifactIdentity):
+        raise OutcomeArtifactError("identity must be an OutcomeArtifactIdentity")
     if isinstance(artifact, FinalResultArtifact):
         path = artifact.path
         expected_sha256 = artifact.sha256
@@ -2258,14 +2393,14 @@ def load_final_result_manifest(
         if set(document) != _FINAL_RESULT_FIELDS:
             raise OutcomeArtifactError("final result top-level schema drift")
         expected_static = {
-            "artifact_schema": OUTCOME_ARTIFACT_SCHEMA,
+            "artifact_schema": identity.outcome_artifact_schema,
             "direction_ids": list(DIRECTION_IDS),
-            "outcome_config_id": OUTCOME_CONFIG_ID,
-            "query_id": P5_QUERY_ID,
+            "outcome_config_id": identity.outcome_config_id,
+            "query_id": identity.query_id,
             "scenario_ids": list(SCENARIO_IDS),
-            "source_occurrence_count": EXPECTED_SOURCE_OCCURRENCE_COUNT,
-            "source_slice_count": EXPECTED_SOURCE_SLICE_COUNT,
-            "summary_row_count": EXPECTED_SUMMARY_COUNT,
+            "source_occurrence_count": identity.source_occurrence_count,
+            "source_slice_count": identity.source_slice_count,
+            "summary_row_count": identity.summary_row_count,
         }
         if any(document.get(key) != value for key, value in expected_static.items()):
             raise OutcomeArtifactError("final result registry field drift")
@@ -2285,7 +2420,10 @@ def load_final_result_manifest(
             )
             if len(parsed_summaries) != len(raw_summaries):
                 raise OutcomeArtifactError("final cell summary is not an object")
-            summaries, summaries_sha256 = validate_complete_cell_summaries(parsed_summaries)
+            summaries, summaries_sha256 = validate_complete_cell_summaries(
+                parsed_summaries,
+                query_id=identity.query_id,
+            )
         except OutcomeRegistryError as error:
             raise OutcomeArtifactError("final cell summary grid validation failed") from error
         if summaries_sha256 != _sha256(
@@ -2297,11 +2435,14 @@ def load_final_result_manifest(
         raw_shards = document.get("detail_shards")
         if not isinstance(raw_shards, list):
             raise OutcomeArtifactError("final detail_shards must be a list")
-        shards = tuple(_shard_from_mapping(value, data_root=root) for value in raw_shards)
+        shards = tuple(
+            _shard_from_mapping(value, data_root=root, identity=identity) for value in raw_shards
+        )
         shards = _validated_shards(
             shards,
             run_fingerprint=fingerprint,
             data_root=data_root,
+            identity=identity,
         )
         if document.get("detail_shard_count") != len(shards):
             raise OutcomeArtifactError("final detail shard count drift")
@@ -2328,6 +2469,7 @@ def load_final_result_manifest(
             verify_cache_content=verify_cache_content,
             verify_detail_content=verify_detail_content,
             retain_detail_records=False,
+            identity=identity,
         )
         if loaded_checkpoint.artifact.as_dict() != checkpoint.as_dict():
             raise OutcomeArtifactError("final checkpoint artifact identity drift")
@@ -2357,6 +2499,8 @@ def load_final_result_manifest(
         ):
             raise OutcomeArtifactError("final detail record count drift")
         relative = held.path.relative_to(derived).as_posix()
+        if Path(relative).parent != identity.result_directory:
+            raise OutcomeArtifactError("final result candidate namespace drift")
         result_artifact = FinalResultArtifact(
             path=held.path,
             relative_uri=relative,

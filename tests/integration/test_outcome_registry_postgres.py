@@ -7,6 +7,7 @@ import tempfile
 import unittest
 import uuid
 from collections.abc import Mapping
+from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -16,6 +17,7 @@ from psycopg.types.json import Jsonb
 
 from systematic_fx.db.migrations import apply_migrations
 from systematic_fx.db.outcome_registry import (
+    _EQUIVALENCE_COMPARISON_FIELDS,
     BARRIER_TICKS,
     CAMPAIGN_KEY,
     CHECKPOINT_ARTIFACT_SCHEMA,
@@ -30,20 +32,35 @@ from systematic_fx.db.outcome_registry import (
     OUTCOME_ARTIFACT_SCHEMA,
     OUTCOME_CONFIG_ID,
     OUTCOME_ENGINE_VERSION,
+    P1_05_QUERY_ID,
     P5_QUERY_ID,
     SCENARIO_COST_TICKS_PER_FILL,
     SCENARIO_IDS,
     OutcomeCellSummary,
     OutcomeRegistryError,
+    OutcomeReplayAuditSubject,
     complete_phase1a_outcome_replay,
+    derive_phase1a_outcome_screening_decisions,
+    find_phase1a_p5_equivalence_audit_for_subject,
     load_latest_phase1a_outcome_checkpoint,
+    load_phase1a_p1_predecessor_gate,
+    load_phase1a_p5_audit_subject,
+    load_phase1a_p5_equivalence_audit_for_attempt,
+    outcome_query_profile,
+    phase1a_outcome_parameters,
     phase1a_p5_outcome_parameters,
     register_phase1a_outcome_checkpoint,
+    register_phase1a_outcome_screening_decisions,
+    register_phase1a_p5_equivalence_audit,
     reserve_phase1a_outcome_replay,
     start_phase1a_outcome_replay,
     validate_complete_cell_summaries,
 )
-from systematic_fx.db.run_registry import register_run_spec
+from systematic_fx.db.run_registry import (
+    register_run_spec,
+    reserve_run_attempt,
+    start_run_attempt,
+)
 from systematic_fx.research.run_spec import RunSpec
 
 
@@ -420,6 +437,56 @@ class OutcomeRegistryPostgreSQLIntegrationTest(unittest.TestCase):
             },
         )
 
+    def _audit_run_spec(
+        self,
+        *,
+        subject: OutcomeReplayAuditSubject,
+        nonce: str,
+    ) -> RunSpec:
+        return RunSpec(
+            campaign_id=CAMPAIGN_KEY,
+            experiment_id=None,
+            run_kind="VALIDATION",
+            engine_version="phase1a_outcome_equivalence_audit_v1",
+            source_manifest_hashes={"p5_result": subject.result_artifact_sha256},
+            eligible_calendar_version="phase1a_calendar_v1",
+            eligible_calendar_sha256="1" * 64,
+            split_version="phase1a_split_v1",
+            split_sha256="2" * 64,
+            feature_version="phase1a_mbp10_screening_v1",
+            feature_sha256="3" * 64,
+            outcome_version=OUTCOME_CONFIG_ID,
+            outcome_sha256="4" * 64,
+            cost_version="phase1a_conservative_cost_v1",
+            cost_sha256="5" * 64,
+            execution_version="phase1a_conservative_execution_v1",
+            execution_sha256="6" * 64,
+            code_commit="7" * 40,
+            code_snapshot_sha256="8" * 64,
+            dependency_lock_sha256="9" * 64,
+            runtime_environment={"fixture_nonce": nonce},
+            random_seed=int(nonce[:16], 16),
+            direction="BOTH",
+            signal_policy={"query_id": P5_QUERY_ID},
+            entry_policy={"checkpoint_load": "FORCED_NONE"},
+            barrier_policy={"comparison": "BYTE_IDENTICAL"},
+            terminal_policy={"control_plane_mutations": "NO_OP"},
+            parameters={
+                "audit_kind": "UNINTERRUPTED_VS_RESUMED_BYTE_EQUIVALENCE",
+                "cache_manifest_sha256": subject.cache_manifest_sha256,
+                "cell_summaries_sha256": subject.cell_summaries_sha256,
+                "checkpoint_chain_sha256": subject.checkpoint_chain_sha256,
+                "checkpoint_count": len(subject.checkpoints),
+                "detail_shard_manifest_sha256": (subject.detail_shard_manifest_sha256),
+                "final_checkpoint_sha256": subject.final_checkpoint_sha256,
+                "input_lineage_sha256": subject.input_lineage_sha256,
+                "predecessor_outcome_replay_manifest_id": (subject.outcome_replay_manifest_id),
+                "predecessor_result_artifact_sha256": (subject.result_artifact_sha256),
+                "predecessor_run_fingerprint": subject.run_fingerprint,
+                "query_id": P5_QUERY_ID,
+            },
+        )
+
     def test_full_lifecycle_is_atomic_idempotent_and_append_only(self) -> None:
         nonce = uuid.uuid4().hex
         source_sha256 = _digest(f"source:{nonce}")
@@ -708,6 +775,227 @@ class OutcomeRegistryPostgreSQLIntegrationTest(unittest.TestCase):
             result_artifact_path=result_path,
             data_root=self.data_root,
         )
+        derived_decisions = derive_phase1a_outcome_screening_decisions(cells)
+        forged_take_profit = next(
+            value
+            for value in BARRIER_TICKS
+            if value != derived_decisions[0].selected_take_profit_ticks
+        )
+        with self.assertRaises(OutcomeRegistryError):
+            register_phase1a_outcome_screening_decisions(
+                self.database_url,
+                outcome_replay_manifest_id=reservation.outcome_replay_manifest_id,
+                decisions=(
+                    replace(
+                        derived_decisions[0],
+                        selected_take_profit_ticks=forged_take_profit,
+                    ),
+                    derived_decisions[1],
+                ),
+            )
+        audit_subject = load_phase1a_p5_audit_subject(
+            self.database_url,
+            data_root=self.data_root,
+            outcome_replay_manifest_id=reservation.outcome_replay_manifest_id,
+        )
+        validation_spec = self._audit_run_spec(subject=audit_subject, nonce=nonce)
+        validation_registration = register_run_spec(self.database_url, validation_spec)
+        validation_reservation = reserve_run_attempt(
+            self.database_url,
+            run_fingerprint=validation_spec.fingerprint,
+        )
+        start_run_attempt(
+            self.database_url,
+            research_run_attempt_id=validation_reservation.research_run_attempt_id,
+        )
+        audit_observed = {
+            "cache_manifest_sha256": audit_subject.cache_manifest_sha256,
+            "cell_summaries_sha256": audit_subject.cell_summaries_sha256,
+            "checkpoint_chain_sha256": audit_subject.checkpoint_chain_sha256,
+            "checkpoint_count": EXPECTED_PLANNED_SOURCE_DATE_COUNT,
+            "checkpoint_load_count": 1,
+            "checkpoint_publication_count": EXPECTED_PLANNED_SOURCE_DATE_COUNT,
+            "checkpoint_reused_count": EXPECTED_PLANNED_SOURCE_DATE_COUNT,
+            "complete_noop_count": 1,
+            "detail_record_count": audit_subject.detail_record_count,
+            "detail_shard_manifest_sha256": (audit_subject.detail_shard_manifest_sha256),
+            "detail_shard_publication_count": EXPECTED_PLANNED_SOURCE_DATE_COUNT,
+            "detail_shard_reused_count": EXPECTED_PLANNED_SOURCE_DATE_COUNT,
+            "final_checkpoint_sequence": EXPECTED_PLANNED_SOURCE_DATE_COUNT,
+            "final_checkpoint_sha256": audit_subject.final_checkpoint_sha256,
+            "final_result_disposition": "REUSED",
+            "input_lineage_sha256": audit_subject.input_lineage_sha256,
+            "outcome_replay_manifest_id": audit_subject.outcome_replay_manifest_id,
+            "result_artifact_byte_size": audit_subject.result_artifact_byte_size,
+            "result_artifact_sha256": audit_subject.result_artifact_sha256,
+            "run_fingerprint": audit_subject.run_fingerprint,
+            "source_event_count": audit_subject.source_event_count,
+            "start_noop_count": 1,
+            "summary_row_count": audit_subject.summary_row_count,
+        }
+        audit_path = _publish(
+            self.data_root,
+            "outcomes/audits/phase1a_p5_outcome_equivalence_v1",
+            {
+                "artifact_schema": ("systematic_fx.phase1a_p5_outcome_equivalence_audit.v1"),
+                "audit_kind": "UNINTERRUPTED_VS_RESUMED_BYTE_EQUIVALENCE",
+                "audit_version": "phase1a_p5_outcome_equivalence_v1",
+                "comparisons": {key: True for key in _EQUIVALENCE_COMPARISON_FIELDS},
+                "execution_policy": {
+                    "checkpoint_load": "FORCED_NONE",
+                    "control_plane_mutations": "NO_OP",
+                    "daily_artifact_policy": "MUST_REUSE_IDENTICAL_CONTENT",
+                    "replay_start": "FIRST_PLANNED_SOURCE_DATE",
+                },
+                "mismatches": [],
+                "observed": audit_observed,
+                "passed": True,
+                "query_id": P5_QUERY_ID,
+                "subject": audit_subject.subject_payload,
+            },
+        )
+        audit_registration = register_phase1a_p5_equivalence_audit(
+            self.database_url,
+            validation_research_run_attempt_id=(validation_reservation.research_run_attempt_id),
+            subject=audit_subject,
+            audit_artifact_path=audit_path,
+            data_root=self.data_root,
+        )
+        loaded_audit = load_phase1a_p5_equivalence_audit_for_attempt(
+            self.database_url,
+            validation_research_run_attempt_id=(validation_reservation.research_run_attempt_id),
+            data_root=self.data_root,
+        )
+        found_audit = find_phase1a_p5_equivalence_audit_for_subject(
+            self.database_url,
+            predecessor_outcome_replay_manifest_id=(reservation.outcome_replay_manifest_id),
+            data_root=self.data_root,
+        )
+        gate = load_phase1a_p1_predecessor_gate(
+            self.database_url,
+            data_root=self.data_root,
+            equivalence_audit_id=audit_registration.outcome_equivalence_audit_id,
+        )
+        self.assertEqual(
+            loaded_audit.audit.outcome_equivalence_audit_id,
+            audit_registration.outcome_equivalence_audit_id,
+        )
+        self.assertEqual(found_audit, loaded_audit)
+        self.assertEqual(
+            gate.equivalence_audit_id,
+            audit_registration.outcome_equivalence_audit_id,
+        )
+        p1_profile = outcome_query_profile(P1_05_QUERY_ID)
+        p1_parameters = {
+            **phase1a_outcome_parameters(
+                source_sha256,
+                query_id=P1_05_QUERY_ID,
+                predecessor_gate=gate,
+            ),
+            "expected_completed_source_date_count": (p1_profile.planned_source_date_count),
+            "expected_last_completed_source_date": (p1_profile.final_source_date.isoformat()),
+            "fixture_nonce": f"{nonce}-p1",
+        }
+        p1_run_spec = replace(
+            run_spec,
+            outcome_version=p1_profile.outcome_config_id,
+            parameters=p1_parameters,
+            signal_policy={"query_id": P1_05_QUERY_ID},
+            source_manifest_hashes={
+                "phase1a_ai_slices": source_sha256,
+                "phase1a_p5_equivalence_audit_v1": (gate.equivalence_audit_artifact_sha256),
+            },
+        )
+        register_run_spec(self.database_url, p1_run_spec)
+        p1_reservation = reserve_phase1a_outcome_replay(
+            self.database_url,
+            run_fingerprint=p1_run_spec.fingerprint,
+            source_artifact_manifest_sha256=source_sha256,
+            query_id=P1_05_QUERY_ID,
+            predecessor_equivalence_audit_id=gate.equivalence_audit_id,
+            data_root=self.data_root,
+        )
+        self.assertTrue(p1_reservation.execute)
+        self.assertTrue(p1_reservation.created_manifest)
+        self.assertEqual(p1_reservation.attempt_status, "QUEUED")
+
+        forged_p1_run_spec = replace(
+            p1_run_spec,
+            parameters={
+                **p1_parameters,
+                "fixture_nonce": f"{nonce}-p1-forged",
+                "predecessor_equivalence_audit_artifact_sha256": "0" * 64,
+            },
+        )
+        forged_registration = register_run_spec(self.database_url, forged_p1_run_spec)
+        with psycopg.connect(self.database_url) as connection:  # noqa: SIM117
+            with (
+                self.assertRaisesRegex(
+                    psycopg.errors.RaiseException,
+                    "p1_05 predecessor equivalence lineage drift",
+                ),
+                connection.transaction(),
+            ):
+                forged_attempt_id = connection.execute(
+                    """
+                    INSERT INTO systematic_fx.research_run_attempts
+                        (research_run_spec_id, attempt_number, status, result_summary)
+                    VALUES (%s, 1, 'QUEUED', '{}'::jsonb)
+                    RETURNING research_run_attempt_id
+                    """,
+                    (forged_registration.research_run_spec_id,),
+                ).fetchone()[0]
+                connection.execute(
+                    """
+                    INSERT INTO systematic_fx.phase1a_outcome_replay_manifests
+                        (research_run_spec_id, research_run_attempt_id, campaign_id,
+                         run_fingerprint, pattern_key,
+                         source_artifact_manifest_sha256, source_slice_count,
+                         source_occurrence_count, scenario_count, direction_count,
+                         barrier_axis_size, cell_count_per_surface,
+                         expected_summary_count, expected_detail_record_count,
+                         planned_source_date_count, final_source_date, status)
+                    VALUES (%s, %s, %s, %s, %s, %s, 99, 943, 3, 2, 22, 484,
+                            2904, 1369236, 478, DATE '2023-08-31', 'QUEUED')
+                    """,
+                    (
+                        forged_registration.research_run_spec_id,
+                        forged_attempt_id,
+                        forged_registration.campaign_id,
+                        forged_p1_run_spec.fingerprint,
+                        P1_05_QUERY_ID,
+                        source_sha256,
+                    ),
+                )
+        duplicate_validation = reserve_run_attempt(
+            self.database_url,
+            run_fingerprint=validation_spec.fingerprint,
+        )
+        self.assertEqual(
+            duplicate_validation.reused_attempt_id,
+            validation_reservation.research_run_attempt_id,
+        )
+        self.assertEqual(
+            load_phase1a_p5_equivalence_audit_for_attempt(
+                self.database_url,
+                validation_research_run_attempt_id=(duplicate_validation.reused_attempt_id),
+                data_root=self.data_root,
+            ).audit.validation_research_run_spec_id,
+            validation_registration.research_run_spec_id,
+        )
+        missing_path = audit_path.with_suffix(".missing")
+        audit_path.rename(missing_path)
+        try:
+            with self.assertRaises(OutcomeRegistryError):
+                load_phase1a_p5_equivalence_audit_for_attempt(
+                    self.database_url,
+                    validation_research_run_attempt_id=(
+                        validation_reservation.research_run_attempt_id
+                    ),
+                    data_root=self.data_root,
+                )
+        finally:
+            missing_path.rename(audit_path)
         duplicate = reserve_phase1a_outcome_replay(
             self.database_url,
             run_fingerprint=run_spec.fingerprint,
@@ -726,7 +1014,11 @@ class OutcomeRegistryPostgreSQLIntegrationTest(unittest.TestCase):
                        (SELECT count(*)
                         FROM systematic_fx.phase1a_outcome_cell_summaries AS cell
                         WHERE cell.outcome_replay_manifest_id =
-                              manifest.outcome_replay_manifest_id) AS cell_count
+                              manifest.outcome_replay_manifest_id) AS cell_count,
+                       (SELECT count(*)
+                        FROM systematic_fx.phase1a_outcome_screening_decisions AS decision
+                        WHERE decision.outcome_replay_manifest_id =
+                              manifest.outcome_replay_manifest_id) AS decision_count
                 FROM systematic_fx.phase1a_outcome_replay_manifests AS manifest
                 JOIN systematic_fx.research_run_attempts AS attempt
                   ON attempt.research_run_attempt_id = manifest.research_run_attempt_id
@@ -734,7 +1026,10 @@ class OutcomeRegistryPostgreSQLIntegrationTest(unittest.TestCase):
                 """,
                 (reservation.outcome_replay_manifest_id,),
             ).fetchone()
-            self.assertEqual(row, ("SUCCEEDED", "SUCCEEDED", EXPECTED_SUMMARY_COUNT))
+            self.assertEqual(
+                row,
+                ("SUCCEEDED", "SUCCEEDED", EXPECTED_SUMMARY_COUNT, 2),
+            )
 
         with psycopg.connect(self.database_url) as connection:  # noqa: SIM117
             with self.assertRaises(psycopg.errors.RaiseException):

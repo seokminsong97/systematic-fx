@@ -32,6 +32,7 @@ from systematic_fx.research.discovery_slice import (
 )
 from systematic_fx.research.hypotheses import canonical_sha256
 from systematic_fx.research.phase1a_pipeline import (
+    _SUPPORTED_SCHEMA_MIGRATION_VERSIONS,
     DEFAULT_SERVICES,
     MISSING_PREVIOUS_REASON,
     UNQUALIFIED_PREVIOUS_REASON,
@@ -96,6 +97,17 @@ def _repository_migration_rows() -> list[dict[str, object]]:
         }
         for migration in discover_migrations(_PROJECT_ROOT / "migrations")
     ]
+
+
+def test_phase1a_pipeline_supports_exact_bar_pattern_lineage_fix_migration() -> None:
+    migrations = discover_migrations(_PROJECT_ROOT / "migrations")
+
+    assert tuple(item.version for item in migrations) == (_SUPPORTED_SCHEMA_MIGRATION_VERSIONS)
+    assert _SUPPORTED_SCHEMA_MIGRATION_VERSIONS == tuple(range(1, 24))
+    assert migrations[-1].name == "bar_pattern_raw_dataset_lineage_fix"
+    assert migrations[-1].checksum == (
+        "887f8dc487eb3961c03ccb06980b8282f7b2e3485db8787612d763f09f9d47b6"
+    )
 
 
 @dataclass(frozen=True)

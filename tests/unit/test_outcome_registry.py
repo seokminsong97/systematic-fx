@@ -14,6 +14,7 @@ import psycopg
 import pytest
 
 from systematic_fx.db.outcome_registry import (
+    _EQUIVALENCE_COMPARISON_FIELDS,
     BARRIER_TICKS,
     CAMPAIGN_KEY,
     CHECKPOINT_ARTIFACT_SCHEMA,
@@ -29,16 +30,31 @@ from systematic_fx.db.outcome_registry import (
     EXPECTED_SUMMARY_COUNT,
     OUTCOME_CONFIG_ID,
     OUTCOME_ENGINE_VERSION,
+    P1_05_EXPECTED_DETAIL_RECORD_COUNT,
+    P1_05_EXPECTED_DIRECTION_SIGNAL_COUNTS,
+    P1_05_EXPECTED_PLANNED_SOURCE_DATE_COUNT,
+    P1_05_EXPECTED_SOURCE_OCCURRENCE_COUNT,
+    P1_05_QUERY_ID,
     P5_QUERY_ID,
     SCENARIO_COST_TICKS_PER_FILL,
     SCENARIO_IDS,
     OutcomeCellSummary,
+    OutcomePredecessorGate,
     OutcomeRegistryDatabaseError,
     OutcomeRegistryError,
+    OutcomeReplayAuditCheckpoint,
+    OutcomeReplayAuditSubject,
+    OutcomeScreeningDecision,
     _open_held_immutable_file,
+    _require_held_parent,
     _validate_checkpoint_artifact,
+    _validate_equivalence_audit_artifact,
     _validate_source_artifact_document,
+    _verify_held_file,
+    derive_phase1a_outcome_screening_decisions,
     load_latest_phase1a_outcome_checkpoint,
+    outcome_query_profile,
+    phase1a_outcome_parameters,
     phase1a_p5_outcome_parameters,
     reserve_phase1a_outcome_replay,
     validate_complete_cell_summaries,
@@ -146,6 +162,255 @@ def test_frozen_outcome_parameters_distinguish_shared_engine_and_p5_config() -> 
         "stop_loss_ticks": list(BARRIER_TICKS),
         "take_profit_ticks": list(BARRIER_TICKS),
     }
+
+
+def test_p1_profile_and_parameters_are_distinct_and_predecessor_bound() -> None:
+    profile = outcome_query_profile(P1_05_QUERY_ID)
+    gate = OutcomePredecessorGate(
+        equivalence_audit_id=7,
+        equivalence_audit_artifact_sha256="1" * 64,
+        predecessor_outcome_replay_manifest_id=11,
+        predecessor_run_fingerprint="2" * 64,
+        predecessor_result_artifact_sha256="3" * 64,
+        predecessor_input_lineage_sha256="4" * 64,
+        predecessor_cell_summaries_sha256="5" * 64,
+        predecessor_detail_shard_manifest_sha256="6" * 64,
+        predecessor_final_checkpoint_sha256="7" * 64,
+    )
+
+    with pytest.raises(OutcomeRegistryError, match="predecessor gate"):
+        phase1a_outcome_parameters("a" * 64, query_id=P1_05_QUERY_ID)
+    parameters = phase1a_outcome_parameters(
+        "a" * 64,
+        query_id=P1_05_QUERY_ID,
+        predecessor_gate=gate,
+    )
+
+    assert profile.source_occurrence_count == 943
+    assert profile.direction_signal_counts == {"LONG": 446, "SHORT": 497}
+    assert profile.planned_source_date_count == 478
+    assert profile.detail_record_count == 1_369_236
+    assert parameters["outcome_config_id"] == "phase1a_p1_05_outcome_replay_v1"
+    assert parameters["predecessor_equivalence_audit_id"] == 7
+    assert parameters["predecessor_result_artifact_sha256"] == "3" * 64
+
+
+def test_p1_cell_surface_uses_its_own_frozen_direction_counts() -> None:
+    p1_cells = tuple(
+        replace(
+            cell,
+            signal_count=P1_05_EXPECTED_DIRECTION_SIGNAL_COUNTS[cell.direction],
+            entry_not_filled_count=(P1_05_EXPECTED_DIRECTION_SIGNAL_COUNTS[cell.direction] - 1),
+        )
+        for cell in _complete_cells()
+    )
+
+    ordered, digest = validate_complete_cell_summaries(
+        p1_cells,
+        query_id=P1_05_QUERY_ID,
+    )
+
+    assert len(ordered) == 2_904
+    assert len(digest) == 64
+    with pytest.raises(OutcomeRegistryError, match="LONG cell signal_count"):
+        validate_complete_cell_summaries(p1_cells)
+
+
+def test_audit_checkpoint_chain_identity_uses_progress_digest() -> None:
+    checkpoint = OutcomeReplayAuditCheckpoint(
+        checkpoint_sequence=1,
+        checkpoint_artifact_sha256="a" * 64,
+        checkpoint_artifact_byte_size=123,
+        predecessor_checkpoint_sha256=None,
+        last_completed_source_date=date(2022, 1, 3),
+        source_event_count=456,
+        progress_metadata={"replay_finished": False},
+    )
+
+    assert (
+        checkpoint.identity_payload["progress_metadata_sha256"]
+        == hashlib.sha256(b'{"replay_finished":false}').hexdigest()
+    )
+    assert "progress_metadata" not in checkpoint.identity_payload
+
+
+def test_equivalence_audit_artifact_binds_every_subject_identity(tmp_path: Path) -> None:
+    checkpoint = OutcomeReplayAuditCheckpoint(
+        checkpoint_sequence=1,
+        checkpoint_artifact_sha256="a" * 64,
+        checkpoint_artifact_byte_size=123,
+        predecessor_checkpoint_sha256=None,
+        last_completed_source_date=date(2022, 1, 3),
+        source_event_count=456,
+        progress_metadata={"replay_finished": True},
+    )
+    subject = OutcomeReplayAuditSubject(
+        outcome_replay_manifest_id=1,
+        research_run_spec_id=2,
+        research_run_attempt_id=3,
+        run_fingerprint="b" * 64,
+        status="SUCCEEDED",
+        query_id=P5_QUERY_ID,
+        source_artifact_manifest_sha256="c" * 64,
+        result_artifact_id=4,
+        result_artifact_path=tmp_path / "result.json",
+        result_artifact_sha256="d" * 64,
+        result_artifact_byte_size=789,
+        cell_summaries_sha256="e" * 64,
+        cache_manifest_sha256="f" * 64,
+        detail_shard_manifest_sha256="1" * 64,
+        input_lineage_sha256="2" * 64,
+        final_checkpoint_sha256="a" * 64,
+        final_checkpoint_sequence=EXPECTED_PLANNED_SOURCE_DATE_COUNT,
+        source_event_count=456,
+        detail_record_count=1_613_172,
+        summary_row_count=2_904,
+        checkpoints=(checkpoint,) * EXPECTED_PLANNED_SOURCE_DATE_COUNT,
+    )
+    observed = {
+        "cache_manifest_sha256": subject.cache_manifest_sha256,
+        "cell_summaries_sha256": subject.cell_summaries_sha256,
+        "checkpoint_chain_sha256": subject.checkpoint_chain_sha256,
+        "checkpoint_count": EXPECTED_PLANNED_SOURCE_DATE_COUNT,
+        "checkpoint_load_count": 1,
+        "checkpoint_publication_count": EXPECTED_PLANNED_SOURCE_DATE_COUNT,
+        "checkpoint_reused_count": EXPECTED_PLANNED_SOURCE_DATE_COUNT,
+        "complete_noop_count": 1,
+        "detail_record_count": subject.detail_record_count,
+        "detail_shard_manifest_sha256": subject.detail_shard_manifest_sha256,
+        "detail_shard_publication_count": EXPECTED_PLANNED_SOURCE_DATE_COUNT,
+        "detail_shard_reused_count": EXPECTED_PLANNED_SOURCE_DATE_COUNT,
+        "final_checkpoint_sequence": EXPECTED_PLANNED_SOURCE_DATE_COUNT,
+        "final_checkpoint_sha256": subject.final_checkpoint_sha256,
+        "final_result_disposition": "REUSED",
+        "input_lineage_sha256": subject.input_lineage_sha256,
+        "outcome_replay_manifest_id": 1,
+        "result_artifact_byte_size": subject.result_artifact_byte_size,
+        "result_artifact_sha256": subject.result_artifact_sha256,
+        "run_fingerprint": subject.run_fingerprint,
+        "source_event_count": subject.source_event_count,
+        "start_noop_count": 1,
+        "summary_row_count": subject.summary_row_count,
+    }
+    data_root = tmp_path / "data"
+    (data_root / "derived").mkdir(parents=True)
+    audit_path = _publish_json(
+        data_root,
+        "outcomes/audits/phase1a_p5_outcome_equivalence_v1",
+        {
+            "artifact_schema": "systematic_fx.phase1a_p5_outcome_equivalence_audit.v1",
+            "audit_kind": "UNINTERRUPTED_VS_RESUMED_BYTE_EQUIVALENCE",
+            "audit_version": "phase1a_p5_outcome_equivalence_v1",
+            "comparisons": {key: True for key in _EQUIVALENCE_COMPARISON_FIELDS},
+            "execution_policy": {
+                "checkpoint_load": "FORCED_NONE",
+                "control_plane_mutations": "NO_OP",
+                "daily_artifact_policy": "MUST_REUSE_IDENTICAL_CONTENT",
+                "replay_start": "FIRST_PLANNED_SOURCE_DATE",
+            },
+            "mismatches": [],
+            "observed": observed,
+            "passed": True,
+            "query_id": P5_QUERY_ID,
+            "subject": subject.subject_payload,
+        },
+    )
+    held = _open_held_immutable_file(audit_path, data_root=data_root)
+    try:
+        document = _validate_equivalence_audit_artifact(held, subject=subject)
+    finally:
+        held.close()
+
+    assert document["passed"] is True
+    for section, field, forged_value in (
+        ("observed", "checkpoint_load_count", 0),
+        ("observed", "checkpoint_reused_count", 484),
+        ("comparisons", "manifest_identity", False),
+    ):
+        forged = json.loads(audit_path.read_text(encoding="utf-8"))
+        forged[section][field] = forged_value
+        forged_path = _publish_json(
+            data_root,
+            f"outcomes/audits/forged-{section}-{field}",
+            forged,
+        )
+        forged_held = _open_held_immutable_file(forged_path, data_root=data_root)
+        try:
+            with pytest.raises(OutcomeRegistryError):
+                _validate_equivalence_audit_artifact(forged_held, subject=subject)
+        finally:
+            forged_held.close()
+
+
+def test_held_artifact_rejects_ancestor_directory_swap(tmp_path: Path) -> None:
+    data_root = tmp_path / "data"
+    (data_root / "derived").mkdir(parents=True)
+    path = _publish_json(data_root, "outcomes/swap-target", {"value": 1})
+    held = _open_held_immutable_file(path, data_root=data_root)
+    original_parent = path.parent
+    moved_parent = original_parent.with_name("swap-held-original")
+    try:
+        original_parent.rename(moved_parent)
+        original_parent.mkdir()
+        replacement = original_parent / path.name
+        replacement.write_bytes(held.content)
+        replacement.chmod(0o444)
+
+        with pytest.raises(OutcomeRegistryError, match="parent|path"):
+            _verify_held_file(held)
+    finally:
+        held.close()
+
+
+def test_held_artifact_rejects_cross_query_namespace(tmp_path: Path) -> None:
+    data_root = tmp_path / "data"
+    (data_root / "derived").mkdir(parents=True)
+    path = _publish_json(
+        data_root,
+        "outcomes/checkpoints/phase1a_p5_outcome_replay_v1",
+        {"value": 1},
+    )
+    held = _open_held_immutable_file(path, data_root=data_root)
+    try:
+        with pytest.raises(OutcomeRegistryError, match="frozen artifact directory"):
+            _require_held_parent(
+                held,
+                data_root=data_root,
+                expected_parent=outcome_query_profile(P1_05_QUERY_ID).checkpoint_directory,
+                label="p1 checkpoint",
+            )
+    finally:
+        held.close()
+
+
+def test_screening_decision_requires_canonical_rejection_reasons() -> None:
+    decision = OutcomeScreeningDecision(
+        direction="SHORT",
+        decision_label="SCREENING_REJECT",
+        selected_take_profit_ticks=None,
+        selected_stop_loss_ticks=None,
+        positive_region_size=0,
+        rejection_reasons=("BASELINE_PROFIT_FACTOR_BELOW_GATE",),
+    )
+
+    assert decision.payload(outcome_replay_manifest_id=1)["direction"] == "SHORT"
+    with pytest.raises(OutcomeRegistryError, match="unique non-empty"):
+        OutcomeScreeningDecision(
+            direction="LONG",
+            decision_label="SCREENING_REJECT",
+            selected_take_profit_ticks=None,
+            selected_stop_loss_ticks=None,
+            positive_region_size=0,
+            rejection_reasons=("Z", "Z"),
+        )
+
+
+def test_complete_surface_derives_both_frozen_screening_decisions() -> None:
+    decisions = derive_phase1a_outcome_screening_decisions(_complete_cells())
+
+    assert tuple(decision.direction for decision in decisions) == ("LONG", "SHORT")
+    assert all(decision.decision_label == "SCREENING_SURVIVOR" for decision in decisions)
+    assert all(decision.selected_take_profit_ticks is not None for decision in decisions)
 
 
 def test_complete_cell_surface_is_canonical_and_rejects_missing_or_drifted_rows() -> None:
@@ -281,7 +546,7 @@ def test_latest_checkpoint_loader_is_read_only_and_returns_verified_exact_state(
         }
         checkpoint_path = _publish_json(
             data_root,
-            "checkpoints",
+            "outcomes/checkpoints/phase1a_p5_outcome_replay_v1",
             checkpoint_document,
         )
         checkpoint_sha256 = checkpoint_path.name.removeprefix("sha256=").removesuffix(".json")
@@ -452,6 +717,18 @@ def test_migration_freezes_append_only_checkpoint_chain_and_complete_surface() -
     validation_sql = (ROOT / "migrations/0015_phase1a_outcome_constraints_validated.sql").read_text(
         encoding="utf-8"
     )
+    ordered_sql = (ROOT / "migrations/0016_phase1a_ordered_outcome_candidates.sql").read_text(
+        encoding="utf-8"
+    )
+    routing_sql = (ROOT / "migrations/0017_phase1a_ordered_trigger_routing.sql").read_text(
+        encoding="utf-8"
+    )
+    decision_sql = (ROOT / "migrations/0018_phase1a_outcome_decision_atomicity.sql").read_text(
+        encoding="utf-8"
+    )
+    lineage_sql = (ROOT / "migrations/0019_phase1a_outcome_audit_lineage_hardening.sql").read_text(
+        encoding="utf-8"
+    )
 
     assert "phase1a_outcome_replay_manifests" in sql
     assert "phase1a_outcome_replay_checkpoints" in sql
@@ -474,6 +751,54 @@ def test_migration_freezes_append_only_checkpoint_chain_and_complete_surface() -
     assert "replay_finished" in hardening_sql
     assert "VALIDATE CONSTRAINT phase1a_outcome_cells_frozen_signal_count" in (validation_sql)
     assert "VALIDATE CONSTRAINT phase1a_outcome_cells_frozen_cost_accounting" in (validation_sql)
+    assert "p1_05_unconfirmed_move_reversal" in ordered_sql
+    assert "source_occurrence_count = 943" in ordered_sql
+    assert "expected_detail_record_count = 1369236" in ordered_sql
+    assert "planned_source_date_count = 478" in ordered_sql
+    assert "phase1a_outcome_replay_equivalence_audits" in ordered_sql
+    assert "phase1a_outcome_screening_decisions" in ordered_sql
+    assert "predecessor_equivalence_audit_id" in ordered_sql
+    assert "phase1a_p5_outcome_manifests_preserve_and_validate" in routing_sql
+    assert "phase1a_p1_05_outcome_manifests_preserve_and_validate" in routing_sql
+    assert "successful Phase 1A outcome replay requires atomic" in decision_sql
+    assert "phase1a_outcome_equivalence_one_per_subject" in lineage_sql
+    assert "CREATE OR REPLACE FUNCTION systematic_fx.protect_phase1a_outcome_manifest" in (
+        lineage_sql
+    )
+    assert "CREATE OR REPLACE FUNCTION systematic_fx.protect_phase1a_outcome_checkpoint" in (
+        lineage_sql
+    )
+    assert "predecessor_detail_shard_manifest_sha256" in lineage_sql
+    assert "IS DISTINCT FROM" in lineage_sql
+    assert "<>" not in lineage_sql
+    assert "CREATE TRIGGER" not in lineage_sql
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    (
+        "predecessor_equivalence_audit_id",
+        "predecessor_equivalence_audit_artifact_sha256",
+        "predecessor_outcome_replay_manifest_id",
+        "predecessor_run_fingerprint",
+        "predecessor_result_artifact_sha256",
+        "predecessor_input_lineage_sha256",
+        "predecessor_cell_summaries_sha256",
+        "predecessor_detail_shard_manifest_sha256",
+        "predecessor_final_checkpoint_sha256",
+    ),
+)
+def test_migration_rejects_every_missing_p1_predecessor_key(field_name: str) -> None:
+    sql = (ROOT / "migrations/0019_phase1a_outcome_audit_lineage_hardening.sql").read_text(
+        encoding="utf-8"
+    )
+
+    assert f"{{{field_name}}}' IS NULL" in sql or (
+        f"{{{field_name}}}'\n" in sql and "IS NULL" in sql
+    )
+    assert f"{{{field_name}}}' IS DISTINCT FROM" in sql or (
+        f"{{{field_name}}}'\n" in sql and "IS DISTINCT FROM" in sql
+    )
 
 
 def test_constants_describe_three_two_by_484_surfaces() -> None:
@@ -488,4 +813,8 @@ def test_constants_describe_three_two_by_484_surfaces() -> None:
     assert EXPECTED_PLANNED_SOURCE_DATE_COUNT == 485
     assert EXPECTED_FINAL_SOURCE_DATE == date(2023, 8, 31)
     assert EXPECTED_DETAIL_RECORD_COUNT == 1_613_172
+    assert P1_05_EXPECTED_SOURCE_OCCURRENCE_COUNT == 943
+    assert P1_05_EXPECTED_DIRECTION_SIGNAL_COUNTS == {"LONG": 446, "SHORT": 497}
+    assert P1_05_EXPECTED_PLANNED_SOURCE_DATE_COUNT == 478
+    assert P1_05_EXPECTED_DETAIL_RECORD_COUNT == 1_369_236
     assert os.path.basename("/data/derived") == "derived"

@@ -25,6 +25,7 @@ from systematic_fx.backtest.event_cache import (
     read_daily_executable_cache,
 )
 from systematic_fx.backtest.shared_replay import SharedReplay, SignalSeed
+from systematic_fx.db.migrations import discover_migrations
 from systematic_fx.db.outcome_registry import phase1a_p5_outcome_parameters
 from systematic_fx.research.outcome_artifacts import (
     load_final_result_manifest,
@@ -43,6 +44,7 @@ from systematic_fx.research.outcome_inputs import (
     TerminalResolution,
 )
 from systematic_fx.research.phase1a_outcome_pipeline import (
+    _SUPPORTED_MIGRATIONS,
     OutcomeProgress,
     Phase1AOutcomePipelineError,
     _input_lineage,
@@ -50,6 +52,17 @@ from systematic_fx.research.phase1a_outcome_pipeline import (
     _run_replay,
     merge_daily_shared_events,
 )
+
+
+def test_outcome_pipeline_supports_exact_bar_pattern_governance_migration() -> None:
+    migrations = discover_migrations(Path(__file__).resolve().parents[2] / "migrations")
+
+    assert tuple(item.version for item in migrations) == _SUPPORTED_MIGRATIONS
+    assert _SUPPORTED_MIGRATIONS == tuple(range(1, 24))
+    assert migrations[-1].name == "bar_pattern_raw_dataset_lineage_fix"
+    assert migrations[-1].checksum == (
+        "887f8dc487eb3961c03ccb06980b8282f7b2e3485db8787612d763f09f9d47b6"
+    )
 
 
 class _Phase1ACompleteTestEconomics(OutcomeEconomicsAccumulator):
@@ -416,6 +429,45 @@ def test_phase1a_outcome_cli_rejects_conflicting_mode_and_worker_bounds() -> Non
         )
     with pytest.raises(SystemExit):
         parser.parse_args(["research", "phase1a-p5-outcomes", "--max-cache-workers", "5"])
+    with pytest.raises(SystemExit):
+        parser.parse_args(
+            [
+                "research",
+                "phase1a-p1-05-outcomes",
+                "--plan-only",
+                "--cache-only",
+            ]
+        )
+    with pytest.raises(SystemExit):
+        parser.parse_args(["research", "phase1a-p1-05-outcomes", "--max-cache-workers", "5"])
+
+
+def test_phase1a_p1_outcome_cli_selects_second_runner(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: Any,
+) -> None:
+    arguments = cli.build_parser().parse_args(
+        ["research", "phase1a-p1-05-outcomes", "--plan-only", "--json"]
+    )
+    captured: dict[str, object] = {}
+
+    def fake_runner(**kwargs: object) -> object:
+        captured.update(kwargs)
+        return SimpleNamespace(as_dict=lambda: {"query_id": "p1_05_unconfirmed_move_reversal"})
+
+    monkeypatch.setattr(
+        "systematic_fx.research.phase1a_outcome_pipeline.run_phase1a_p1_05_outcomes",
+        fake_runner,
+    )
+    monkeypatch.setattr(
+        cli.Settings,
+        "from_env",
+        lambda: SimpleNamespace(data_root=Path("data"), database_url="postgresql://test"),
+    )
+
+    assert arguments.handler(arguments) == 0
+    assert captured["mode"] == "PLAN_ONLY"
+    assert json.loads(capsys.readouterr().out) == {"query_id": "p1_05_unconfirmed_move_reversal"}
 
 
 def test_outcome_run_spec_records_rich_portable_plan_and_cache_lineage() -> None:
@@ -803,7 +855,7 @@ def test_resume_streams_each_detail_shard_and_final_reload_uses_bounded_path(
     )
     monkeypatch.setattr(
         "systematic_fx.research.phase1a_outcome_pipeline.validate_complete_cell_summaries",
-        lambda summaries: (tuple(summaries), "f" * 64),
+        lambda summaries, **kwargs: (tuple(summaries), "f" * 64),
     )
 
     result, final_checkpoint, completed, events, records, summaries = _run_replay(
@@ -825,13 +877,11 @@ def test_resume_streams_each_detail_shard_and_final_reload_uses_bounded_path(
     assert checkpoint_load_kwargs[0]["verify_detail_content"] is False
     assert checkpoint_load_kwargs[0]["retain_detail_records"] is False
     assert checkpoint_load_kwargs[0]["verify_cache_content"] is False
-    assert final_load_kwargs == [
-        {
-            "data_root": data_root,
-            "verify_cache_content": False,
-            "verify_detail_content": True,
-        }
-    ]
+    assert len(final_load_kwargs) == 1
+    assert final_load_kwargs[0]["data_root"] == data_root
+    assert final_load_kwargs[0]["verify_cache_content"] is False
+    assert final_load_kwargs[0]["verify_detail_content"] is True
+    assert final_load_kwargs[0]["identity"].query_id == "p5_01_range_expansion_flow_continuation"
 
 
 def test_pipeline_core_roundtrips_real_cache_shard_checkpoint_and_final_artifacts(

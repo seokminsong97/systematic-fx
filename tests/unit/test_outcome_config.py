@@ -5,8 +5,12 @@ from datetime import date
 from pathlib import Path
 
 from systematic_fx.backtest.event_cache import CACHE_SCHEMA, CACHE_VERSION
+from systematic_fx.research.hypotheses import canonical_sha256
 from systematic_fx.research.outcome_config import (
     EXPECTED_SCENARIO_IDS,
+    P1_OUTCOME_ARTIFACT_SCHEMA,
+    P1_OUTCOME_CONFIG_RELATIVE_PATH,
+    P1_QUERY_ID,
     P5_QUERY_ID,
     load_outcome_replay_config,
 )
@@ -83,6 +87,56 @@ class OutcomeReplayConfigTests(unittest.TestCase):
             parameters["terminal_partition_resolution"],
             "REVERSE_SCAN_LAST_VALID_EXECUTABLE_QUOTE_PARTITION_V1",
         )
+
+    def test_p1_config_freezes_distinct_query_counts_hashes_and_paths(self) -> None:
+        config = load_outcome_replay_config(
+            ROOT,
+            config_path=P1_OUTCOME_CONFIG_RELATIVE_PATH,
+        )
+
+        self.assertEqual(config.outcome_config_id, "phase1a_p1_05_outcome_replay_v1")
+        self.assertEqual(config.query_id, P1_QUERY_ID)
+        self.assertEqual(config.outcome_artifact_schema, P1_OUTCOME_ARTIFACT_SCHEMA)
+        self.assertEqual(config.expected_signal_count, 943)
+        self.assertEqual(dict(config.expected_direction_counts), {"LONG": 446, "SHORT": 497})
+        self.assertEqual(config.expected_signal_source_date_count, 216)
+        self.assertEqual(config.expected_contract_count, 7)
+        self.assertEqual(config.expected_cache_partition_count, 478)
+        self.assertEqual(config.expected_completed_source_date_count, 478)
+        self.assertEqual(config.expected_detail_record_count, 1_369_236)
+        self.assertEqual(config.expected_summary_row_count, 2_904)
+        self.assertEqual(config.expected_first_completed_source_date, date(2022, 1, 7))
+        self.assertEqual(config.expected_last_completed_source_date, date(2023, 8, 31))
+        self.assertEqual(
+            config.expected_artifact_manifest_sha256,
+            "23037db1dd12784e379b76effa4f3056cec18d9ae2db7fe7e54e11f2f5424d33",
+        )
+        self.assertEqual(
+            config.expected_signal_manifest_sha256,
+            "733728670870dd438e79dfadd9df80043a0f2baf9553733cf89382132fefba25",
+        )
+        self.assertEqual(
+            config.expected_input_plan_sha256,
+            "3ad39a9bff36e0eae1c87687bf38108b663394624582167bdbf5d848fe5b0252",
+        )
+        self.assertEqual(
+            config.checkpoint_output_relative,
+            Path("data/derived/outcomes/checkpoints/phase1a_p1_05_outcome_replay_v1"),
+        )
+        self.assertEqual(
+            config.result_output_relative,
+            Path("data/derived/outcomes/phase1a_p1_05_outcome_replay_v1"),
+        )
+
+    def test_p5_canonical_parameters_remain_byte_compatible(self) -> None:
+        config = load_outcome_replay_config(ROOT)
+
+        self.assertEqual(
+            canonical_sha256(config.canonical_parameters()),
+            "00b3258353e99da08b40c201cccd2002b0a7d4ddf2538756ae6be28f0a047bfc",
+        )
+        self.assertNotIn("expected_first_completed_source_date", config.canonical_parameters())
+        self.assertNotIn("outcome_artifact_schema", config.canonical_parameters())
 
 
 if __name__ == "__main__":

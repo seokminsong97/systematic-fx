@@ -594,11 +594,11 @@ def _phase1a_slice_command(args: argparse.Namespace) -> int:
     return 0
 
 
-def _phase1a_p5_outcomes_command(args: argparse.Namespace) -> int:
-    from systematic_fx.research.phase1a_outcome_pipeline import (
-        Phase1AOutcomePipelineError,
-        run_phase1a_p5_outcomes,
-    )
+def _phase1a_outcomes_command(args: argparse.Namespace, *, runner_name: str) -> int:
+    from systematic_fx.research import phase1a_outcome_pipeline
+
+    Phase1AOutcomePipelineError = phase1a_outcome_pipeline.Phase1AOutcomePipelineError
+    runner = getattr(phase1a_outcome_pipeline, runner_name)
 
     settings = Settings.from_env()
     database_url = args.database_url or settings.database_url
@@ -631,7 +631,7 @@ def _phase1a_p5_outcomes_command(args: argparse.Namespace) -> int:
         print(message, file=sys.stderr, flush=True)
 
     try:
-        report = run_phase1a_p5_outcomes(
+        report = runner(
             project_root=Path.cwd(),
             data_root=settings.data_root,
             database_url=database_url,
@@ -650,6 +650,68 @@ def _phase1a_p5_outcomes_command(args: argparse.Namespace) -> int:
         for name, value in payload.items():
             print(f"{name}: {value}")
     return 0
+
+
+def _phase1a_p5_outcomes_command(args: argparse.Namespace) -> int:
+    return _phase1a_outcomes_command(args, runner_name="run_phase1a_p5_outcomes")
+
+
+def _phase1a_p1_05_outcomes_command(args: argparse.Namespace) -> int:
+    return _phase1a_outcomes_command(args, runner_name="run_phase1a_p1_05_outcomes")
+
+
+def _phase1a_p5_equivalence_audit_command(args: argparse.Namespace) -> int:
+    from systematic_fx.research.outcome_equivalence_audit import (
+        OutcomeEquivalenceAuditError,
+        run_phase1a_p5_outcome_equivalence_audit,
+    )
+
+    settings = Settings.from_env()
+    database_url = args.database_url or settings.database_url
+    if not database_url:
+        print("database URL is required via --database-url or SYSTEMATIC_FX_DATABASE_URL")
+        return 2
+
+    def report_progress(progress: object) -> None:
+        if args.json:
+            return
+        payload = progress.as_dict()
+        completed = int(payload["completed"])
+        total = int(payload["total"])
+        if payload["stage"] == "CACHE":
+            print(
+                f"cache: {completed}/{total} reused={payload['cache_reused_count']}",
+                file=sys.stderr,
+                flush=True,
+            )
+            return
+        print(
+            f"checkpoint: {completed}/{total} date={payload['source_date']} "
+            f"events={payload['source_event_count']} "
+            f"detail_rows={payload['detail_record_count']}",
+            file=sys.stderr,
+            flush=True,
+        )
+
+    try:
+        report = run_phase1a_p5_outcome_equivalence_audit(
+            project_root=Path.cwd(),
+            data_root=settings.data_root,
+            database_url=database_url,
+            outcome_replay_manifest_id=args.outcome_replay_manifest_id,
+            progress_callback=report_progress,
+        )
+    except OutcomeEquivalenceAuditError as error:
+        print(error)
+        return 2
+
+    payload = report.as_dict()
+    if args.json:
+        print(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        for name, value in payload.items():
+            print(f"{name}: {value}")
+    return 0 if report.passed else 1
 
 
 def _register_pilot_lineage_command(args: argparse.Namespace) -> int:
@@ -1164,6 +1226,48 @@ def build_parser() -> argparse.ArgumentParser:
     phase1a_outcome_parser.add_argument("--database-url")
     phase1a_outcome_parser.add_argument("--json", action="store_true", help="emit JSON")
     phase1a_outcome_parser.set_defaults(handler=_phase1a_p5_outcomes_command)
+
+    phase1a_p5_audit_parser = research_commands.add_parser(
+        "phase1a-p5-equivalence-audit",
+        help="prove byte equivalence of uninterrupted and resumed governed p5 replays",
+    )
+    phase1a_p5_audit_parser.add_argument(
+        "--outcome-replay-manifest-id",
+        type=_positive_int,
+        help="explicit successful p5 replay manifest (required only if selection is ambiguous)",
+    )
+    phase1a_p5_audit_parser.add_argument("--database-url")
+    phase1a_p5_audit_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="emit final JSON report",
+    )
+    phase1a_p5_audit_parser.set_defaults(handler=_phase1a_p5_equivalence_audit_command)
+
+    phase1a_p1_outcome_parser = research_commands.add_parser(
+        "phase1a-p1-05-outcomes",
+        help="plan, cache, run, or exactly resume the governed p1_05 shared outcome replay",
+    )
+    phase1a_p1_outcome_mode = phase1a_p1_outcome_parser.add_mutually_exclusive_group()
+    phase1a_p1_outcome_mode.add_argument(
+        "--plan-only",
+        action="store_true",
+        help="verify the exact 99-slice/943-signal/478-partition plan without building caches",
+    )
+    phase1a_p1_outcome_mode.add_argument(
+        "--cache-only",
+        action="store_true",
+        help="build and verify immutable daily caches without starting the economic replay",
+    )
+    phase1a_p1_outcome_parser.add_argument(
+        "--max-cache-workers",
+        type=_positive_int,
+        choices=range(1, 5),
+        help="parallel raw-cache builders (1-4; defaults to the governed config)",
+    )
+    phase1a_p1_outcome_parser.add_argument("--database-url")
+    phase1a_p1_outcome_parser.add_argument("--json", action="store_true", help="emit JSON")
+    phase1a_p1_outcome_parser.set_defaults(handler=_phase1a_p1_05_outcomes_command)
 
     exposure_parser = research_commands.add_parser(
         "exposure",

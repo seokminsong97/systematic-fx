@@ -22,9 +22,14 @@ from systematic_fx.research.screening_config import (
 )
 
 OUTCOME_CONFIG_RELATIVE_PATH: Final = Path("configs/research/phase1a_p5_outcome_replay_v1.toml")
+P1_OUTCOME_CONFIG_RELATIVE_PATH: Final = Path(
+    "configs/research/phase1a_p1_05_outcome_replay_v1.toml"
+)
 OUTCOME_ARTIFACT_SCHEMA: Final = "systematic_fx.phase1a_p5_outcome_replay.v1"
+P1_OUTCOME_ARTIFACT_SCHEMA: Final = "systematic_fx.phase1a_p1_05_outcome_replay.v1"
 OUTCOME_REPLAY_ENGINE_VERSION: Final = "phase1a_shared_outcome_replay_v1"
 P5_QUERY_ID: Final = "p5_01_range_expansion_flow_continuation"
+P1_QUERY_ID: Final = "p1_05_unconfirmed_move_reversal"
 TERMINAL_EXIT_POLICY: Final = "LAST_VALID_EXECUTABLE_QUOTE_BEFORE_EXPIRY_MONTH_START"
 TERMINAL_PARTITION_RESOLUTION_POLICY: Final = (
     "REVERSE_SCAN_LAST_VALID_EXECUTABLE_QUOTE_PARTITION_V1"
@@ -53,6 +58,77 @@ EXPECTED_SCENARIO_IDS: Final = (
     "MODERATE_COMBINED",
     "SEVERE_DIAGNOSTIC",
 )
+
+
+@dataclass(frozen=True, slots=True)
+class FrozenOutcomeProfile:
+    """Immutable query-specific identity and cardinality of one governed replay."""
+
+    config_relative_path: Path
+    config_id: str
+    query_id: str
+    outcome_artifact_schema: str
+    slice_indices: tuple[int, ...]
+    expected_signal_count: int
+    expected_long_signal_count: int
+    expected_short_signal_count: int
+    expected_signal_source_date_count: int
+    expected_contract_count: int
+    expected_cache_partition_count: int
+    expected_completed_source_date_count: int
+    expected_first_completed_source_date: date
+    expected_last_completed_source_date: date
+    expected_artifact_manifest_sha256: str
+    expected_signal_manifest_sha256: str
+    expected_input_plan_sha256: str
+
+
+P5_OUTCOME_PROFILE: Final = FrozenOutcomeProfile(
+    config_relative_path=OUTCOME_CONFIG_RELATIVE_PATH,
+    config_id="phase1a_p5_outcome_replay_v1",
+    query_id=P5_QUERY_ID,
+    outcome_artifact_schema=OUTCOME_ARTIFACT_SCHEMA,
+    slice_indices=EXPECTED_SLICE_INDICES,
+    expected_signal_count=EXPECTED_SIGNAL_COUNT,
+    expected_long_signal_count=EXPECTED_LONG_SIGNAL_COUNT,
+    expected_short_signal_count=EXPECTED_SHORT_SIGNAL_COUNT,
+    expected_signal_source_date_count=EXPECTED_SIGNAL_SOURCE_DATE_COUNT,
+    expected_contract_count=EXPECTED_CONTRACT_COUNT,
+    expected_cache_partition_count=EXPECTED_CACHE_PARTITION_COUNT,
+    expected_completed_source_date_count=EXPECTED_COMPLETED_SOURCE_DATE_COUNT,
+    expected_first_completed_source_date=EXPECTED_FIRST_COMPLETED_SOURCE_DATE,
+    expected_last_completed_source_date=EXPECTED_LAST_COMPLETED_SOURCE_DATE,
+    expected_artifact_manifest_sha256=EXPECTED_ARTIFACT_MANIFEST_SHA256,
+    expected_signal_manifest_sha256=EXPECTED_SIGNAL_MANIFEST_SHA256,
+    expected_input_plan_sha256=EXPECTED_INPUT_PLAN_SHA256,
+)
+P1_OUTCOME_PROFILE: Final = FrozenOutcomeProfile(
+    config_relative_path=P1_OUTCOME_CONFIG_RELATIVE_PATH,
+    config_id="phase1a_p1_05_outcome_replay_v1",
+    query_id=P1_QUERY_ID,
+    outcome_artifact_schema=P1_OUTCOME_ARTIFACT_SCHEMA,
+    slice_indices=EXPECTED_SLICE_INDICES,
+    expected_signal_count=943,
+    expected_long_signal_count=446,
+    expected_short_signal_count=497,
+    expected_signal_source_date_count=216,
+    expected_contract_count=7,
+    expected_cache_partition_count=478,
+    expected_completed_source_date_count=478,
+    expected_first_completed_source_date=date(2022, 1, 7),
+    expected_last_completed_source_date=date(2023, 8, 31),
+    expected_artifact_manifest_sha256=(
+        "23037db1dd12784e379b76effa4f3056cec18d9ae2db7fe7e54e11f2f5424d33"
+    ),
+    expected_signal_manifest_sha256=(
+        "733728670870dd438e79dfadd9df80043a0f2baf9553733cf89382132fefba25"
+    ),
+    expected_input_plan_sha256=("3ad39a9bff36e0eae1c87687bf38108b663394624582167bdbf5d848fe5b0252"),
+)
+OUTCOME_PROFILES_BY_QUERY_ID: Final = {
+    P5_QUERY_ID: P5_OUTCOME_PROFILE,
+    P1_QUERY_ID: P1_OUTCOME_PROFILE,
+}
 
 
 class OutcomeConfigError(ValueError):
@@ -89,11 +165,12 @@ class OutcomeScenario:
 
 @dataclass(frozen=True, slots=True)
 class OutcomeReplayConfig:
-    """All governed variables needed to plan and identify one p5 outcome replay."""
+    """All governed variables needed to plan and identify one outcome replay."""
 
     path: Path
     sha256: str
     config_id: str
+    outcome_artifact_schema: str
     campaign_key: str
     query_id: str
     slice_indices: tuple[int, ...]
@@ -104,6 +181,7 @@ class OutcomeReplayConfig:
     expected_contract_count: int
     expected_cache_partition_count: int
     expected_completed_source_date_count: int
+    expected_first_completed_source_date: date
     expected_last_completed_source_date: date
     expected_artifact_manifest_sha256: str
     expected_signal_manifest_sha256: str
@@ -124,8 +202,26 @@ class OutcomeReplayConfig:
     split_relative: Path
 
     @property
+    def outcome_config_id(self) -> str:
+        """Explicit alias used by query-neutral pipeline and registry adapters."""
+
+        return self.config_id
+
+    @property
     def expected_cell_count(self) -> int:
         return len(self.barrier_ticks) ** 2
+
+    @property
+    def expected_detail_record_count(self) -> int:
+        """One record per signal, stress scenario, and barrier-grid cell."""
+
+        return self.expected_signal_count * len(self.scenarios) * self.expected_cell_count
+
+    @property
+    def expected_summary_row_count(self) -> int:
+        """One aggregate for every scenario, direction, and barrier-grid cell."""
+
+        return len(self.scenarios) * 2 * self.expected_cell_count
 
     @property
     def config_hashes(self) -> dict[str, str]:
@@ -303,10 +399,12 @@ def load_outcome_replay_config(
     *,
     config_path: Path | None = None,
 ) -> OutcomeReplayConfig:
-    """Load the p5 replay policy and reject any drift from frozen Phase 1A inputs."""
+    """Load a governed replay policy and reject frozen input drift."""
 
     root = project_root.expanduser().resolve(strict=True)
     requested = config_path or root / OUTCOME_CONFIG_RELATIVE_PATH
+    if not requested.is_absolute():
+        requested = root / requested
     path = requested.expanduser().resolve(strict=True)
     document = load_toml_document(path)
     expected_tables = {
@@ -333,43 +431,58 @@ def load_outcome_replay_config(
 
     if _integer(replay_id, "schema_version", minimum=1) != 1:
         raise OutcomeConfigError("unsupported outcome replay schema_version")
-    if _string(replay_id, "id") != "phase1a_p5_outcome_replay_v1":
+    query_id = _string(replay_id, "query_id")
+    profile = OUTCOME_PROFILES_BY_QUERY_ID.get(query_id)
+    if profile is None:
+        raise OutcomeConfigError("unsupported governed outcome query")
+    if _string(replay_id, "id") != profile.config_id:
         raise OutcomeConfigError("outcome replay ID drift")
+    try:
+        relative_config_path = path.relative_to(root)
+    except ValueError as error:
+        raise OutcomeConfigError("outcome config must remain inside the project") from error
+    if relative_config_path != profile.config_relative_path:
+        raise OutcomeConfigError("outcome replay config path/query identity drift")
     if _string(replay_id, "engine_version") != OUTCOME_REPLAY_ENGINE_VERSION:
         raise OutcomeConfigError("outcome replay engine version drift")
-    if _string(replay_id, "query_id") != P5_QUERY_ID:
-        raise OutcomeConfigError("the first outcome replay must remain p5_01")
     _boolean(replay_id, "screening_only", expected=True)
     if _string(replay_id, "maximum_authority") != "SCREENING_SURVIVOR":
         raise OutcomeConfigError("outcome replay cannot confer backtest or trading authority")
 
     first = _integer(discovery, "first_slice_index")
     last = _integer(discovery, "last_slice_index")
+    if _string(discovery, "artifact_schema") != "systematic_fx.phase1a_discovery_slice.v1":
+        raise OutcomeConfigError("Discovery artifact schema drift")
+    if _integer(discovery, "source_dates_per_slice", minimum=1) != 5:
+        raise OutcomeConfigError("Discovery source-date slice width drift")
     slices = tuple(range(first, last + 1))
-    if slices != EXPECTED_SLICE_INDICES or _integer(
+    if slices != profile.slice_indices or _integer(
         discovery, "expected_slice_count", minimum=1
     ) != len(slices):
-        raise OutcomeConfigError("p5 replay must consume the canonical 99-slice prefix")
+        raise OutcomeConfigError("replay must consume its frozen canonical slice prefix")
     expected_signal_count = _integer(discovery, "expected_signal_count", minimum=1)
     long_count = _integer(discovery, "expected_long_signal_count", minimum=1)
     short_count = _integer(discovery, "expected_short_signal_count", minimum=1)
     if (expected_signal_count, long_count, short_count) != (
-        EXPECTED_SIGNAL_COUNT,
-        EXPECTED_LONG_SIGNAL_COUNT,
-        EXPECTED_SHORT_SIGNAL_COUNT,
+        profile.expected_signal_count,
+        profile.expected_long_signal_count,
+        profile.expected_short_signal_count,
     ) or long_count + short_count != expected_signal_count:
-        raise OutcomeConfigError("p5 frozen support/direction counts drift")
+        raise OutcomeConfigError("frozen support/direction counts drift")
     if (
         _integer(discovery, "expected_signal_source_date_count", minimum=1)
-        != (EXPECTED_SIGNAL_SOURCE_DATE_COUNT)
-        or _integer(discovery, "expected_contract_count", minimum=1) != EXPECTED_CONTRACT_COUNT
+        != profile.expected_signal_source_date_count
+        or _integer(discovery, "expected_contract_count", minimum=1)
+        != profile.expected_contract_count
     ):
-        raise OutcomeConfigError("p5 frozen signal-date/contract counts drift")
+        raise OutcomeConfigError("frozen signal-date/contract counts drift")
     if (
-        _string(discovery, "expected_artifact_manifest_sha256") != EXPECTED_ARTIFACT_MANIFEST_SHA256
-        or _string(discovery, "expected_signal_manifest_sha256") != EXPECTED_SIGNAL_MANIFEST_SHA256
+        _string(discovery, "expected_artifact_manifest_sha256")
+        != profile.expected_artifact_manifest_sha256
+        or _string(discovery, "expected_signal_manifest_sha256")
+        != profile.expected_signal_manifest_sha256
     ):
-        raise OutcomeConfigError("p5 frozen Discovery artifact/signal manifests drift")
+        raise OutcomeConfigError("frozen Discovery artifact/signal manifests drift")
     for name, expected in (
         ("require_canonical_success_attempt", True),
         ("require_visible_to_ai", True),
@@ -387,8 +500,8 @@ def load_outcome_replay_config(
     if configured_discovery != Path("configs/research/phase1a_discovery_slice_v1.toml"):
         raise OutcomeConfigError("Discovery config path drift")
     discovery_config = load_discovery_slice_config(root / configured_discovery)
-    if P5_QUERY_ID not in {query.query_id for query in discovery_config.candidate_queries}:
-        raise OutcomeConfigError("p5 query is absent from the frozen Discovery config")
+    if query_id not in {query.query_id for query in discovery_config.candidate_queries}:
+        raise OutcomeConfigError("query is absent from the frozen Discovery config")
 
     expected_policy_paths = {
         "campaign_path": screening.campaign.path.relative_to(root),
@@ -413,10 +526,12 @@ def load_outcome_replay_config(
         raise OutcomeConfigError("cache in-flight partition bound must equal worker count")
     if _string(cache, "worker_unit") != "ONE_CACHE_KEY":
         raise OutcomeConfigError("each cache worker must own exactly one cache key")
-    if _integer(cache, "expected_partition_count", minimum=1) != (EXPECTED_CACHE_PARTITION_COUNT):
-        raise OutcomeConfigError("p5 expected cache partition count drift")
-    if _string(cache, "expected_plan_sha256") != EXPECTED_INPUT_PLAN_SHA256:
-        raise OutcomeConfigError("p5 expected input plan identity drift")
+    if _integer(cache, "expected_partition_count", minimum=1) != (
+        profile.expected_cache_partition_count
+    ):
+        raise OutcomeConfigError("expected cache partition count drift")
+    if _string(cache, "expected_plan_sha256") != profile.expected_input_plan_sha256:
+        raise OutcomeConfigError("expected input plan identity drift")
     _boolean(cache, "retain_invalid_observations", expected=True)
     _boolean(cache, "retain_source_row_lineage", expected=True)
     _boolean(cache, "semantic_request_index_required", expected=True)
@@ -424,11 +539,11 @@ def load_outcome_replay_config(
     if _integer(replay, "logical_passes", minimum=1) != 1:
         raise OutcomeConfigError("economic replay must use one logical chronological pass")
     if _integer(replay, "expected_completed_source_date_count", minimum=1) != (
-        EXPECTED_COMPLETED_SOURCE_DATE_COUNT
+        profile.expected_completed_source_date_count
     ):
         raise OutcomeConfigError("completed replay source-date count drift")
     if _date(replay, "expected_last_completed_source_date") != (
-        EXPECTED_LAST_COMPLETED_SOURCE_DATE
+        profile.expected_last_completed_source_date
     ):
         raise OutcomeConfigError("completed replay final source-date drift")
     if replay.get("global_event_order") != [
@@ -469,7 +584,7 @@ def load_outcome_replay_config(
     ):
         _boolean(checkpoint, name, expected=True)
 
-    if _string(results, "artifact_schema") != OUTCOME_ARTIFACT_SCHEMA:
+    if _string(results, "artifact_schema") != profile.outcome_artifact_schema:
         raise OutcomeConfigError("outcome artifact schema drift")
     if tuple(results.get("required_scenarios", ())) != EXPECTED_SCENARIO_IDS:
         raise OutcomeConfigError("required result scenarios drift")
@@ -496,30 +611,45 @@ def load_outcome_replay_config(
 
     if (
         _string(sequence, "first_query_id") != P5_QUERY_ID
-        or _string(sequence, "second_query_id") != "p1_05_unconfirmed_move_reversal"
+        or _string(sequence, "second_query_id") != P1_QUERY_ID
         or _string(sequence, "second_query_may_start_after")
         != "P5_COMPLETE_AND_LINEAGE_RESUME_AUDIT_PASSED"
     ):
         raise OutcomeConfigError("campaign query sequence drift")
 
+    checkpoint_output = _relative_path(
+        checkpoint["output_directory"],
+        label="checkpoint.output_directory",
+        derived=True,
+    )
+    result_output = _relative_path(
+        results["output_directory"], label="results.output_directory", derived=True
+    )
+    if checkpoint_output != Path("data/derived/outcomes/checkpoints") / profile.config_id:
+        raise OutcomeConfigError("checkpoint output directory/query identity drift")
+    if result_output != Path("data/derived/outcomes") / profile.config_id:
+        raise OutcomeConfigError("result output directory/query identity drift")
+
     return OutcomeReplayConfig(
         path=path,
         sha256=canonical_sha256(document),
         config_id=_string(replay_id, "id"),
+        outcome_artifact_schema=profile.outcome_artifact_schema,
         campaign_key=_string(replay_id, "campaign_key"),
-        query_id=P5_QUERY_ID,
+        query_id=query_id,
         slice_indices=slices,
         source_dates_per_slice=_integer(discovery, "source_dates_per_slice", minimum=1),
         expected_signal_count=expected_signal_count,
         expected_direction_counts=(("LONG", long_count), ("SHORT", short_count)),
-        expected_signal_source_date_count=EXPECTED_SIGNAL_SOURCE_DATE_COUNT,
-        expected_contract_count=EXPECTED_CONTRACT_COUNT,
-        expected_cache_partition_count=EXPECTED_CACHE_PARTITION_COUNT,
-        expected_completed_source_date_count=EXPECTED_COMPLETED_SOURCE_DATE_COUNT,
-        expected_last_completed_source_date=EXPECTED_LAST_COMPLETED_SOURCE_DATE,
-        expected_artifact_manifest_sha256=EXPECTED_ARTIFACT_MANIFEST_SHA256,
-        expected_signal_manifest_sha256=EXPECTED_SIGNAL_MANIFEST_SHA256,
-        expected_input_plan_sha256=EXPECTED_INPUT_PLAN_SHA256,
+        expected_signal_source_date_count=profile.expected_signal_source_date_count,
+        expected_contract_count=profile.expected_contract_count,
+        expected_cache_partition_count=profile.expected_cache_partition_count,
+        expected_completed_source_date_count=profile.expected_completed_source_date_count,
+        expected_first_completed_source_date=profile.expected_first_completed_source_date,
+        expected_last_completed_source_date=profile.expected_last_completed_source_date,
+        expected_artifact_manifest_sha256=profile.expected_artifact_manifest_sha256,
+        expected_signal_manifest_sha256=profile.expected_signal_manifest_sha256,
+        expected_input_plan_sha256=profile.expected_input_plan_sha256,
         screening_bundle=screening,
         discovery_config_sha256=discovery_config.sha256,
         discovery_definition_sha256=discovery_config.definition_sha256,
@@ -530,14 +660,8 @@ def load_outcome_replay_config(
         cache_output_relative=_relative_path(
             cache["output_directory"], label="cache.output_directory", derived=True
         ),
-        checkpoint_output_relative=_relative_path(
-            checkpoint["output_directory"],
-            label="checkpoint.output_directory",
-            derived=True,
-        ),
-        result_output_relative=_relative_path(
-            results["output_directory"], label="results.output_directory", derived=True
-        ),
+        checkpoint_output_relative=checkpoint_output,
+        result_output_relative=result_output,
         source_footer_manifest_relative=_relative_path(
             policy["source_footer_manifest"],
             label="source_footer_manifest",

@@ -20,6 +20,9 @@ version is an error; create a new migration instead of editing history. Every
 migration contains its own `BEGIN`/`COMMIT`, so a failed file leaves neither a
 partial schema nor a migration record.
 
+Governed research pipelines require the exact contiguous migration history
+from `0001` through `0023`.
+
 Integration tests require an explicitly disposable or repository-private
 database. The test target is never inferred from the application URL:
 
@@ -113,3 +116,42 @@ lineage hashes agree.
 scan for the signal-count and scenario-cost constraints introduced by `0014`.
 Migration stops on any pre-existing weak cell rather than carrying it forward
 as unvalidated research evidence.
+
+`0016_phase1a_ordered_outcome_candidates.sql` adds the ordered p5-to-p1_05
+candidate boundary. It registers append-only p5 byte-equivalence proofs,
+direction-level screening decisions, the p1_05 cardinalities, and the complete
+predecessor lineage that must authorize the second replay.
+
+`0017_phase1a_ordered_trigger_routing.sql` routes the already validated p5 rows
+through their original exact guards and p1_05 rows through the ordered-candidate
+guards. This prevents a p5 transition from dereferencing p1-only predecessor
+state while retaining a common append-preserved manifest table.
+
+`0018_phase1a_outcome_decision_atomicity.sql` makes LONG and SHORT screening
+decisions part of the same deferred success transaction. A replay manifest
+cannot commit `SUCCEEDED` unless exactly two direction decisions already exist.
+
+`0019_phase1a_outcome_audit_lineage_hardening.sql` reinstalls the ordered audit,
+manifest, completion, decision, summary, and checkpoint guards with NULL-safe
+`IS DISTINCT FROM` comparisons. It verifies the complete p5 audit and p1_05
+predecessor lineage and permits only one canonical equivalence proof per p5
+subject.
+
+`0020_publication_run_progress.sql` extends the durable publication outbox to
+governed RunSpec, run-attempt, and outcome-checkpoint changes so the public
+projection can refresh as research execution progresses.
+
+`0021_phase1a_outcome_manifest_record_alias_hardening.sql` replaces the routed
+ordered-outcome manifest guard with unambiguous PL/pgSQL record and SQL table
+aliases. This removes the p1 predecessor-audit lookup's unassigned-record
+failure while preserving its fail-closed lineage checks and trigger routing.
+
+`0022_bar_pattern_registry_governance.sql` freezes bar-pattern candidate
+trial-to-RunSpec bindings and terminal lifecycles, defers exact attempt/trial
+consistency checks to transaction commit, and makes registration, code,
+Discovery evidence, global result, and terminal artifacts immutable.
+
+`0023_bar_pattern_raw_dataset_lineage_fix.sql` corrects the governed
+bar-pattern RunSpec matcher so the control-plane dataset row is bound to the
+raw MBP-10 source manifest, while the derived selected-trade-bar manifest
+remains independently bound in the candidate trial and RunSpec parameters.

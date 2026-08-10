@@ -49,18 +49,30 @@ EXPECTED_CONSTRAINTS = {
     "research_run_specs_code_snapshot_sha256_valid",
     "research_run_specs_experiment_ownership",
     "research_run_specs_fingerprint_valid",
+    "phase1a_outcome_equivalence_one_per_subject",
     "source_files_dataset_fk",
     "strategies_take_profit_positive",
 }
 
 EXPECTED_TRIGGERS = {
+    "artifacts_protect_bar_pattern_lineage",
     "artifacts_protect_phase1a_lineage",
+    "campaigns_protect_bar_pattern_identity",
     "campaigns_protect_phase1a_identity",
     "derived_partition_sources_protect_phase1a_lineage",
     "derived_partitions_protect_phase1a_lineage",
     "discovery_exposures_require_phase1a_success",
+    "experiment_trials_enforce_bar_pattern_insert",
+    "experiment_trials_protect_bar_pattern_lifecycle",
+    "experiment_trials_require_bar_pattern_terminal_pair",
+    "experiments_protect_bar_pattern_identity",
+    "phase1a_outcome_checkpoints_publication_refresh",
+    "research_run_attempts_publication_refresh",
+    "research_run_attempts_enforce_bar_pattern_immediate",
+    "research_run_attempts_require_bar_pattern_terminal_pair",
     "research_run_attempts_require_duplicate_success",
     "research_run_attempts_protect_phase1a_artifact_links",
+    "research_run_specs_publication_refresh",
     "source_files_protect_phase1a_lineage",
 }
 
@@ -105,17 +117,7 @@ class PostgreSQLSchemaIntegrationTest(unittest.TestCase):
     def test_migration_is_repeatable_and_expected_tables_exist(self) -> None:
         report = apply_migrations(self.database_url, psql_binary=self.psql)
         self.assertEqual(report.applied, ())
-        self.assertIn(1, report.skipped)
-        self.assertIn(2, report.skipped)
-        self.assertIn(3, report.skipped)
-        self.assertIn(4, report.skipped)
-        self.assertIn(5, report.skipped)
-        self.assertIn(6, report.skipped)
-        self.assertIn(7, report.skipped)
-        self.assertIn(8, report.skipped)
-        self.assertIn(9, report.skipped)
-        self.assertIn(10, report.skipped)
-        self.assertIn(11, report.skipped)
+        self.assertEqual(report.skipped, tuple(range(1, 24)))
 
         result = self._run_sql(
             "SELECT tablename FROM pg_catalog.pg_tables "

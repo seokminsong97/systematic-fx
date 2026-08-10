@@ -1,4 +1,4 @@
-"""Strict, deterministic inputs and daily-cache plans for the p5 replay.
+"""Strict, deterministic inputs and daily-cache plans for governed replays.
 
 Discovery artifacts are immutable evidence, not trusted Python objects.  This
 module reopens every canonical artifact without following a leaf symlink,
@@ -49,22 +49,37 @@ from systematic_fx.research.outcome_config import (
     EXPECTED_SHORT_SIGNAL_COUNT,
     EXPECTED_SIGNAL_COUNT,
     EXPECTED_SLICE_INDICES,
+    P1_QUERY_ID,
     P5_QUERY_ID,
     TERMINAL_EXIT_POLICY,
     TERMINAL_PARTITION_RESOLUTION_POLICY,
+    OutcomeReplayConfig,
 )
 
 _SHA256: Final = re.compile(r"[0-9a-f]{64}")
-_TARGET_DEFINITION: Final = {
-    "conditions": [
-        "bar_range_x2_ticks>=32",
-        "abs(bar_move_x2_ticks)>=8",
-        "same_sign_signed_flow",
-        "last_spread_ticks<=2",
-    ],
-    "direction_rule": "SIGN_BAR_MOVE",
-    "id": P5_QUERY_ID,
-    "parent_hypothesis_ids": ["p5_03_volatility_expansion_continuation"],
+_TARGET_DEFINITIONS: Final = {
+    P5_QUERY_ID: {
+        "conditions": [
+            "bar_range_x2_ticks>=32",
+            "abs(bar_move_x2_ticks)>=8",
+            "same_sign_signed_flow",
+            "last_spread_ticks<=2",
+        ],
+        "direction_rule": "SIGN_BAR_MOVE",
+        "id": P5_QUERY_ID,
+        "parent_hypothesis_ids": ["p5_03_volatility_expansion_continuation"],
+    },
+    P1_QUERY_ID: {
+        "conditions": [
+            "abs(bar_move_x2_ticks)>=16",
+            "abs(signed_flow_ppm)<100000",
+            "abs(l5_mean_ppm)<100000",
+            "last_spread_ticks<=2",
+        ],
+        "direction_rule": "OPPOSITE_SIGN_BAR_MOVE",
+        "id": P1_QUERY_ID,
+        "parent_hypothesis_ids": [P1_QUERY_ID],
+    },
 }
 _ARTIFACT_FIELDS: Final = {
     "artifact_schema",
@@ -102,7 +117,7 @@ type JsonScalar = str | int | bool | None
 
 
 class OutcomeInputError(ValueError):
-    """Canonical p5 evidence or its deterministic replay plan is invalid."""
+    """Canonical Discovery evidence or its deterministic replay plan is invalid."""
 
 
 def _sha256(value: object, *, label: str) -> str:
@@ -297,7 +312,7 @@ class CanonicalDiscoveryArtifact:
 
 @dataclass(frozen=True, slots=True)
 class ReplaySignal:
-    """One immutable p5 signal with every Discovery variable retained."""
+    """One immutable governed signal with every Discovery variable retained."""
 
     signal_id: str
     slice_index: int
@@ -373,13 +388,15 @@ class ReplaySignal:
 
 
 @dataclass(frozen=True, slots=True)
-class P5DiscoveryInputs:
-    """Verified artifacts and their ordered complete p5 signal evidence."""
+class DiscoveryInputs:
+    """Verified artifacts and ordered signal evidence for one query."""
 
     artifacts: tuple[CanonicalDiscoveryArtifact, ...]
     signals: tuple[ReplaySignal, ...]
+    query_id: str = P5_QUERY_ID
 
     def __post_init__(self) -> None:
+        _text(self.query_id, label="Discovery query_id")
         if not isinstance(self.artifacts, tuple) or any(
             not isinstance(artifact, CanonicalDiscoveryArtifact) for artifact in self.artifacts
         ):
@@ -396,9 +413,9 @@ class P5DiscoveryInputs:
         for signal in self.signals:
             order = (signal.source_date, signal.bucket_end_ns)
             if prior_order is not None and order <= prior_order:
-                raise OutcomeInputError("p5 signals must be uniquely ordered by source time")
+                raise OutcomeInputError("signals must be uniquely ordered by source time")
             if signal.signal_id in signal_ids:
-                raise OutcomeInputError("p5 signal IDs must be unique")
+                raise OutcomeInputError("signal IDs must be unique")
             signal_ids.add(signal.signal_id)
             prior_order = order
 
@@ -415,7 +432,7 @@ class P5DiscoveryInputs:
         return canonical_sha256(
             {
                 "artifact_manifest_sha256": self.artifact_manifest_sha256,
-                "query_id": P5_QUERY_ID,
+                "query_id": self.query_id,
                 "signal_manifest_sha256": self.signal_manifest_sha256,
             }
         )
@@ -425,7 +442,7 @@ class P5DiscoveryInputs:
             "artifact_manifest_sha256": self.artifact_manifest_sha256,
             "artifacts": [artifact.as_dict() for artifact in self.artifacts],
             "input_manifest_sha256": self.input_manifest_sha256,
-            "query_id": P5_QUERY_ID,
+            "query_id": self.query_id,
             "signal_manifest_sha256": self.signal_manifest_sha256,
             "signals": [signal.as_dict() for signal in self.signals],
         }
@@ -438,7 +455,12 @@ def _requested_dates(document: Mapping[str, object], *, slice_index: int) -> tup
     return _strict_dates(raw, label=f"Discovery slice {slice_index} requested_source_dates")  # type: ignore[arg-type]
 
 
-def _target_query(document: Mapping[str, object], *, slice_index: int) -> Mapping[str, object]:
+def _target_query(
+    document: Mapping[str, object],
+    *,
+    slice_index: int,
+    query_id: str,
+) -> Mapping[str, object]:
     raw = document.get("query_results")
     if not isinstance(raw, list) or len(raw) != 11:
         raise OutcomeInputError(f"Discovery slice {slice_index} query cardinality drift")
@@ -450,16 +472,19 @@ def _target_query(document: Mapping[str, object], *, slice_index: int) -> Mappin
         definition = value.get("definition")
         if not isinstance(definition, dict):
             raise OutcomeInputError(f"Discovery slice {slice_index} query definition drift")
-        query_id = _text(definition.get("id"), label="Discovery query id")
-        query_ids.append(query_id)
-        if query_id == P5_QUERY_ID:
+        discovered_query_id = _text(definition.get("id"), label="Discovery query id")
+        query_ids.append(discovered_query_id)
+        if discovered_query_id == query_id:
             if target is not None:
-                raise OutcomeInputError(f"Discovery slice {slice_index} repeats p5 query")
+                raise OutcomeInputError(f"Discovery slice {slice_index} repeats {query_id} query")
             target = value
     if len(query_ids) != len(set(query_ids)) or target is None:
         raise OutcomeInputError(f"Discovery slice {slice_index} query identity drift")
-    if target.get("definition") != _TARGET_DEFINITION:
-        raise OutcomeInputError(f"Discovery slice {slice_index} p5 definition drift")
+    expected_definition = _TARGET_DEFINITIONS.get(query_id)
+    if expected_definition is None:
+        raise OutcomeInputError(f"unsupported Discovery query: {query_id}")
+    if target.get("definition") != expected_definition:
+        raise OutcomeInputError(f"Discovery slice {slice_index} {query_id} definition drift")
     return target
 
 
@@ -484,11 +509,12 @@ def _slice_signals(
     *,
     slice_index: int,
     requested_dates: tuple[date, ...],
+    query_id: str,
 ) -> tuple[ReplaySignal, ...]:
-    support_count = _integer(result.get("support_count"), label="p5 support_count")
+    support_count = _integer(result.get("support_count"), label=f"{query_id} support_count")
     occurrences = result.get("occurrences")
     if not isinstance(occurrences, list) or len(occurrences) != support_count:
-        raise OutcomeInputError(f"Discovery slice {slice_index} p5 support evidence drift")
+        raise OutcomeInputError(f"Discovery slice {slice_index} {query_id} support evidence drift")
     requested = set(requested_dates)
     signals: list[ReplaySignal] = []
     prior_order: tuple[date, int] | None = None
@@ -524,7 +550,7 @@ def _slice_signals(
         except ContractSelectionError as error:
             raise OutcomeInputError(f"{label} has an invalid 6E contract") from error
         _validate_forward(occurrence.get("forward"), label=label)
-        signal_id = f"{P5_QUERY_ID}:slice={slice_index:02d}:occurrence={occurrence_index:06d}"
+        signal_id = f"{query_id}:slice={slice_index:02d}:occurrence={occurrence_index:06d}"
         signals.append(
             ReplaySignal(
                 signal_id=signal_id,
@@ -543,24 +569,67 @@ def _slice_signals(
         "LONG": counts["LONG"],
         "SHORT": counts["SHORT"],
     }:
-        raise OutcomeInputError(f"Discovery slice {slice_index} p5 direction counts drift")
+        raise OutcomeInputError(f"Discovery slice {slice_index} {query_id} direction counts drift")
     if result.get("source_date_count") != len(supported_dates):
-        raise OutcomeInputError(f"Discovery slice {slice_index} p5 source-date count drift")
+        raise OutcomeInputError(f"Discovery slice {slice_index} {query_id} source-date count drift")
     return tuple(signals)
 
 
-def load_p5_discovery_inputs(
+def load_discovery_inputs(
     artifacts: Sequence[CanonicalDiscoveryArtifact],
-) -> P5DiscoveryInputs:
-    """Verify the exact 99 canonical Discovery artifacts and extract 1,111 signals."""
+    *,
+    query_id: str,
+    expected_slice_indices: tuple[int, ...],
+    expected_signal_count: int,
+    expected_direction_counts: Mapping[str, int],
+    expected_signal_source_date_count: int | None = None,
+    expected_contract_count: int | None = None,
+) -> DiscoveryInputs:
+    """Verify canonical Discovery artifacts and extract one frozen query."""
 
+    query_id = _text(query_id, label="query_id")
+    if (
+        not isinstance(expected_slice_indices, tuple)
+        or not expected_slice_indices
+        or any(
+            isinstance(index, bool) or not isinstance(index, int) or index < 0
+            for index in expected_slice_indices
+        )
+        or expected_slice_indices != tuple(sorted(set(expected_slice_indices)))
+    ):
+        raise OutcomeInputError("expected slice indices must be a non-empty ordered tuple")
+    expected_signal_count = _integer(
+        expected_signal_count,
+        label="expected_signal_count",
+        minimum=1,
+    )
+    if not isinstance(expected_direction_counts, Mapping) or set(expected_direction_counts) != {
+        "LONG",
+        "SHORT",
+    }:
+        raise OutcomeInputError("expected direction counts must contain LONG and SHORT")
+    normalized_direction_counts = {
+        direction: _integer(
+            expected_direction_counts[direction],
+            label=f"expected {direction} signal count",
+        )
+        for direction in ("LONG", "SHORT")
+    }
+    if sum(normalized_direction_counts.values()) != expected_signal_count:
+        raise OutcomeInputError("expected signal and direction counts disagree")
+    for value, label in (
+        (expected_signal_source_date_count, "expected_signal_source_date_count"),
+        (expected_contract_count, "expected_contract_count"),
+    ):
+        if value is not None:
+            _integer(value, label=label, minimum=1)
     if isinstance(artifacts, (str, bytes)) or not isinstance(artifacts, Sequence):
         raise OutcomeInputError("artifacts must be an ordered sequence")
     if any(not isinstance(artifact, CanonicalDiscoveryArtifact) for artifact in artifacts):
         raise OutcomeInputError("every artifact must be a CanonicalDiscoveryArtifact")
     ordered = tuple(sorted(artifacts, key=lambda artifact: artifact.slice_index))
-    if tuple(artifact.slice_index for artifact in ordered) != EXPECTED_SLICE_INDICES:
-        raise OutcomeInputError("canonical Discovery artifacts must cover slices 0 through 98")
+    if tuple(artifact.slice_index for artifact in ordered) != expected_slice_indices:
+        raise OutcomeInputError("canonical Discovery artifact slice coverage drift")
     if len({artifact.sha256 for artifact in ordered}) != len(ordered):
         raise OutcomeInputError("canonical Discovery artifacts repeat a content identity")
     signals: list[ReplaySignal] = []
@@ -573,26 +642,92 @@ def load_p5_discovery_inputs(
         if prior_requested_date is not None and requested_dates[0] <= prior_requested_date:
             raise OutcomeInputError("Discovery slice source-date ranges overlap or regress")
         prior_requested_date = requested_dates[-1]
-        target = _target_query(document, slice_index=descriptor.slice_index)
+        target = _target_query(
+            document,
+            slice_index=descriptor.slice_index,
+            query_id=query_id,
+        )
         for signal in _slice_signals(
             target,
             slice_index=descriptor.slice_index,
             requested_dates=requested_dates,
+            query_id=query_id,
         ):
             order = (signal.source_date, signal.bucket_end_ns)
             if prior_signal_order is not None and order <= prior_signal_order:
-                raise OutcomeInputError("p5 signals are duplicated or globally out of order")
+                raise OutcomeInputError("signals are duplicated or globally out of order")
             prior_signal_order = order
             signals.append(signal)
     direction_counts = Counter(signal.direction for signal in signals)
-    if len(signals) != EXPECTED_SIGNAL_COUNT or direction_counts != Counter(
+    expected_counts = Counter(
         {
-            Direction.LONG: EXPECTED_LONG_SIGNAL_COUNT,
-            Direction.SHORT: EXPECTED_SHORT_SIGNAL_COUNT,
+            Direction.LONG: normalized_direction_counts["LONG"],
+            Direction.SHORT: normalized_direction_counts["SHORT"],
         }
+    )
+    if len(signals) != expected_signal_count or direction_counts != expected_counts:
+        raise OutcomeInputError(f"frozen {query_id} signal/direction totals drift")
+    if (
+        expected_signal_source_date_count is not None
+        and len({signal.source_date for signal in signals}) != expected_signal_source_date_count
     ):
-        raise OutcomeInputError("frozen p5 totals must equal 1,111 signals (LONG 529, SHORT 582)")
-    return P5DiscoveryInputs(artifacts=ordered, signals=tuple(signals))
+        raise OutcomeInputError(f"frozen {query_id} signal-date total drift")
+    if (
+        expected_contract_count is not None
+        and len({signal.contract for signal in signals}) != expected_contract_count
+    ):
+        raise OutcomeInputError(f"frozen {query_id} contract total drift")
+    return DiscoveryInputs(
+        artifacts=ordered,
+        signals=tuple(signals),
+        query_id=query_id,
+    )
+
+
+# Backward-compatible public name used by the original p5 pipeline and tests.
+P5DiscoveryInputs = DiscoveryInputs
+
+
+def load_p5_discovery_inputs(
+    artifacts: Sequence[CanonicalDiscoveryArtifact],
+) -> DiscoveryInputs:
+    """Verify the frozen p5 query in all 99 canonical Discovery artifacts."""
+
+    return load_discovery_inputs(
+        artifacts,
+        query_id=P5_QUERY_ID,
+        expected_slice_indices=EXPECTED_SLICE_INDICES,
+        expected_signal_count=EXPECTED_SIGNAL_COUNT,
+        expected_direction_counts={
+            "LONG": EXPECTED_LONG_SIGNAL_COUNT,
+            "SHORT": EXPECTED_SHORT_SIGNAL_COUNT,
+        },
+    )
+
+
+def load_configured_discovery_inputs(
+    artifacts: Sequence[CanonicalDiscoveryArtifact],
+    config: OutcomeReplayConfig,
+) -> DiscoveryInputs:
+    """Load one query and bind its signal evidence to the frozen config hashes."""
+
+    if not isinstance(config, OutcomeReplayConfig):
+        raise OutcomeInputError("configured Discovery loading requires OutcomeReplayConfig")
+    inputs = load_discovery_inputs(
+        artifacts,
+        query_id=config.query_id,
+        expected_slice_indices=config.slice_indices,
+        expected_signal_count=config.expected_signal_count,
+        expected_direction_counts=dict(config.expected_direction_counts),
+        expected_signal_source_date_count=config.expected_signal_source_date_count,
+        expected_contract_count=config.expected_contract_count,
+    )
+    if (
+        inputs.artifact_manifest_sha256 != config.expected_artifact_manifest_sha256
+        or inputs.signal_manifest_sha256 != config.expected_signal_manifest_sha256
+    ):
+        raise OutcomeInputError("Discovery artifact or signal manifest differs from frozen config")
+    return inputs
 
 
 @dataclass(frozen=True, slots=True)
@@ -958,8 +1093,8 @@ def _manifest_records(
     return tuple(rows)
 
 
-def plan_p5_replay_inputs(
-    discovery: P5DiscoveryInputs,
+def plan_replay_inputs(
+    discovery: DiscoveryInputs,
     *,
     source_manifest: SourceManifestBundle,
     mbp10_root: Path | str,
@@ -973,12 +1108,12 @@ def plan_p5_replay_inputs(
     barrier or mandatory terminal exit releases it.
     """
 
-    if not isinstance(discovery, P5DiscoveryInputs) or not discovery.signals:
-        raise OutcomeInputError("discovery must contain at least one p5 signal")
+    if not isinstance(discovery, DiscoveryInputs) or not discovery.signals:
+        raise OutcomeInputError("discovery must contain at least one signal")
     calendar = _strict_dates(calendar_source_dates, label="calendar_source_dates")
     calendar_set = set(calendar)
     if any(signal.source_date not in calendar_set for signal in discovery.signals):
-        raise OutcomeInputError("every p5 signal date must belong to the canonical calendar")
+        raise OutcomeInputError("every signal date must belong to the canonical calendar")
     root = _source_root(mbp10_root)
     manifest_rows = _manifest_records(source_manifest)
     records_by_date = {record.source_date: (record, offset) for record, offset in manifest_rows}
@@ -1079,3 +1214,50 @@ def plan_p5_replay_inputs(
         calendar_sha256=canonical_sha256([day.isoformat() for day in calendar]),
         partitions=partitions,
     )
+
+
+def plan_p5_replay_inputs(
+    discovery: DiscoveryInputs,
+    *,
+    source_manifest: SourceManifestBundle,
+    mbp10_root: Path | str,
+    calendar_source_dates: Sequence[date],
+) -> OutcomeInputPlan:
+    """Backward-compatible wrapper for the query-neutral replay planner."""
+
+    return plan_replay_inputs(
+        discovery,
+        source_manifest=source_manifest,
+        mbp10_root=mbp10_root,
+        calendar_source_dates=calendar_source_dates,
+    )
+
+
+def plan_configured_replay_inputs(
+    config: OutcomeReplayConfig,
+    discovery: DiscoveryInputs,
+    *,
+    source_manifest: SourceManifestBundle,
+    mbp10_root: Path | str,
+    calendar_source_dates: Sequence[date],
+) -> OutcomeInputPlan:
+    """Build a plan and fail closed unless it matches the frozen query identity."""
+
+    if not isinstance(config, OutcomeReplayConfig) or discovery.query_id != config.query_id:
+        raise OutcomeInputError("replay plan config/query identity drift")
+    plan = plan_replay_inputs(
+        discovery,
+        source_manifest=source_manifest,
+        mbp10_root=mbp10_root,
+        calendar_source_dates=calendar_source_dates,
+    )
+    completed_dates = tuple(dict.fromkeys(partition.key[0] for partition in plan.partitions))
+    if (
+        len(plan.partitions) != config.expected_cache_partition_count
+        or len(completed_dates) != config.expected_completed_source_date_count
+        or completed_dates[0] != config.expected_first_completed_source_date
+        or completed_dates[-1] != config.expected_last_completed_source_date
+        or plan.plan_sha256 != config.expected_input_plan_sha256
+    ):
+        raise OutcomeInputError("replay input plan differs from frozen config")
+    return plan

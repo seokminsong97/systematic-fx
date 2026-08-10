@@ -14,7 +14,7 @@ from systematic_fx.backtest.event_cache import DailyCacheReport
 from systematic_fx.db.data_registry import SourceFileRegistration, SourceManifestBundle
 from systematic_fx.research.discovery_slice import DISCOVERY_VARIABLE_FIELDS
 from systematic_fx.research.hypotheses import canonical_json_bytes, canonical_sha256
-from systematic_fx.research.outcome_config import P5_QUERY_ID
+from systematic_fx.research.outcome_config import P1_QUERY_ID, P5_QUERY_ID
 from systematic_fx.research.outcome_inputs import (
     CanonicalDiscoveryArtifact,
     DailyReplayPartition,
@@ -22,6 +22,7 @@ from systematic_fx.research.outcome_inputs import (
     P5DiscoveryInputs,
     ReplaySignal,
     apply_terminal_resolution,
+    load_discovery_inputs,
     load_p5_discovery_inputs,
     plan_p5_replay_inputs,
     resolve_terminal_partitions,
@@ -37,6 +38,17 @@ _P5_DEFINITION = {
     "direction_rule": "SIGN_BAR_MOVE",
     "id": P5_QUERY_ID,
     "parent_hypothesis_ids": ["p5_03_volatility_expansion_continuation"],
+}
+_P1_DEFINITION = {
+    "conditions": [
+        "abs(bar_move_x2_ticks)>=16",
+        "abs(signed_flow_ppm)<100000",
+        "abs(l5_mean_ppm)<100000",
+        "last_spread_ticks<=2",
+    ],
+    "direction_rule": "OPPOSITE_SIGN_BAR_MOVE",
+    "id": P1_QUERY_ID,
+    "parent_hypothesis_ids": [P1_QUERY_ID],
 }
 _BOOLEAN_VARIABLES = {
     "definition_status_available",
@@ -87,11 +99,12 @@ def _artifact_document(
     *,
     requested_dates: tuple[date, ...],
     occurrences: list[dict[str, object]],
+    target_definition: dict[str, object] = _P5_DEFINITION,
 ) -> dict[str, object]:
     query_results = [
         _query_result({"id": f"synthetic_query_{index:02d}"}, []) for index in range(10)
     ]
-    query_results.append(_query_result(_P5_DEFINITION, occurrences))
+    query_results.append(_query_result(target_definition, occurrences))
     return {
         "artifact_schema": "systematic_fx.phase1a_discovery_slice.v1",
         "artifact_version": "phase1a_discovery_slice_v1",
@@ -141,7 +154,13 @@ def _write_artifact(
     )
 
 
-def _frozen_artifacts(root: Path) -> list[CanonicalDiscoveryArtifact]:
+def _frozen_query_artifacts(
+    root: Path,
+    *,
+    signal_count: int,
+    long_count: int,
+    target_definition: dict[str, object],
+) -> list[CanonicalDiscoveryArtifact]:
     artifacts: list[CanonicalDiscoveryArtifact] = []
     first_day = date(2022, 1, 1)
     global_occurrence = 0
@@ -149,10 +168,11 @@ def _frozen_artifacts(root: Path) -> list[CanonicalDiscoveryArtifact]:
         requested = tuple(
             first_day + timedelta(days=(slice_index * 5) + offset) for offset in range(5)
         )
-        support = 12 if slice_index < 22 else 11
+        base_support, extra_slice_count = divmod(signal_count, 99)
+        support = base_support + int(slice_index < extra_slice_count)
         occurrences: list[dict[str, object]] = []
         for local_index in range(support):
-            direction = "LONG" if global_occurrence < 529 else "SHORT"
+            direction = "LONG" if global_occurrence < long_count else "SHORT"
             occurrences.append(
                 {
                     "bucket_end_ns": _epoch_ns(requested[0], minutes=local_index + 1),
@@ -170,11 +190,21 @@ def _frozen_artifacts(root: Path) -> list[CanonicalDiscoveryArtifact]:
                 document=_artifact_document(
                     requested_dates=requested,
                     occurrences=occurrences,
+                    target_definition=target_definition,
                 ),
             )
         )
-    assert global_occurrence == 1_111
+    assert global_occurrence == signal_count
     return artifacts
+
+
+def _frozen_artifacts(root: Path) -> list[CanonicalDiscoveryArtifact]:
+    return _frozen_query_artifacts(
+        root,
+        signal_count=1_111,
+        long_count=529,
+        target_definition=_P5_DEFINITION,
+    )
 
 
 def _signal(
@@ -327,6 +357,34 @@ class P5DiscoveryInputTests(unittest.TestCase):
             )
             with self.assertRaisesRegex(OutcomeInputError, "variable schema drift"):
                 load_p5_discovery_inputs(artifacts)
+
+    def test_generic_loader_extracts_frozen_p1_query_without_p5_identity_leakage(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            artifacts = _frozen_query_artifacts(
+                Path(directory),
+                signal_count=943,
+                long_count=446,
+                target_definition=_P1_DEFINITION,
+            )
+
+            inputs = load_discovery_inputs(
+                tuple(reversed(artifacts)),
+                query_id=P1_QUERY_ID,
+                expected_slice_indices=tuple(range(99)),
+                expected_signal_count=943,
+                expected_direction_counts={"LONG": 446, "SHORT": 497},
+            )
+
+            self.assertEqual(inputs.query_id, P1_QUERY_ID)
+            self.assertEqual(len(inputs.signals), 943)
+            self.assertEqual(
+                Counter(signal.direction for signal in inputs.signals),
+                Counter({Direction.LONG: 446, Direction.SHORT: 497}),
+            )
+            self.assertTrue(
+                all(signal.signal_id.startswith(f"{P1_QUERY_ID}:") for signal in inputs.signals)
+            )
+            self.assertEqual(inputs.as_dict()["query_id"], P1_QUERY_ID)
 
 
 class P5ReplayPlanTests(unittest.TestCase):

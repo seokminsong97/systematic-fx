@@ -1,4 +1,4 @@
-"""Runnable, resumable Phase 1A p5 shared-outcome orchestration.
+"""Runnable, resumable Phase 1A governed shared-outcome orchestration.
 
 The expensive raw decode is the only parallel stage.  Every scenario, signal,
 direction, and barrier cell subsequently shares one chronological event pass.
@@ -38,12 +38,14 @@ from systematic_fx.db.data_registry import load_source_manifest_bundle
 from systematic_fx.db.migrations import discover_migrations
 from systematic_fx.db.outcome_registry import (
     OUTCOME_ENGINE_VERSION,
-    P5SourceArtifactSet,
+    OutcomePredecessorGate,
+    OutcomeSourceArtifactSet,
     complete_phase1a_outcome_replay,
     fail_phase1a_outcome_replay,
     load_latest_phase1a_outcome_checkpoint,
-    load_phase1a_p5_source_artifacts,
-    phase1a_p5_outcome_parameters,
+    load_phase1a_outcome_source_artifacts,
+    load_phase1a_p1_predecessor_gate,
+    phase1a_outcome_parameters,
     register_phase1a_outcome_checkpoint,
     reserve_phase1a_outcome_replay,
     start_phase1a_outcome_replay,
@@ -56,19 +58,10 @@ from systematic_fx.features.screening import (
 )
 from systematic_fx.research.hypotheses import canonical_sha256
 from systematic_fx.research.outcome_config import (
-    EXPECTED_ARTIFACT_MANIFEST_SHA256,
-    EXPECTED_CACHE_PARTITION_COUNT,
-    EXPECTED_COMPLETED_SOURCE_DATE_COUNT,
-    EXPECTED_CONTRACT_COUNT,
-    EXPECTED_FIRST_COMPLETED_SOURCE_DATE,
-    EXPECTED_INPUT_PLAN_SHA256,
-    EXPECTED_LAST_COMPLETED_SOURCE_DATE,
-    EXPECTED_LONG_SIGNAL_COUNT,
-    EXPECTED_SHORT_SIGNAL_COUNT,
-    EXPECTED_SIGNAL_COUNT,
-    EXPECTED_SIGNAL_MANIFEST_SHA256,
-    EXPECTED_SIGNAL_SOURCE_DATE_COUNT,
-    EXPECTED_SLICE_INDICES,
+    OUTCOME_CONFIG_RELATIVE_PATH,
+    P1_OUTCOME_CONFIG_RELATIVE_PATH,
+    P1_QUERY_ID,
+    P5_QUERY_ID,
     OutcomeReplayConfig,
     load_outcome_replay_config,
 )
@@ -76,13 +69,13 @@ from systematic_fx.research.outcome_economics import OutcomeEconomicsAccumulator
 from systematic_fx.research.outcome_inputs import (
     CanonicalDiscoveryArtifact,
     DailyReplayPartition,
+    DiscoveryInputs,
     OutcomeInputError,
     OutcomeInputPlan,
-    P5DiscoveryInputs,
     TerminalResolution,
     apply_terminal_resolution,
-    load_p5_discovery_inputs,
-    plan_p5_replay_inputs,
+    load_configured_discovery_inputs,
+    plan_configured_replay_inputs,
     resolve_terminal_partitions,
 )
 from systematic_fx.research.provenance import (
@@ -101,15 +94,17 @@ from systematic_fx.validation.splits import (
     publish_phase1a_screening_artifacts,
 )
 
-PIPELINE_VERSION: Final = "phase1a_p5_outcome_pipeline_v1"
+P5_PIPELINE_VERSION: Final = "phase1a_p5_outcome_pipeline_v1"
+P1_PIPELINE_VERSION: Final = "phase1a_p1_05_outcome_pipeline_v1"
+PIPELINE_VERSION: Final = P5_PIPELINE_VERSION
 RANDOM_SEED: Final = 0
 EXPECTED_SUMMARY_COUNT: Final = 3 * 2 * len(BARRIER_TICKS) ** 2
-_SUPPORTED_MIGRATIONS: Final = tuple(range(1, 16))
+_SUPPORTED_MIGRATIONS: Final = tuple(range(1, 24))
 _MODES: Final = frozenset({"PLAN_ONLY", "CACHE_ONLY", "RUN"})
 
 
 class Phase1AOutcomePipelineError(RuntimeError):
-    """The governed p5 outcome replay could not be planned or resumed safely."""
+    """A governed outcome replay could not be planned or resumed safely."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -147,9 +142,9 @@ class PreparedOutcomeInputs:
     config: OutcomeReplayConfig
     calendar: Any
     split: Any
-    discovery: P5DiscoveryInputs
+    discovery: DiscoveryInputs
     plan: OutcomeInputPlan
-    source_artifacts: P5SourceArtifactSet
+    source_artifacts: OutcomeSourceArtifactSet
     calendar_path: Path
     split_path: Path
 
@@ -251,8 +246,8 @@ class OutcomePipelineServices:
     build_split: Callable[..., Any]
     publish_calendar_split: Callable[..., Any]
     load_source_bundle: Callable[..., Any]
-    load_source_artifacts: Callable[..., P5SourceArtifactSet]
-    load_discovery: Callable[..., P5DiscoveryInputs]
+    load_source_artifacts: Callable[..., OutcomeSourceArtifactSet]
+    load_discovery: Callable[..., DiscoveryInputs]
     plan_inputs: Callable[..., OutcomeInputPlan]
     build_caches: Callable[..., tuple[DailyCacheReport, ...]]
     read_cache: Callable[[DailyCacheReport], Iterator[CachedExecutableQuote]]
@@ -269,6 +264,7 @@ class OutcomePipelineServices:
     register_checkpoint: Callable[..., Any]
     complete_replay: Callable[..., Any]
     fail_replay: Callable[..., Any]
+    load_predecessor_gate: Callable[..., OutcomePredecessorGate]
     replay_factory: Callable[[Sequence[Any]], SharedReplay]
     replay_from_checkpoint: Callable[[Mapping[str, object]], SharedReplay]
     economics_factory: Callable[..., OutcomeEconomicsAccumulator]
@@ -297,7 +293,7 @@ def _git_head(project_root: Path) -> str:
 def _postgres_runtime(database_url: str, *, migrations_directory: Path) -> dict[str, object]:
     migrations = discover_migrations(migrations_directory)
     if tuple(item.version for item in migrations) != _SUPPORTED_MIGRATIONS:
-        raise Phase1AOutcomePipelineError("outcome replay requires migrations 0001-0015")
+        raise Phase1AOutcomePipelineError("outcome replay requires migrations 0001-0023")
     with psycopg.connect(database_url, row_factory=dict_row) as connection:
         version = connection.execute(
             "SELECT current_setting('server_version') AS version, "
@@ -371,9 +367,9 @@ def _default_services() -> OutcomePipelineServices:
         build_split=build_phase1a_screening_split,
         publish_calendar_split=publish_phase1a_screening_artifacts,
         load_source_bundle=load_source_manifest_bundle,
-        load_source_artifacts=load_phase1a_p5_source_artifacts,
-        load_discovery=load_p5_discovery_inputs,
-        plan_inputs=plan_p5_replay_inputs,
+        load_source_artifacts=load_phase1a_outcome_source_artifacts,
+        load_discovery=load_configured_discovery_inputs,
+        plan_inputs=plan_configured_replay_inputs,
         build_caches=build_daily_cache_batch,
         read_cache=read_daily_executable_cache,
         git_head=_git_head,
@@ -389,6 +385,7 @@ def _default_services() -> OutcomePipelineServices:
         register_checkpoint=register_phase1a_outcome_checkpoint,
         complete_replay=complete_phase1a_outcome_replay,
         fail_replay=fail_phase1a_outcome_replay,
+        load_predecessor_gate=load_phase1a_p1_predecessor_gate,
         replay_factory=SharedReplay,
         replay_from_checkpoint=SharedReplay.from_checkpoint,
         economics_factory=OutcomeEconomicsAccumulator,
@@ -426,8 +423,34 @@ def _data_layout(data_root: Path, *, create_derived: bool) -> tuple[Path, Path]:
     return raw.resolve(strict=True), manifests.resolve(strict=True)
 
 
+def _pipeline_version(query_id: str) -> str:
+    if query_id == P5_QUERY_ID:
+        return P5_PIPELINE_VERSION
+    if query_id == P1_QUERY_ID:
+        return P1_PIPELINE_VERSION
+    raise Phase1AOutcomePipelineError("unsupported governed outcome query")
+
+
+def _artifact_identity(config: OutcomeReplayConfig) -> Any:
+    """Build the candidate artifact namespace lazily for lightweight planning."""
+
+    try:
+        from systematic_fx.research.outcome_artifacts import OutcomeArtifactIdentity
+
+        return OutcomeArtifactIdentity(
+            query_id=config.query_id,
+            outcome_config_id=config.outcome_config_id,
+            outcome_artifact_schema=config.outcome_artifact_schema,
+            source_slice_count=len(config.slice_indices),
+            source_occurrence_count=config.expected_signal_count,
+            summary_row_count=config.expected_summary_row_count,
+        )
+    except (ImportError, TypeError, ValueError) as error:
+        raise Phase1AOutcomePipelineError("outcome artifact identity is invalid") from error
+
+
 def _as_discovery_descriptors(
-    source: P5SourceArtifactSet,
+    source: OutcomeSourceArtifactSet,
 ) -> tuple[CanonicalDiscoveryArtifact, ...]:
     return tuple(
         CanonicalDiscoveryArtifact(
@@ -476,20 +499,33 @@ def _validate_inputs(prepared: PreparedOutcomeInputs) -> None:
     contracts = {signal.contract for signal in discovery.signals}
     planned_source_dates = tuple(partition.key[0] for partition in plan.partitions)
     completed_source_dates = tuple(dict.fromkeys(planned_source_dates))
+    expected_directions = dict(config.expected_direction_counts)
     checks = (
         (
-            tuple(item.slice_index for item in discovery.artifacts) == EXPECTED_SLICE_INDICES,
-            "99 slices",
+            tuple(item.slice_index for item in discovery.artifacts) == config.slice_indices,
+            "frozen source slices",
         ),
-        (len(discovery.signals) == EXPECTED_SIGNAL_COUNT, "1,111 signals"),
-        (directions[Direction.LONG] == EXPECTED_LONG_SIGNAL_COUNT, "529 LONG signals"),
-        (directions[Direction.SHORT] == EXPECTED_SHORT_SIGNAL_COUNT, "582 SHORT signals"),
-        (len(source_dates) == EXPECTED_SIGNAL_SOURCE_DATE_COUNT, "238 signal dates"),
-        (len(contracts) == EXPECTED_CONTRACT_COUNT, "7 contracts"),
-        (len(plan.partitions) == EXPECTED_CACHE_PARTITION_COUNT, "485 cache partitions"),
+        (len(discovery.signals) == config.expected_signal_count, "frozen signals"),
         (
-            len(completed_source_dates) == EXPECTED_COMPLETED_SOURCE_DATE_COUNT,
-            "485 completed source dates",
+            directions[Direction.LONG] == expected_directions["LONG"],
+            "frozen LONG signals",
+        ),
+        (
+            directions[Direction.SHORT] == expected_directions["SHORT"],
+            "frozen SHORT signals",
+        ),
+        (
+            len(source_dates) == config.expected_signal_source_date_count,
+            "frozen signal dates",
+        ),
+        (len(contracts) == config.expected_contract_count, "frozen contracts"),
+        (
+            len(plan.partitions) == config.expected_cache_partition_count,
+            "frozen cache partitions",
+        ),
+        (
+            len(completed_source_dates) == config.expected_completed_source_date_count,
+            "frozen completed source dates",
         ),
         (
             planned_source_dates == tuple(sorted(planned_source_dates))
@@ -498,24 +534,29 @@ def _validate_inputs(prepared: PreparedOutcomeInputs) -> None:
         ),
         (
             bool(completed_source_dates)
-            and completed_source_dates[0] == EXPECTED_FIRST_COMPLETED_SOURCE_DATE,
-            "first completed source date 2022-01-03",
+            and completed_source_dates[0] == config.expected_first_completed_source_date,
+            "frozen first completed source date",
         ),
         (
             bool(completed_source_dates)
-            and completed_source_dates[-1] == EXPECTED_LAST_COMPLETED_SOURCE_DATE,
-            "last completed source date 2023-08-31",
+            and completed_source_dates[-1] == config.expected_last_completed_source_date,
+            "frozen last completed source date",
         ),
         (
-            discovery.artifact_manifest_sha256 == EXPECTED_ARTIFACT_MANIFEST_SHA256,
+            discovery.artifact_manifest_sha256 == config.expected_artifact_manifest_sha256,
             "portable artifact manifest",
         ),
-        (discovery.signal_manifest_sha256 == EXPECTED_SIGNAL_MANIFEST_SHA256, "signal manifest"),
-        (plan.plan_sha256 == EXPECTED_INPUT_PLAN_SHA256, "input plan"),
+        (
+            discovery.signal_manifest_sha256 == config.expected_signal_manifest_sha256,
+            "signal manifest",
+        ),
+        (plan.plan_sha256 == config.expected_input_plan_sha256, "input plan"),
     )
     failed = [label for condition, label in checks if not condition]
     if failed:
-        raise Phase1AOutcomePipelineError("frozen p5 input drift: " + ", ".join(failed))
+        raise Phase1AOutcomePipelineError(
+            f"frozen {config.query_id} input drift: " + ", ".join(failed)
+        )
     if (
         config.expected_signal_count != len(discovery.signals)
         or config.expected_cache_partition_count != len(plan.partitions)
@@ -545,8 +586,9 @@ def _prepare_inputs(
     database_url: str,
     services: OutcomePipelineServices,
     publish_control_plane: bool,
+    config_path: Path,
 ) -> PreparedOutcomeInputs:
-    config = services.load_config(project)
+    config = services.load_config(project, config_path=config_path)
     source_path = project / config.source_sha256_manifest_relative
     footer_path = project / config.source_footer_manifest_relative
     qc_path = manifests / "mbp10_structural_qc_v1.jsonl"
@@ -596,9 +638,14 @@ def _prepare_inputs(
         or Path(bundle.hash_manifest_path).resolve(strict=True) != source_path.resolve(strict=True)
     ):
         raise Phase1AOutcomePipelineError("source manifest bundle identity drift")
-    source_artifacts = services.load_source_artifacts(database_url, data_root=data)
-    discovery = services.load_discovery(_as_discovery_descriptors(source_artifacts))
+    source_artifacts = services.load_source_artifacts(
+        database_url,
+        data_root=data,
+        query_id=config.query_id,
+    )
+    discovery = services.load_discovery(_as_discovery_descriptors(source_artifacts), config)
     plan = services.plan_inputs(
+        config,
         discovery,
         source_manifest=bundle,
         mbp10_root=raw,
@@ -621,7 +668,7 @@ def _prepare_inputs(
 def _base_report(prepared: PreparedOutcomeInputs, *, mode: str) -> OutcomePipelineReport:
     directions = Counter(signal.direction for signal in prepared.discovery.signals)
     return OutcomePipelineReport(
-        pipeline_version=PIPELINE_VERSION,
+        pipeline_version=_pipeline_version(prepared.config.query_id),
         mode=mode,
         query_id=prepared.config.query_id,
         signal_count=len(prepared.discovery.signals),
@@ -845,12 +892,17 @@ def _make_run_spec(
     dependency_sha256: str,
     runtime: Mapping[str, object],
     feature_sha256: str,
+    predecessor_gate: OutcomePredecessorGate | None = None,
 ) -> RunSpec:
     config = prepared.config
     screening = config.screening_bundle
     parameters = {
         **config.canonical_parameters(),
-        **phase1a_p5_outcome_parameters(prepared.source_artifacts.source_artifact_manifest_sha256),
+        **phase1a_outcome_parameters(
+            prepared.source_artifacts.source_artifact_manifest_sha256,
+            query_id=config.query_id,
+            predecessor_gate=predecessor_gate,
+        ),
         "cache_manifest_sha256": cache_manifest_sha256,
         "cache_partition_count": len(prepared.plan.partitions),
         "input_plan_sha256": prepared.plan.plan_sha256,
@@ -862,26 +914,32 @@ def _make_run_spec(
         "source_record_manifest_sha256": prepared.plan.source_record_manifest_sha256,
         "terminal_resolution": terminal_resolution.as_dict(),
         "terminal_resolution_sha256": terminal_resolution.sha256,
-        "pipeline_version": PIPELINE_VERSION,
+        "pipeline_version": _pipeline_version(config.query_id),
     }
     signal, entry, barrier, terminal = _policies(config, terminal_resolution)
+    source_namespace = "phase1a_p5" if config.query_id == P5_QUERY_ID else "phase1a_p1_05"
+    source_manifest_hashes = {
+        "mbp10_footer_manifest_v1": prepared.plan.footer_manifest_sha256,
+        "mbp10_source_sha256_v1": prepared.plan.source_hash_manifest_sha256,
+        f"{source_namespace}_cache_manifest_v1": cache_manifest_sha256,
+        f"{source_namespace}_discovery_artifacts_portable_v1": (
+            prepared.discovery.artifact_manifest_sha256
+        ),
+        f"{source_namespace}_discovery_artifacts_registry_v1": (
+            prepared.source_artifacts.source_artifact_manifest_sha256
+        ),
+        f"{source_namespace}_signal_manifest_v1": prepared.discovery.signal_manifest_sha256,
+    }
+    if predecessor_gate is not None:
+        source_manifest_hashes["phase1a_p5_equivalence_audit_v1"] = (
+            predecessor_gate.equivalence_audit_artifact_sha256
+        )
     return RunSpec(
         campaign_id=CAMPAIGN_ID,
         experiment_id=None,
         run_kind="OUTCOME_BUILD",
         engine_version=OUTCOME_ENGINE_VERSION,
-        source_manifest_hashes={
-            "mbp10_footer_manifest_v1": prepared.plan.footer_manifest_sha256,
-            "mbp10_source_sha256_v1": prepared.plan.source_hash_manifest_sha256,
-            "phase1a_p5_cache_manifest_v1": cache_manifest_sha256,
-            "phase1a_p5_discovery_artifacts_portable_v1": (
-                prepared.discovery.artifact_manifest_sha256
-            ),
-            "phase1a_p5_discovery_artifacts_registry_v1": (
-                prepared.source_artifacts.source_artifact_manifest_sha256
-            ),
-            "phase1a_p5_signal_manifest_v1": prepared.discovery.signal_manifest_sha256,
-        },
+        source_manifest_hashes=source_manifest_hashes,
         eligible_calendar_version=CALENDAR_VERSION,
         eligible_calendar_sha256=prepared.calendar.sha256,
         split_version=SPLIT_VERSION,
@@ -929,10 +987,11 @@ def _date_groups(
 def _input_lineage(
     prepared: PreparedOutcomeInputs,
     terminal_resolution: TerminalResolution,
+    predecessor_gate: OutcomePredecessorGate | None = None,
 ) -> dict[str, object]:
     """Portable and registry-rich identities copied into every replay artifact."""
 
-    return {
+    lineage = {
         "cache_plan_sha256": prepared.plan.cache_plan_sha256,
         "calendar_sha256": prepared.calendar.sha256,
         "discovery_input_manifest_sha256": prepared.discovery.input_manifest_sha256,
@@ -954,6 +1013,9 @@ def _input_lineage(
         "split_sha256": prepared.split.sha256,
         "terminal_resolution_sha256": terminal_resolution.sha256,
     }
+    if predecessor_gate is not None:
+        lineage.update(predecessor_gate.parameters)
+    return lineage
 
 
 def _economics(prepared: PreparedOutcomeInputs, services: OutcomePipelineServices) -> Any:
@@ -982,6 +1044,7 @@ def _run_replay(
     database_url: str,
     data: Path,
     services: OutcomePipelineServices,
+    predecessor_gate: OutcomePredecessorGate | None = None,
     progress_callback: Callable[[OutcomeProgress], None] | None = None,
 ) -> tuple[object, object, int, int, int, int]:
     groups = _date_groups(prepared.plan, reports, terminal_resolution)
@@ -992,10 +1055,12 @@ def _run_replay(
     ):
         raise Phase1AOutcomePipelineError("completed source-date plan differs from frozen policy")
     manifest_id = int(reservation.outcome_replay_manifest_id)
+    identity = _artifact_identity(prepared.config)
     services.start_replay(
         database_url,
         outcome_replay_manifest_id=manifest_id,
         run_fingerprint=run_spec.fingerprint,
+        data_root=data,
     )
     latest = services.load_checkpoint(
         database_url,
@@ -1028,6 +1093,7 @@ def _run_replay(
             verify_cache_content=False,
             verify_detail_content=False,
             retain_detail_records=False,
+            identity=identity,
         )
         if _report_sha(loaded.cache_manifest, label="checkpoint cache manifest") != _report_sha(
             cache_manifest, label="cache manifest"
@@ -1036,7 +1102,11 @@ def _run_replay(
         replay = loaded.replay
         final_checkpoint = loaded
         shards.extend(loaded.detail_shards)
-        if loaded.input_lineage != _input_lineage(prepared, terminal_resolution):
+        if loaded.input_lineage != _input_lineage(
+            prepared,
+            terminal_resolution,
+            predecessor_gate,
+        ):
             raise Phase1AOutcomePipelineError("resume input lineage drift")
         if loaded.loaded_detail_shards:
             raise Phase1AOutcomePipelineError("resume checkpoint unexpectedly retained detail rows")
@@ -1044,6 +1114,7 @@ def _run_replay(
             loaded_shard = services.artifacts.read_result_shard(
                 shard,
                 data_root=data,
+                identity=identity,
             )
             economics.extend(loaded_shard.records)
             del loaded_shard
@@ -1086,6 +1157,7 @@ def _run_replay(
             run_fingerprint=run_spec.fingerprint,
             shard_sequence=sequence,
             source_date=source_date,
+            identity=identity,
         )
         shards.append(shard)
         checkpoint = services.artifacts.publish_checkpoint(
@@ -1100,7 +1172,12 @@ def _run_replay(
             replay_state=replay.checkpoint(),
             detail_shards=tuple(shards),
             cache_manifest=cache_manifest,
-            input_lineage=_input_lineage(prepared, terminal_resolution),
+            input_lineage=_input_lineage(
+                prepared,
+                terminal_resolution,
+                predecessor_gate,
+            ),
+            identity=identity,
         )
         checkpoint_path = _report_path(checkpoint, label="checkpoint")
         registered = services.register_checkpoint(
@@ -1115,6 +1192,7 @@ def _run_replay(
             progress_metadata=checkpoint.progress_metadata,
             checkpoint_artifact_path=checkpoint_path,
             data_root=data,
+            query_id=prepared.config.query_id,
         )
         predecessor = str(registered.checkpoint_artifact_sha256)
         final_checkpoint = checkpoint
@@ -1145,7 +1223,10 @@ def _run_replay(
             "final checkpoint differs from frozen completion boundary"
         )
     summaries = economics.finalize()
-    ordered, _ = validate_complete_cell_summaries(summaries)
+    ordered, _ = validate_complete_cell_summaries(
+        summaries,
+        query_id=prepared.config.query_id,
+    )
     result = services.artifacts.publish_result(
         data_root=data,
         run_fingerprint=run_spec.fingerprint,
@@ -1153,8 +1234,13 @@ def _run_replay(
         cell_summaries=ordered,
         detail_shards=tuple(shards),
         cache_manifest=cache_manifest,
-        input_lineage=_input_lineage(prepared, terminal_resolution),
+        input_lineage=_input_lineage(
+            prepared,
+            terminal_resolution,
+            predecessor_gate,
+        ),
         final_checkpoint=final_checkpoint,
+        identity=identity,
     )
     verified_result = services.artifacts.load_result(
         result,
@@ -1165,6 +1251,7 @@ def _run_replay(
         # shards are fully validated once here with one-shard peak memory.
         verify_cache_content=False,
         verify_detail_content=True,
+        identity=identity,
     )
     if _report_sha(verified_result, label="verified result") != _report_sha(
         result, label="published result"
@@ -1179,6 +1266,7 @@ def _run_replay(
         cell_summaries=ordered,
         result_artifact_path=_report_path(verified_result, label="result"),
         data_root=data,
+        query_id=prepared.config.query_id,
     )
     return (
         verified_result,
@@ -1190,17 +1278,18 @@ def _run_replay(
     )
 
 
-def _run_phase1a_p5_outcomes(
+def _run_phase1a_outcomes(
     *,
     project_root: Path | str,
     data_root: Path | str,
     database_url: str,
+    config_relative_path: Path,
     mode: Literal["PLAN_ONLY", "CACHE_ONLY", "RUN"] = "RUN",
     max_cache_workers: int | None = None,
     services: OutcomePipelineServices | None = None,
     progress_callback: Callable[[OutcomeProgress], None] | None = None,
 ) -> OutcomePipelineReport:
-    """Plan, cache, or execute the complete governed p5 shared replay."""
+    """Plan, cache, or execute one complete governed shared replay."""
 
     if mode not in _MODES:
         raise Phase1AOutcomePipelineError("mode must be PLAN_ONLY, CACHE_ONLY, or RUN")
@@ -1226,6 +1315,7 @@ def _run_phase1a_p5_outcomes(
         database_url=database_url,
         services=active,
         publish_control_plane=mode != "PLAN_ONLY",
+        config_path=project / config_relative_path,
     )
     report = _base_report(prepared, mode=mode)
     if mode == "PLAN_ONLY":
@@ -1241,7 +1331,13 @@ def _run_phase1a_p5_outcomes(
     dependency_sha256: str | None = None
     runtime: dict[str, object] | None = None
     feature_sha256: str | None = None
+    predecessor_gate: OutcomePredecessorGate | None = None
     if mode == "RUN":
+        if prepared.config.query_id == P1_QUERY_ID:
+            predecessor_gate = active.load_predecessor_gate(
+                database_url,
+                data_root=data,
+            )
         # Fail on schema/provenance drift before spending hours decoding raw
         # data.  The snapshot is checked again after cache construction so a
         # worker cannot silently execute bytes different from this identity.
@@ -1258,7 +1354,7 @@ def _run_phase1a_p5_outcomes(
         )
         runtime["phase1a_outcome_pipeline"] = {
             "cache_workers": workers,
-            "pipeline_version": PIPELINE_VERSION,
+            "pipeline_version": _pipeline_version(prepared.config.query_id),
         }
         feature_sha256 = load_phase1a_screening_config(
             project / "configs/features/phase1a_mbp10_screening_v1.toml"
@@ -1363,12 +1459,18 @@ def _run_phase1a_p5_outcomes(
         dependency_sha256=dependency_sha256,
         runtime=runtime,
         feature_sha256=feature_sha256,
+        predecessor_gate=predecessor_gate,
     )
     active.register_spec(database_url, run_spec)
     reservation = active.reserve_replay(
         database_url,
         run_fingerprint=run_spec.fingerprint,
         source_artifact_manifest_sha256=(prepared.source_artifacts.source_artifact_manifest_sha256),
+        query_id=prepared.config.query_id,
+        predecessor_equivalence_audit_id=(
+            None if predecessor_gate is None else predecessor_gate.equivalence_audit_id
+        ),
+        data_root=data,
     )
     manifest_id = int(reservation.outcome_replay_manifest_id)
     if not reservation.execute:
@@ -1390,6 +1492,7 @@ def _run_phase1a_p5_outcomes(
             database_url=database_url,
             data=data,
             services=active,
+            predecessor_gate=predecessor_gate,
             progress_callback=progress_callback,
         )
     except Exception as error:
@@ -1439,10 +1542,11 @@ def run_phase1a_p5_outcomes(
     """Plan, cache, execute, or exactly resume the governed p5 replay."""
 
     try:
-        return _run_phase1a_p5_outcomes(
+        return _run_phase1a_outcomes(
             project_root=project_root,
             data_root=data_root,
             database_url=database_url,
+            config_relative_path=OUTCOME_CONFIG_RELATIVE_PATH,
             mode=mode,
             max_cache_workers=max_cache_workers,
             services=services,
@@ -1456,6 +1560,37 @@ def run_phase1a_p5_outcomes(
         ) from error
 
 
+def run_phase1a_p1_05_outcomes(
+    *,
+    project_root: Path | str,
+    data_root: Path | str,
+    database_url: str,
+    mode: Literal["PLAN_ONLY", "CACHE_ONLY", "RUN"] = "RUN",
+    max_cache_workers: int | None = None,
+    services: OutcomePipelineServices | None = None,
+    progress_callback: Callable[[OutcomeProgress], None] | None = None,
+) -> OutcomePipelineReport:
+    """Plan, cache, execute, or exactly resume the governed p1_05 replay."""
+
+    try:
+        return _run_phase1a_outcomes(
+            project_root=project_root,
+            data_root=data_root,
+            database_url=database_url,
+            config_relative_path=P1_OUTCOME_CONFIG_RELATIVE_PATH,
+            mode=mode,
+            max_cache_workers=max_cache_workers,
+            services=services,
+            progress_callback=progress_callback,
+        )
+    except Phase1AOutcomePipelineError:
+        raise
+    except Exception as error:
+        raise Phase1AOutcomePipelineError(
+            f"Phase 1A p1_05 outcome pipeline failed ({type(error).__name__})"
+        ) from error
+
+
 __all__ = [
     "OutcomeArtifactServices",
     "OutcomePipelineReport",
@@ -1464,5 +1599,6 @@ __all__ = [
     "Phase1AOutcomePipelineError",
     "PreparedOutcomeInputs",
     "merge_daily_shared_events",
+    "run_phase1a_p1_05_outcomes",
     "run_phase1a_p5_outcomes",
 ]
