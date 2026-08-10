@@ -1,0 +1,362 @@
+schema_version = 1
+config_id = "bar_state_conditional_v2"
+campaign_key = "bar_state_conditional_v2"
+parent_campaign_key = "bar_pattern_discovery_v1"
+parent_candidate_exposure_count = 216
+parent_global_result_sha256 = "bda2cfef66c6f59469b77d2d4f85f4ccc531a290934c010f99389262bba8cbfa"
+screening_only = true
+authorized_stage = "DISCOVERY_ONLY"
+qualification_status = "BLOCKED_MISSING_POINT_IN_TIME_DEFINITION_AND_TRADING_STATUS"
+
+[source]
+raw_source_manifest_sha256 = "14db710d8a522a83d495faeac1c05c9a0169f80f088dfbeb7a66b38f14b6e3de"
+raw_source_file_count = 1434
+bar_dataset_manifest_sha256 = "e2c066ce4c8a97c4059dd2499f881300f905f4bab589240f87532d5cc49599dc"
+bar_dataset_build_plan_sha256 = "c46323e70e389dd2f7bca4b0e3e42ad86b1a9b7b502834512906e38b4651d0dc"
+eligible_active_day_count = 1413
+eligible_start_date = "2022-01-03"
+eligible_end_date = "2026-07-31"
+outer_split_plan_sha256 = "5594725f6769a706018d414a5b27e3903f1d7d1cc22c98e93b6e973ead1af043"
+price_source = "SELECTED_CONTRACT_TRADE_OHLCV"
+source_timeframe_seconds = 1
+
+[market]
+parent_symbol = "6E"
+tick_size_raw = 50000
+ticks_per_pip = 2
+
+[candidate_catalog]
+signal_timeframes_seconds = [300, 1800]
+feature_set_ids = ["MORPHOLOGY", "STATE"]
+confidence_margin_fractions = ["1/20", "1/10", "3/20"]
+candidate_order = "TIMEFRAME_THEN_FEATURE_SET_THEN_MARGIN"
+allocated_variants = 12
+maximum_variants = 12
+result_driven_additions_allowed = false
+direction_is_model_output = true
+
+[feature_sets.MORPHOLOGY]
+version = "bar_state_morphology_v1"
+feature_ids = [
+  "ret_1",
+  "body_atr",
+  "range_atr",
+  "upper_wick_atr",
+  "lower_wick_atr",
+  "close_location",
+]
+
+[feature_sets.STATE]
+version = "bar_state_full_v1"
+feature_ids = [
+  "ret_1",
+  "body_atr",
+  "range_atr",
+  "upper_wick_atr",
+  "lower_wick_atr",
+  "close_location",
+  "ret_3",
+  "ret_6",
+  "trend_6_atr",
+  "realized_range_6",
+  "atr_ratio_5_20",
+  "volume_z20",
+  "trade_count_z20",
+  "buy_imbalance",
+  "tod_sin",
+  "tod_cos",
+  "gap_from_prev_atr",
+  "higher_tf_ret_1",
+]
+
+[features]
+decision_row = "COMPLETED_SIGNAL_BAR_T"
+atr_policy = "PRIOR_ATR20_TICKS"
+atr_window = "TRUE_RANGE_T_MINUS_19_THROUGH_T_WITH_T_MINUS_20_CLOSE"
+atr_arithmetic = "EXACT_RATIONAL_MEAN"
+feature_availability = "POINT_IN_TIME_AT_SIGNAL_BAR_CLOSE"
+segment_policy = "RESET_ON_CONTRACT_QUALITY_OR_SOURCE_SEGMENT_BOUNDARY"
+forward_fill_allowed = false
+train_defined_scaler = "STANDARD_SCALER_TRAIN_ONLY"
+higher_timeframe_5m = "LATEST_CAUSALLY_COMPLETED_30M"
+higher_timeframe_30m = "ZERO_SENTINEL"
+
+[feature_formulas]
+ret_1 = "(C[t]-C[t-1])/ATR20[t]"
+body_atr = "(C[t]-O[t])/ATR20[t]"
+range_atr = "(H[t]-L[t])/ATR20[t]"
+upper_wick_atr = "(H[t]-max(O[t],C[t]))/ATR20[t]"
+lower_wick_atr = "(min(O[t],C[t])-L[t])/ATR20[t]"
+close_location = "(C[t]-L[t])/(H[t]-L[t]);ZERO_RANGE=1/2"
+ret_3 = "(C[t]-C[t-3])/ATR20[t]"
+ret_6 = "(C[t]-C[t-6])/ATR20[t]"
+trend_6_atr = "OLS_SLOPE_PER_BAR(C[t-5:t])/ATR20[t]"
+realized_range_6 = "(max(H[t-5:t])-min(L[t-5:t]))/ATR20[t]"
+atr_ratio_5_20 = "MEAN(TR[t-4:t])/MEAN(TR[t-19:t])"
+volume_z20 = "POPULATION_ZSCORE(VOLUME[t-19:t]);ZERO_STD=0"
+trade_count_z20 = "POPULATION_ZSCORE(TRADE_COUNT[t-19:t]);ZERO_STD=0"
+buy_imbalance = "(BUY_VOLUME-SELL_VOLUME)/(BUY_VOLUME+SELL_VOLUME);MISSING_OR_ZERO=0"
+tod_sin = "sin(2*pi*UTC_BUCKET_START_SECOND/86400)"
+tod_cos = "cos(2*pi*UTC_BUCKET_START_SECOND/86400)"
+gap_from_prev_atr = "(O[t]-C[t-1])/ATR20[t]"
+higher_tf_ret_1 = "5M=(C30[k]-C30[k-1])/ATR20_30[k];30M=0"
+
+[model]
+family = "ELASTIC_NET_MULTINOMIAL_LOGISTIC"
+implementation = "sklearn.linear_model.LogisticRegression"
+scaler_implementation = "sklearn.preprocessing.StandardScaler"
+scaler_fit_scope = "TRAIN_ONLY"
+scaler_copy = true
+scaler_with_mean = true
+scaler_with_std = true
+multiclass_policy = "MULTINOMIAL"
+regularization_family = "ELASTIC_NET_VIA_L1_RATIO"
+deprecated_penalty_argument_policy = "OMIT_ON_SKLEARN_1_9"
+n_jobs_argument_policy = "OMIT_ON_SKLEARN_1_9_NO_EFFECT"
+convergence_failure_policy = "HARD_FAIL"
+coefficient_refit_policy = "EXPANDING_PRIOR_MATURED_ROWS_ONLY"
+hyperparameter_refit_allowed = false
+
+[model.actual_sklearn_kwargs]
+solver = "saga"
+C_decimal = "0.1"
+l1_ratio_decimal = "0.5"
+class_weight = "balanced"
+fit_intercept = true
+max_iter = 5000
+tol_decimal = "0.00000001"
+random_state = 20260809
+
+[labels]
+class_order = ["UP_FIRST", "DOWN_FIRST", "CENSORED"]
+entry_reference = "NEXT_SIGNAL_BAR_FIRST_TRADE"
+volatility_distance = "PRIOR_ATR20_TICKS"
+symmetric_multiplier_fraction = "1/1"
+distance_rounding = "NEAREST_8_TICKS_HALF_UP"
+minimum_distance_ticks = 24
+maximum_distance_ticks = 192
+observation_horizon_active_days = 20
+simultaneous_touch_policy = "CENSORED_WITH_AMBIGUITY_COUNT"
+boundary_event_ordering = "UNRESOLVED_AT_BOUNDARY_CENSORED_PRIOR_FIRST_TOUCH_PRESERVED"
+split_policy = "SPLIT_INDEPENDENT_CHRONOLOGICAL_LABEL"
+contract_boundary_policy = "CENSORED"
+quality_boundary_policy = "CENSORED"
+artificial_split_boundary_policy = "DO_NOT_TERMINATE_LABEL"
+
+[prediction]
+score = "P_UP_FIRST_MINUS_P_DOWN_FIRST"
+long_rule = "SCORE_GREATER_THAN_OR_EQUAL_TO_MARGIN"
+short_rule = "SCORE_LESS_THAN_OR_EQUAL_TO_NEGATIVE_MARGIN"
+otherwise = "NO_TRADE"
+tie_policy = "NO_TRADE"
+probability_class_order = ["UP_FIRST", "DOWN_FIRST", "CENSORED"]
+
+[entry]
+decision_time_policy = "SIGNAL_BAR_END"
+entry_price_policy = "NEXT_SIGNAL_BAR_FIRST_TRADE_PLUS_SCENARIO_ADVERSITY"
+successor_policy = "IMMEDIATE_CHRONOLOGICAL_OBSERVED_SIGNAL_BAR_WITHIN_SAME_OUTCOME_SPAN"
+missing_next_bar_policy = "ENTRY_NOT_FILLED"
+one_position_policy = "ONE_NET_POSITION_PER_CANDIDATE_SCENARIO_BARRIER_CELL"
+occupied_signal_policy = "SKIPPED_OCCUPIED"
+portfolio_same_second_touch_policy = "DIRECTION_SPECIFIC_STOP_FIRST"
+portfolio_terminal_policy = "CONTRACT_QUALITY_OR_EVALUATION_SPLIT_END"
+
+[economic_barriers]
+volatility_distance = "PRIOR_ATR20_TICKS"
+take_profit_multiplier_fractions = ["1/2", "3/4", "1/1", "3/2", "2/1", "3/1", "4/1"]
+stop_loss_multiplier_fractions = ["1/2", "3/4", "1/1", "3/2", "2/1", "3/1", "4/1"]
+distance_rounding = "NEAREST_8_TICKS_HALF_UP"
+minimum_distance_ticks = 24
+maximum_distance_ticks = 192
+axis_count = 7
+cell_count = 49
+duplicate_realized_distances_recorded = true
+minimum_distinct_realized_distances_per_axis = 4
+insufficient_distinct_distance_policy = "CANDIDATE_OOS_REJECT"
+selection_policy = "STABLE_CONNECTED_REGION_NOT_SINGLE_BEST_CELL"
+
+[costs]
+cost_model_id = "BAR_TRADE_ONLY_COSTS_V1"
+base_monthly_fixed_pool_usd = "500.00"
+expected_monthly_round_trips = 20
+tick_value_usd = "6.25"
+
+[[costs.scenarios]]
+scenario_id = "BASELINE"
+entry_adverse_ticks = 1
+take_profit_trade_through_ticks = 1
+stop_total_minimum_adverse_ticks = 2
+terminal_exit_adverse_ticks = 1
+variable_debit_ticks = 4
+fixed_pool_multiplier_fraction = "1/1"
+
+[[costs.scenarios]]
+scenario_id = "MODERATE_COMBINED"
+entry_adverse_ticks = 2
+take_profit_trade_through_ticks = 1
+stop_total_minimum_adverse_ticks = 4
+terminal_exit_adverse_ticks = 2
+variable_debit_ticks = 5
+fixed_pool_multiplier_fraction = "5/4"
+
+[[costs.scenarios]]
+scenario_id = "SEVERE_DIAGNOSTIC"
+entry_adverse_ticks = 3
+take_profit_trade_through_ticks = 2
+stop_total_minimum_adverse_ticks = 6
+terminal_exit_adverse_ticks = 3
+variable_debit_ticks = 6
+fixed_pool_multiplier_fraction = "3/2"
+
+[splits]
+outer_split_plan_sha256 = "5594725f6769a706018d414a5b27e3903f1d7d1cc22c98e93b6e973ead1af043"
+label_purge_active_days = 20
+label_purge_policy = "FIXED_HORIZON_NOT_REALIZED_EARLY_HIT"
+training_row_policy = "ALL_PRIOR_LABEL_MATURED_ROWS"
+discovery_start_ordinal = 1
+discovery_end_ordinal = 489
+discovery_decision_end_ordinal = 469
+discovery_outcome_tail_start_ordinal = 470
+discovery_start_date = "2022-01-03"
+discovery_decision_end_date = "2023-07-10"
+discovery_end_date = "2023-08-02"
+inner_oos_fold_count = 3
+walk_forward_visibility = "SEALED_UNTIL_ALL_FIVE_FOLDS_COMPLETE"
+holdout_visibility = "SEALED_UNTIL_FINALIST_SET_AND_FINAL_FIT_FROZEN"
+embargo_fit_policy = "NEVER_TRAIN_SELECT_OR_CALIBRATE"
+
+[[splits.discovery_inner]]
+fold_number = 1
+train_start_ordinal = 1
+train_end_ordinal = 98
+train_start_date = "2022-01-03"
+train_end_date = "2022-04-28"
+purge_start_ordinal = 99
+purge_end_ordinal = 118
+purge_start_date = "2022-04-29"
+purge_end_date = "2022-05-22"
+oos_start_ordinal = 119
+oos_end_ordinal = 215
+oos_start_date = "2022-05-23"
+oos_end_date = "2022-09-12"
+tail_start_ordinal = 216
+tail_end_ordinal = 235
+tail_start_date = "2022-09-13"
+tail_end_date = "2022-10-05"
+
+[[splits.discovery_inner]]
+fold_number = 2
+train_start_ordinal = 1
+train_end_ordinal = 215
+train_start_date = "2022-01-03"
+train_end_date = "2022-09-12"
+purge_start_ordinal = 216
+purge_end_ordinal = 235
+purge_start_date = "2022-09-13"
+purge_end_date = "2022-10-05"
+oos_start_ordinal = 236
+oos_end_ordinal = 332
+oos_start_date = "2022-10-06"
+oos_end_date = "2023-01-31"
+tail_start_ordinal = 333
+tail_end_ordinal = 352
+tail_start_date = "2023-02-01"
+tail_end_date = "2023-02-23"
+
+[[splits.discovery_inner]]
+fold_number = 3
+train_start_ordinal = 1
+train_end_ordinal = 332
+train_start_date = "2022-01-03"
+train_end_date = "2023-01-31"
+purge_start_ordinal = 333
+purge_end_ordinal = 352
+purge_start_date = "2023-02-01"
+purge_end_date = "2023-02-23"
+oos_start_ordinal = 353
+oos_end_ordinal = 469
+oos_start_date = "2023-02-24"
+oos_end_date = "2023-07-10"
+tail_start_ordinal = 470
+tail_end_ordinal = 489
+tail_start_date = "2023-07-11"
+tail_end_date = "2023-08-02"
+
+[discovery_support.300]
+minimum_raw_signals = 160
+minimum_signals_per_inner_oos_fold = 25
+minimum_distinct_signal_days = 40
+
+[discovery_support.1800]
+minimum_raw_signals = 100
+minimum_signals_per_inner_oos_fold = 15
+minimum_distinct_signal_days = 35
+
+[discovery_economic_gates]
+minimum_filled_round_trips = 40
+minimum_filled_round_trips_per_inner_oos_fold = 8
+minimum_positive_inner_oos_folds = 2
+baseline_net_ev_must_be_positive = true
+moderate_net_pnl_must_be_positive = true
+moderate_calendar_month_net_pnl_must_be_positive = true
+moderate_minimum_profit_factor_fraction = "11/10"
+moderate_minimum_worst_inner_oos_ev_ticks = -2
+severe_net_ev_must_be_nonnegative = true
+minimum_positive_cells_in_3x3 = 7
+minimum_positive_component_cells = 9
+core_positive_cell_definition = "BASELINE_EV_POSITIVE_AND_MODERATE_EV_AND_NET_PNL_POSITIVE"
+neighbor_median_scenario = "MODERATE_COMBINED"
+post_bh_minimum_component_cells = 9
+minimum_neighbor_median_ev_ratio_fraction = "1/2"
+maximum_single_inner_oos_positive_gross_share_fraction = "1/2"
+maximum_single_contract_positive_gross_share_fraction = "1/2"
+bootstrap_method = "POLITIS_ROMANO_STATIONARY_BLOCK_BOOTSTRAP"
+bootstrap_input = "FOLD_LOCAL_EXIT_ACTIVE_DATE_ALIGNED_DAILY_NET_TICKS_AND_FILL_COUNTS"
+bootstrap_evaluation_calendar = "OOS_DECISIONS_PLUS_20_ACTIVE_DAY_OUTCOME_TAIL"
+bootstrap_fold_calendar_lengths = [117, 117, 137]
+bootstrap_pnl_and_fill_attribution = "CLOSED_TRADE_ASSIGNED_TO_EXIT_ACTIVE_DATE_WITH_EXPLICIT_ZERO_DAYS"
+bootstrap_generator = "NUMPY_GENERATOR_PCG64"
+bootstrap_mean_block_length_active_days = 10
+bootstrap_restart_probability_fraction = "1/10"
+bootstrap_circular_blocks = true
+bootstrap_shared_indices_across_cells = true
+bootstrap_replicates = 10000
+bootstrap_random_seed = 20260809
+bootstrap_statistic = "SUM_NET_TICKS_DIVIDED_BY_SUM_FILL_COUNT"
+bootstrap_one_sided_confidence_fraction = "19/20"
+bootstrap_lower_bound_order_statistic = "ONE_INDEXED_500_OF_10000_UNCENTERED"
+bootstrap_zero_fill_lower_bound_policy = "NEGATIVE_INFINITY"
+bootstrap_null = "CENTERED_AT_OBSERVED_NET_EV"
+bootstrap_p_value = "ONE_PLUS_NULL_REPLICATES_AT_LEAST_OBSERVED_DIVIDED_BY_10001"
+bootstrap_zero_fill_p_value_policy = "COUNT_AS_EXCEEDANCE"
+bootstrap_lower_bound_net_ev_must_be_positive = true
+
+[multiplicity]
+predecessor_bar_pattern_variants = 216
+state_model_variants = 12
+state_model_barrier_cells = 588
+family_size = 804
+predecessor_p_value_policy = "ALL_216_FIXED_AT_ONE"
+ineligible_state_cell_p_value_policy = "FIXED_AT_ONE"
+family_order = "PREDECESSOR_THEN_CANONICAL_CANDIDATE_TP_INDEX_SL_INDEX"
+all_model_hyperparameters_thresholds_seeds_and_barrier_cells_recorded = true
+discovery_benjamini_hochberg_q_fraction = "1/20"
+post_bh_component_policy = "ORTHOGONAL_COMPONENT_MUST_RETAIN_AT_LEAST_9_CELLS"
+sealed_holdout_holm_alpha_fraction = "1/20"
+
+[promotion]
+maximum_discovery_finalists = 4
+component_representative_policy = "LARGEST_POST_BH_COMPONENT_MANHATTAN_MEDOID"
+component_tie_order = "WORST_FOLD_MODERATE_EV_DESC_OVERALL_MODERATE_EV_DESC_BOOTSTRAP_LCB_DESC_MDD_ASC_SL_ASC_TP_ASC"
+finalist_rank_order = "POSITIVE_FOLDS_DESC_WORST_FOLD_MODERATE_EV_DESC_BOOTSTRAP_LCB_DESC_OVERALL_MODERATE_EV_DESC_MDD_ASC_SL_ASC_TP_ASC_CANDIDATE_KEY_ASC"
+walk_forward_authorized_at_config_freeze = false
+sealed_holdout_authorized_at_config_freeze = false
+discovery_failure_policy = "STOP_WITHOUT_OPENING_WALK_FORWARD"
+post_result_parameter_changes_allowed = false
+
+[paths]
+bars_input_relative = "data/derived/trade_bars/version=trade_bar_v1"
+labels_output_relative = "data/derived/bar_patterns/bar_state_conditional_v2/labels"
+models_output_relative = "data/derived/bar_patterns/bar_state_conditional_v2/models"
+results_output_relative = "data/derived/bar_patterns/bar_state_conditional_v2/results"
+checkpoints_output_relative = "data/derived/bar_patterns/checkpoints/bar_state_conditional_v2"
