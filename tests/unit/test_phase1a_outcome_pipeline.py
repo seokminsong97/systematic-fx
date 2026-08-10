@@ -54,14 +54,14 @@ from systematic_fx.research.phase1a_outcome_pipeline import (
 )
 
 
-def test_outcome_pipeline_supports_exact_bar_pattern_governance_migration() -> None:
+def test_outcome_pipeline_supports_exact_bar_state_governance_migration() -> None:
     migrations = discover_migrations(Path(__file__).resolve().parents[2] / "migrations")
 
     assert tuple(item.version for item in migrations) == _SUPPORTED_MIGRATIONS
-    assert _SUPPORTED_MIGRATIONS == tuple(range(1, 24))
-    assert migrations[-1].name == "bar_pattern_raw_dataset_lineage_fix"
+    assert _SUPPORTED_MIGRATIONS == tuple(range(1, 25))
+    assert migrations[-1].name == "bar_state_conditional_governance"
     assert migrations[-1].checksum == (
-        "887f8dc487eb3961c03ccb06980b8282f7b2e3485db8787612d763f09f9d47b6"
+        "4aa845757f1a220c8d5595d4db6053f6374d99d067ab7e20c3e40ea22d610010"
     )
 
 

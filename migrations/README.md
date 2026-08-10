@@ -155,3 +155,13 @@ Discovery evidence, global result, and terminal artifacts immutable.
 bar-pattern RunSpec matcher so the control-plane dataset row is bound to the
 raw MBP-10 source manifest, while the derived selected-trade-bar manifest
 remains independently bound in the candidate trial and RunSpec parameters.
+
+`0024_bar_state_conditional_governance.sql` adds the append-only
+`bar_state_artifact_links` registry for compact, content-addressed Discovery
+evidence. It binds every feature, label, model, OOS-trade, global-result, and
+terminal-result artifact to the exact frozen candidate trial, RunSpec, and
+attempt; protects the Bar State campaign and experiment identities; enforces
+the twelve-candidate preregistration boundary; and requires one atomic
+successful-attempt and terminal-trial pair for each completed candidate. It
+also refreshes the durable public-projection outbox whenever those governed
+artifact links change and requests one immediate refresh on installation.

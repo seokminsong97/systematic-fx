@@ -59,14 +59,14 @@ MIGRATION_SHA256 = "e" * 64
 CODE_COMMIT = "1" * 40
 
 
-def test_bar_research_run_supports_exact_raw_dataset_lineage_fix_migration() -> None:
+def test_bar_research_run_supports_exact_bar_state_governance_migration() -> None:
     migrations = discover_migrations(ROOT / "migrations")
 
     assert tuple(item.version for item in migrations) == SUPPORTED_MIGRATIONS
-    assert SUPPORTED_MIGRATIONS == tuple(range(1, 24))
-    assert migrations[-1].name == "bar_pattern_raw_dataset_lineage_fix"
+    assert SUPPORTED_MIGRATIONS == tuple(range(1, 25))
+    assert migrations[-1].name == "bar_state_conditional_governance"
     assert migrations[-1].checksum == (
-        "887f8dc487eb3961c03ccb06980b8282f7b2e3485db8787612d763f09f9d47b6"
+        "4aa845757f1a220c8d5595d4db6053f6374d99d067ab7e20c3e40ea22d610010"
     )
 
 

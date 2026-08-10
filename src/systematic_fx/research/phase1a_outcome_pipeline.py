@@ -99,7 +99,7 @@ P1_PIPELINE_VERSION: Final = "phase1a_p1_05_outcome_pipeline_v1"
 PIPELINE_VERSION: Final = P5_PIPELINE_VERSION
 RANDOM_SEED: Final = 0
 EXPECTED_SUMMARY_COUNT: Final = 3 * 2 * len(BARRIER_TICKS) ** 2
-_SUPPORTED_MIGRATIONS: Final = tuple(range(1, 24))
+_SUPPORTED_MIGRATIONS: Final = tuple(range(1, 25))
 _MODES: Final = frozenset({"PLAN_ONLY", "CACHE_ONLY", "RUN"})
 
 
@@ -293,7 +293,7 @@ def _git_head(project_root: Path) -> str:
 def _postgres_runtime(database_url: str, *, migrations_directory: Path) -> dict[str, object]:
     migrations = discover_migrations(migrations_directory)
     if tuple(item.version for item in migrations) != _SUPPORTED_MIGRATIONS:
-        raise Phase1AOutcomePipelineError("outcome replay requires migrations 0001-0023")
+        raise Phase1AOutcomePipelineError("outcome replay requires migrations 0001-0024")
     with psycopg.connect(database_url, row_factory=dict_row) as connection:
         version = connection.execute(
             "SELECT current_setting('server_version') AS version, "
