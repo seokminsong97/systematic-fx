@@ -1,0 +1,195 @@
+schema_version = 1
+config_id = "bar_pattern_discovery_v1"
+campaign_key = "bar_pattern_discovery_v1"
+screening_only = true
+qualification_status = "BLOCKED_MISSING_POINT_IN_TIME_DEFINITION_AND_TRADING_STATUS"
+
+[source]
+source_manifest_relative = "data/derived/manifests/mbp10_source_sha256_v1.jsonl"
+source_manifest_sha256 = "14db710d8a522a83d495faeac1c05c9a0169f80f088dfbeb7a66b38f14b6e3de"
+source_file_count = 1434
+source_first_date = 2022-01-02
+source_last_date = 2026-07-31
+raw_root_relative = "data/mbp-10"
+
+[market]
+parent_symbol = "6E"
+tick_size_raw = 50000
+ticks_per_pip = 2
+
+[bars]
+source_timeframe_seconds = 1
+signal_timeframes_seconds = [300, 1800, 3600]
+setup_lookback_bars = [1, 2, 3, 4, 6, 12]
+atr_lookback_bars = 20
+alignment_policy = "HALF_OPEN_UTC_EPOCH"
+price_source = "SELECTED_CONTRACT_TRADE_OHLC"
+require_contiguous_signal_bars = true
+reset_at_contract_change = true
+reset_at_quality_gap = true
+
+[patterns]
+family_ids = ["F1", "F2", "F3", "F4", "F5", "F6"]
+directions = ["LONG", "SHORT"]
+exact_arithmetic = "INTEGER_CROSS_PRODUCTS_OR_RATIONALS"
+fitted_thresholds_allowed = false
+time_filters_allowed = false
+
+[entry]
+setup_end_offset_from_trigger = -1
+trigger_offset = 0
+entry_offset_from_trigger = 1
+decision_time_policy = "TRIGGER_BAR_END"
+entry_price_policy = "NEXT_SIGNAL_BAR_OPEN_PLUS_SCENARIO_ADVERSITY"
+same_second_first_touch_policy = "STOP_FIRST"
+holding_limit_policy = "CONTRACT_QUALITY_OR_SPLIT_BOUNDARY"
+normal_market_closure_policy = "CONTINUE_WHILE_SAME_CONTRACT_AND_QUALIFIED"
+signal_context_gap_policy = "RESET_AFTER_3600_SECONDS"
+terminal_boundary_types = ["CONTRACT_CHANGE", "QUALITY_BREAK", "SPLIT_END"]
+
+[barriers]
+minimum_ticks = 24
+maximum_ticks = 192
+step_ticks = 8
+expected_axis_count = 22
+expected_cell_count = 484
+
+[candidate_budget]
+maximum_variants = 240
+allocated_variants = 216
+unallocated_variants = 24
+result_driven_additions_allowed = false
+
+[execution]
+scenario_ids = ["BASELINE", "MODERATE_COMBINED", "SEVERE_DIAGNOSTIC"]
+
+[[execution.scenarios]]
+scenario_id = "BASELINE"
+entry_adverse_ticks = 1
+take_profit_trade_through_ticks = 1
+stop_total_minimum_adverse_ticks = 2
+terminal_exit_adverse_ticks = 1
+variable_debit_ticks = 4
+fixed_pool_multiplier_numerator = 1
+fixed_pool_multiplier_denominator = 1
+
+[[execution.scenarios]]
+scenario_id = "MODERATE_COMBINED"
+entry_adverse_ticks = 2
+take_profit_trade_through_ticks = 1
+stop_total_minimum_adverse_ticks = 4
+terminal_exit_adverse_ticks = 2
+variable_debit_ticks = 5
+fixed_pool_multiplier_numerator = 5
+fixed_pool_multiplier_denominator = 4
+
+[[execution.scenarios]]
+scenario_id = "SEVERE_DIAGNOSTIC"
+entry_adverse_ticks = 3
+take_profit_trade_through_ticks = 2
+stop_total_minimum_adverse_ticks = 6
+terminal_exit_adverse_ticks = 3
+variable_debit_ticks = 6
+fixed_pool_multiplier_numerator = 3
+fixed_pool_multiplier_denominator = 2
+
+[split_policy]
+minimum_eligible_active_days = 740
+reserved_embargo_days = 20
+sealed_holdout_decision_days = 120
+sealed_holdout_outcome_tail_days = 20
+pre_holdout_symbol = "P=N-160"
+discovery_formula = "220+floor(2*(P-580)/5)"
+discovery_reporting_blocks = 4
+discovery_no_entry_tail_days = 20
+walk_forward_folds = 5
+walk_forward_minimum_active_days = 72
+walk_forward_no_entry_tail_days = 20
+remainder_assignment = "OLDEST_FIRST"
+cross_boundary_position_policy = "TERMINAL_EXIT"
+walk_forward_visibility = "SEALED_UNTIL_ALL_FOLDS_COMPLETE"
+holdout_visibility = "SEALED_UNTIL_FINALISTS_FROZEN"
+
+[discovery_support.5m]
+minimum_raw_signals = 160
+minimum_signals_per_block = 25
+minimum_distinct_signal_days = 40
+maximum_median_signals_per_active_day = 10
+
+[discovery_support.30m]
+minimum_raw_signals = 100
+minimum_signals_per_block = 15
+minimum_distinct_signal_days = 35
+maximum_median_signals_per_active_day = 6
+
+[discovery_support.1h]
+minimum_raw_signals = 80
+minimum_signals_per_block = 12
+minimum_distinct_signal_days = 30
+maximum_median_signals_per_active_day = 4
+
+[discovery_economic_gates]
+minimum_filled_round_trips = 40
+minimum_filled_round_trips_per_block = 8
+required_reporting_blocks = 4
+baseline_net_ev_must_be_positive = true
+moderate_net_pnl_must_be_positive = true
+moderate_calendar_month_net_pnl_must_be_positive = true
+moderate_minimum_profit_factor_numerator = 21
+moderate_minimum_profit_factor_denominator = 20
+minimum_positive_blocks = 3
+minimum_worst_block_ev_ticks = -2
+maximum_single_positive_block_gross_share_numerator = 1
+maximum_single_positive_block_gross_share_denominator = 2
+positive_block_gross_profit_definition = "SUM_POSITIVE_GROSS_TRADE_PNL_BEFORE_COSTS"
+profit_factor_zero_loss_policy = "POSITIVE_GROSS_IS_POSITIVE_INFINITY_ZERO_GROSS_UNDEFINED"
+minimum_positive_component_cells = 9
+component_connectivity = "ORTHOGONAL_4_NEIGHBOR"
+minimum_positive_cells_in_3x3 = 7
+minimum_neighbor_median_ev_ratio_numerator = 1
+minimum_neighbor_median_ev_ratio_denominator = 2
+representative_policy = "COMPONENT_MEDOID_THEN_SMALLEST_SL_TP_WITHIN_10_PERCENT_MEDIAN_EV"
+
+[walk_forward_gates]
+minimum_filled_trades_aggregate = 300
+minimum_active_entry_days_aggregate = 150
+minimum_filled_trades_per_fold = 40
+minimum_active_entry_days_per_fold = 20
+minimum_execution_contracts = 5
+minimum_positive_folds = 4
+fold_count = 5
+minimum_fold_profit_factor_numerator = 3
+minimum_fold_profit_factor_denominator = 4
+minimum_aggregate_profit_factor_numerator = 6
+minimum_aggregate_profit_factor_denominator = 5
+minimum_net_profit_to_drawdown_numerator = 3
+minimum_net_profit_to_drawdown_denominator = 2
+bootstrap_replicates = 10000
+bootstrap_confidence_numerator = 95
+bootstrap_confidence_denominator = 100
+benjamini_hochberg_q_numerator = 1
+benjamini_hochberg_q_denominator = 20
+minimum_positive_neighbor_cells = 7
+neighbor_cell_count = 9
+minimum_neighbor_median_ev_ratio_numerator = 1
+minimum_neighbor_median_ev_ratio_denominator = 2
+moderate_minimum_profit_factor_numerator = 21
+moderate_minimum_profit_factor_denominator = 20
+
+[holdout_gates]
+maximum_finalists = 10
+minimum_filled_trades = 80
+minimum_active_entry_days = 40
+minimum_execution_contracts = 2
+minimum_profit_factor_numerator = 23
+minimum_profit_factor_denominator = 20
+bootstrap_confidence_numerator = 90
+bootstrap_confidence_denominator = 100
+holm_alpha_numerator = 1
+holm_alpha_denominator = 20
+both_calendar_halves_must_be_positive = true
+
+[paths]
+bars_output_relative = "data/derived/trade_bars/version=trade_bar_v1"
+checkpoint_output_relative = "data/derived/bar_patterns/checkpoints/bar_pattern_discovery_v1"
+result_output_relative = "data/derived/bar_patterns/bar_pattern_discovery_v1"
