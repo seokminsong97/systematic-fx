@@ -23,5 +23,10 @@
 - [`PHASE_4_DESIGN.md`](phases/PHASE_4_DESIGN.md): risk and capital management
 - [`PHASE_5_DESIGN.md`](phases/PHASE_5_DESIGN.md): continuous strategy lifecycle
 
+## Research Designs
+
+- [`BAR_PATTERN_DISCOVERY_V1.md`](research/BAR_PATTERN_DISCOVERY_V1.md): frozen
+  5-minute, 30-minute, and 1-hour next-open pattern campaign
+
 Document authority is defined in `DESIGN.md`. Moving a document does not change
 its authority or versioning rules.

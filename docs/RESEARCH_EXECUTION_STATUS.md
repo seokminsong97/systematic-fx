@@ -1,9 +1,9 @@
 # Phase 1 Research Execution Status
 
 - Started: 2026-08-03
-- Updated: 2026-08-06
-- Campaigns: `phase1_discovery_v1` and
-  `phase1a_conservative_screening_v1`
+- Updated: 2026-08-09
+- Campaigns: `phase1_discovery_v1`, `phase1a_conservative_screening_v1`, and
+  `bar_pattern_discovery_v1`
 - Campaign mode: `SCREENING_ONLY`
 - Maximum positive label: `SCREENING_SURVIVOR`, `research_eligible = false`
 - Governing plan: [`RESEARCH_PLAN.md`](RESEARCH_PLAN.md)
@@ -18,6 +18,12 @@ whose maximum positive label is `SCREENING_SURVIVOR`; it cannot produce
 execute to produce the cache, checkpoint, and result evidence required by
 `VALIDATION.md`; no outcome may be interpreted and no survivor may be declared
 until every applicable hard gate passes.
+
+The separate `bar_pattern_discovery_v1` branch screens fixed 5-minute,
+30-minute, and 1-hour OHLC hypotheses using derived trade bars and next-bar
+entry. It is also screening-only and cannot produce `PASS_BACKTEST`, Paper, or
+Live authority. Its exact methodology and completed result are recorded in
+[`research/BAR_PATTERN_DISCOVERY_V1.md`](research/BAR_PATTERN_DISCOVERY_V1.md).
 
 A-priori proposals belong in `experiments` with no `pattern_id`. Only patterns
 actually observed in a registered Discovery exposure belong in
@@ -34,6 +40,8 @@ data/derived/outcomes/...
 data/derived/backtest_event_cache/...
 data/derived/outcomes/checkpoints/...
 data/derived/manifests/...
+data/derived/trade_bars/...
+data/derived/bar_patterns/...
 ```
 
 PostgreSQL stores only identities, states, compact summaries, checksums, URIs,
@@ -58,15 +66,21 @@ The implementation order is fixed:
 6. Generate and seal the performance-independent split. **COMPLETE**
 7. Freeze exact research one-second, five-minute, outcome, cost, and execution
    versions. **COMPLETE FOR SCREENING; SHARED CACHE/REPLAY IMPLEMENTED;
-   AUTOMATED TESTS PASS; REAL P5 CACHE/REPLAY NOT RUN**
+   AUTOMATED TESTS PASS; P5 AND P1_05 REPLAYS COMPLETE**
 8. Expose Discovery only in chronological, non-overlapping five-session slices.
    **COMPLETE: 99 OF 99**
 9. Register every query, observation, counterexample, variant, and barrier cell.
-   **DISCOVERY QUERY/PATTERN STATE COMPLETE; 484-CELL GRID FROZEN; REAL OUTCOME
-   DETAIL AND SUMMARY ROWS PENDING**
+   **DISCOVERY QUERY/PATTERN STATE COMPLETE; 484-CELL GRID FROZEN; P5 OUTCOMES
+   COMPLETE AND SCREENING-REJECTED; P1_05 OUTCOMES COMPLETE AND BOTH DIRECTIONS
+   SCREENING-REJECTED**
 10. Prove cache integrity, one-pass replay equivalence, complete 484-cell state,
-    and exact checkpoint/resume before interpreting outcomes. **AUTOMATED
-    IMPLEMENTATION TESTS COMPLETE; 485-DATE REAL-DATA EVIDENCE PENDING**
+    and exact checkpoint/resume before interpreting outcomes. **P5 RESUMED RUN
+    AND INDEPENDENT FULL BYTE-EQUIVALENCE AUDIT COMPLETE; P1_05 REPLAY COMPLETE:
+    478 OF 478**
+11. Build the neutral trade-bar dataset, preregister 216 fixed OHLC candidates,
+    and run Discovery without opening walk-forward or holdout data. **COMPLETE:
+    216 OF 216 COMPUTED; 102 SUPPORT-REJECTED; 114 ECONOMIC-REJECTED; NO
+    FINALISTS**
 
 ## 4. Verified External Contracts
 
@@ -317,11 +331,12 @@ accumulated fixed-query patterns:    11
 
 All 99 AI result artifacts and their query lineage are immutable and registered.
 This completed Discovery state contains source-local feature observations and
-fixed-query support, not executable first-touch outcomes. No Phase 1A barrier
-surface, strategy PnL, screening survivor, walk-forward result, or sealed
-holdout result has been computed or claimed.
+fixed-query support, not executable first-touch outcomes. It is the immutable
+input to the separately registered p5 outcome result below; Discovery by itself
+claims no barrier surface, strategy PnL, screening survivor, walk-forward
+result, or sealed-holdout result.
 
-## 11. Implemented Outcome Engine; p5 Execution Not Run
+## 11. p5 Completed, Screening-Rejected, and Independently Byte-Verified
 
 The content-addressed date/contract event cache, shared chronological runner,
 checkpoint/resume chain, append-only PostgreSQL registry, and operator CLI are
@@ -356,7 +371,7 @@ verification. Economic state evaluation remains one logical chronological
 pass; it is not parallelized by scenario, direction, contract, occurrence,
 time range, or cell.
 
-The frozen `p5_01_range_expansion_flow_continuation` input plan is:
+The completed `p5_01_range_expansion_flow_continuation` replay consumed:
 
 ```text
 Discovery artifacts:                   99
@@ -372,15 +387,14 @@ expected detail rows:                1,613,172
 expected aggregate summaries:           2,904
 ```
 
-The event plan continues after the final Discovery signal on 2023-08-01 so a
-position censored at 20 active sessions remains occupied until a real barrier
-or mandatory terminal quote. The p5 cache-request plan is therefore a bounded
-Discovery screen through the nominal 2023-08-31 pre-expiry boundary, not a full
-2022-01-02 through 2026-07-31 backtest. The executable terminal date is resolved
-only after cache reports exist by reverse-scanning each contract to its last
-valid-quote partition; its versioned selection hash is bound to the RunSpec and
-all checkpoint/final input lineage. This implementation rule is not a claim
-that the real cache reports or terminal selections have already been produced.
+The event plan continued after the final Discovery signal on 2023-08-01 so a
+position censored at 20 active sessions remained occupied until a real barrier
+or mandatory terminal quote. This was a bounded Discovery screen through the
+nominal 2023-08-31 pre-expiry boundary, not a full 2022-01-02 through
+2026-07-31 backtest. The replay processed 868,723,447 ordered events, emitted
+all 1,613,172 detail rows and 2,904 summaries, and completed its 485-date
+checkpoint chain. Its canonical final-result SHA-256 is
+`ca9f4496c7e7e0102cf40631be060c723c16e16cccf0ef6c78986db35572fd79`.
 Each detail row is keyed by `signal_id`, scenario, and one of 484 TP/SL cells
 and retains direction and contract. `signal_id` losslessly resolves to the
 immutable Discovery occurrence containing every original research variable;
@@ -388,32 +402,152 @@ those variables are not redundantly copied into all 1,452 outcome rows for the
 same signal. The 2,904 compact summaries are keyed by scenario, direction,
 take-profit, and stop-loss and are aggregated across contracts.
 
-`p5_01_range_expansion_flow_continuation` is first. Its complete surface,
-checkpoint/resume equivalence, and artifact/DB lineage audit must pass before
-`p1_05_unconfirmed_move_reversal` starts. This is an approved work order, not a
-completed outcome result. At this status revision, neither candidate's
-event-level outcome research has run.
+The conservative economic screen rejected both p5 directions. This is a
+terminal `SCREENING_REJECT` result for p5 under this frozen Phase 1A policy; it
+does not provide Backtest, Paper, or Live evidence.
 
-## 12. Operator Sequence
+The completed replay used a real checkpoint/resume path. A separate full
+uninterrupted replay then reproduced every daily detail shard, checkpoint, cell
+summary, and final canonical document byte for byte. PostgreSQL records the
+proof as `PASSED` equivalence-audit row `1`, owned by `VALIDATION` RunSpec
+`1303` and attempt `1302`, with validation run fingerprint
+`b6a227c2f9c768e3b2a32c8bd7a5e2d210e7b3b053d4213b2d01055f6414ab69`.
+The 485-checkpoint chain SHA-256 is
+`e369bb25566405c46ef5a66268d4d41ba4ed03d6a9ed93fec4443123202946fa`.
+The content-addressed proof is stored at
+`data/derived/outcomes/audits/phase1a_p5_outcome_equivalence_v1/sha256=b878bdfcd65a481f0710a5be5af5e4c77392260392c164ccd86db1cde6f1d309.json`,
+with the same terminal SHA-256. Only this registered proof, not a matching local
+file by itself, authorized the second candidate.
+
+## 12. p1_05 Completed and Screening-Rejected
+
+The frozen `p1_05_unconfirmed_move_reversal` input is:
+
+```text
+Discovery artifacts:                   99
+p1_05 signals:                        943
+LONG / SHORT signals:           446 / 497
+signal source dates:                    216
+futures contracts:                        7
+unique replay source dates:              478
+date/contract cache partitions:           478
+first replay source date:          2022-01-07
+final replay source date:          2023-08-31
+detail rows:                         1,369,236
+aggregate summaries:                    2,904
+```
+
+The frozen portable Discovery-artifact manifest SHA-256 is
+`23037db1dd12784e379b76effa4f3056cec18d9ae2db7fe7e54e11f2f5424d33`.
+The p1_05 signal-manifest SHA-256 is
+`733728670870dd438e79dfadd9df80043a0f2baf9553733cf89382132fefba25`, the
+cache-request plan SHA-256 is
+`3ad39a9bff36e0eae1c87687bf38108b663394624582167bdbf5d848fe5b0252`, the
+canonical configuration-parameters SHA-256 is
+`d74dff325e2bf4632970f74eeb6515b58960e4c2c090b7663247a8f37f61374a`, and
+the checked-in configuration-file SHA-256 is
+`c7c756dbe5a7341dc362a08cf8ba71472fd5667bd21200446e9aee5d2470bb99`.
+
+The p1_05 plan-only verification passed. Its 478-partition immutable cache
+manifest has SHA-256
+`15a35fb14878cae903adaee662c5a8ff27efeea04c373e5f7f4fae02ba03a42c`:
+the cache-only preparation reused 474 partitions by exact content identity and
+created four, while the final replay reused all 478 verified partitions. Cache
+construction by itself contained no p1_05 PnL or barrier conclusion.
+
+The governed replay subsequently succeeded as outcome manifest `4`, RunSpec
+`1306`, and attempt `1305`, with run fingerprint
+`40730e618651c613be15d303054898757a14f1a9671be6bde7567cc921c7e97e`.
+It processed 854,765,427 ordered events, emitted all 1,369,236 detail rows and
+2,904 summaries, and completed all 478 source-date checkpoints. The canonical
+result is
+`data/derived/outcomes/phase1a_p1_05_outcome_replay_v1/sha256=0bd8f465bb3bb47a7f9f72662f905a19a416802a5d8ebff23cdeefd66fcc10ce.json`;
+its SHA-256 is the hash embedded in that path. The final checkpoint SHA-256 is
+`ede238cf6c45287294cc1dce2927f63dd7d2d8a78dda76f5ff59ec1c102a96de`,
+the cell-summary SHA-256 is
+`b781d6111bc098fcd846edde3e0a4378ccbefb4edbb34c5e9dae0d5be2dc65be`,
+the detail-shard-manifest SHA-256 is
+`aca496bacc9606def65c79350a8ca3dbc76f2700d274cdc2badba097fb1fb386`,
+and the input-lineage SHA-256 is
+`de733b7025eb0c7903fc24679f4adbd8cd859217bf1c68505e1032de75287a00`.
+Independent verification rehashed and decoded all 478 detail shards and their
+1,369,236 rows, verified all 478 checkpoint files and their chain, matched all
+2,904 DB summaries to the result artifact, and reproduced both registered
+decisions with the frozen selector. The verified surface is:
+
+| Direction | Baseline positive | Moderate positive | Joint positive | Joint component sizes | Stable cells | Decision |
+|---|---:|---:|---:|---|---:|---|
+| LONG | 0 / 484 | 85 / 484 | 0 / 484 | `[]` | 0 | `SCREENING_REJECT` |
+| SHORT | 5 / 484 | 383 / 484 | 5 / 484 | `[2, 2, 1]` | 0 | `SCREENING_REJECT` |
+
+The five SHORT joint-positive cells have TP/SL distances of 52/96, 56/96,
+92/88, 92/96, and 96/88 pips. They form three disconnected components and none
+passes the frozen adjacent-stability rule. No cell under any registered
+scenario/direction pair has positive calendar-month-loaded net PnL.
+
+Both DB decisions therefore have `positive_region_size = 0`, null selected TP
+and SL, and the same rejection reasons:
+
+```text
+JOINT_POSITIVE_REGION_NOT_SINGLE_CONTIGUOUS_COMPONENT
+NO_INTERIOR_7_OF_9_STABLE_CELL
+NO_STABLE_REGION_MEDOID
+```
+
+There is no selected entry bracket and therefore no Production Buying Price,
+Sell Price, or Loss Price triplet from p1_05. This rejection cannot be promoted
+to `PASS_BACKTEST`, Paper, or Live authority.
+
+Every outcome detail resolves through `signal_id` to its immutable Discovery
+occurrence, which retains every original research variable. Candidate config,
+input manifests, cache reports, terminal resolution, code and dependency
+identity, runtime worker count, RunSpec, attempts, checkpoints, daily shards,
+summary cells, screening decision, and predecessor-audit lineage are all
+recorded. The system does not discard a variable or failed result merely to
+reduce the compact outcome artifact.
+
+## 13. Operator Sequence
 
 Apply all migrations through
-`0015_phase1a_outcome_constraints_validated.sql`, then execute the modes in
-order. Every command requires `SYSTEMATIC_FX_DATABASE_URL` or an explicit
-`--database-url`.
+`0023_bar_pattern_raw_dataset_lineage_fix.sql`, then execute the
+modes in order. Every command requires `SYSTEMATIC_FX_DATABASE_URL` or an
+explicit `--database-url`.
+
+The completed p1_05 RunSpec used the exact contiguous migration history
+`0001`-`0021`. Migration `0021` removed an ambiguous PL/pgSQL record/table alias
+from the p1 predecessor lookup without editing applied migration history or
+weakening the fail-closed lineage comparisons. The run binds Git object
+`d8adc2cd425ac8dda02fe32a2ef4a6571f15f9a5` and exact code-snapshot SHA-256
+`be71a0d6664564e6f52391f9ffa45cb610400c51e79edea4d2fb8c962ca0b178`.
+Migrations `0022` and `0023` subsequently add the bar-campaign registry and
+correct its raw-versus-derived dataset lineage; they do not retroactively alter
+the completed p1_05 RunSpec.
 
 ```bash
 uv run --locked --all-extras systematic-fx db migrate
 uv run --locked --all-extras systematic-fx research phase1a-p5-outcomes --plan-only --json
 uv run --locked --all-extras systematic-fx research phase1a-p5-outcomes --cache-only --max-cache-workers 4 --json
 uv run --locked --all-extras systematic-fx research phase1a-p5-outcomes --max-cache-workers 4 --json
+uv run --locked --all-extras systematic-fx research phase1a-p5-equivalence-audit --outcome-replay-manifest-id <p5_manifest_id> --json
+uv run --locked --all-extras systematic-fx research phase1a-p1-05-outcomes --plan-only --json
+uv run --locked --all-extras systematic-fx research phase1a-p1-05-outcomes --cache-only --max-cache-workers 4 --json
+uv run --locked --all-extras systematic-fx research phase1a-p1-05-outcomes --max-cache-workers 4 --json
 ```
 
-`--plan-only` is read-only. `--cache-only` creates or verifies immutable cache
-and manifest artifacts below `data/derived` without reserving an economic
-attempt. The command without a mode flag starts the governed replay; issuing
-the exact same command again verifies the latest source-date checkpoint and
-resumes the same active attempt. There is no separate `--resume` flag, and a
-terminal failed attempt cannot be reopened.
+`--plan-only` verifies either the exact p5 1,111-signal/485-partition plan or the
+p1_05 943-signal/478-partition plan without writes. `--cache-only` creates or
+verifies immutable cache and manifest artifacts below `data/derived` without
+reserving an economic attempt. The command without a mode flag starts the
+governed replay; issuing the exact same command again verifies the latest
+source-date checkpoint and resumes the same active attempt. There is no
+separate `--resume` flag, and a terminal failed attempt cannot be reopened.
+
+The audit command accepts `--outcome-replay-manifest-id`, `--database-url`, and
+`--json`. The manifest selector is optional only when PostgreSQL has one
+unambiguous successful p5 subject. The audit reuses and verifies immutable
+caches and never rebuilds them, so it intentionally has no
+`--max-cache-workers` option. A zero exit status requires a byte-equivalent
+result and successful audit registration.
 
 Cache progress is printed to standard error after the first, every tenth, and
 final completed partition. Replay progress is printed after every source-date
@@ -421,6 +555,44 @@ checkpoint. The final human-readable or `--json` report is printed to standard
 output. Progress, a successful plan audit, or a built cache is not a barrier,
 PnL, or survivor result.
 
-Current real-execution state: **NOT RUN**. No p5 cache manifest, checkpoint
-chain, 1,613,172-row detail ledger, 2,904-row summary artifact, PnL, or
-`SCREENING_SURVIVOR` decision is claimed by this revision.
+Current real-execution state: **P5 COMPLETE AND SCREENING-REJECTED; P5
+INDEPENDENT BYTE-EQUIVALENCE AUDIT PASSED; P1_05 REPLAY SUCCEEDED AND BOTH
+DIRECTIONS SCREENING-REJECTED**. The completed p1_05 RunSpec binds audit row `1`
+and the exact predecessor hashes. This remains a bounded Phase 1A screen through
+2023-08-31; it is not `PASS_BACKTEST`, Paper, Live, or a full 2022-2026
+validation result, and it provides no Production Buying/Sell/Loss triplet.
+
+## 14. Bar Pattern Discovery V1 Completed Without a Finalist
+
+The governed bar campaign completed on 2026-08-09. It loaded only the 489
+Discovery active dates from `2022-01-03` through `2023-08-02`; decisions ended
+on `2023-07-10`, before walk-forward fold 1 begins on `2023-08-03`. Every
+walk-forward, embargo, holdout, and holdout-tail split remains `SEALED` with no
+reveal timestamp.
+
+All 216 candidate attempts succeeded computationally and all 216 trials were
+rejected by the frozen screen:
+
+| Timeframe | Support reject | Economic reject | Finalists |
+| --- | ---: | ---: | ---: |
+| 5 minutes | 2 | 70 | 0 |
+| 30 minutes | 28 | 44 | 0 |
+| 1 hour | 72 | 0 | 0 |
+
+The result contains 146,864 matched-context evidence rows, 40,906 compact
+replay rows, 208 Parquet evidence shards, 216 complete `3 x 484` terminal
+surfaces, and one global result. An independent read-only validation rehashed
+and schema-checked all 426 live result/evidence files. The global result SHA is
+`bda2cfef66c6f59469b77d2d4f85f4ccc531a290934c010f99389262bba8cbfa`;
+the evidence-manifest SHA is
+`58816efcff5a3051195796b35da3e2c3219892a1da633473218850624a5f6a2e`.
+
+The 5-minute and 30-minute fixed-family candidates are economic rejections
+under the conservative cost and grid-stability rules. The one-hour branch is
+instead design-limited: normal gap segmentation left no 24-bar signal segment,
+so lookbacks 2, 3, 4, 6, and 12 could never assemble ATR20 plus setup history.
+It is inconclusive and requires a new versioned context-continuity policy, not
+a weakened post-result gate.
+
+There is no finalist and therefore no Buying Price, Sell Price, or Loss Price
+triplet. No walk-forward or holdout run is authorized for v1.

@@ -1,6 +1,6 @@
 # Conservative Phase 1A Screening Policy
 
-- Document version: 1.1.0
+- Document version: 1.3.0
 - Status: `FROZEN_SCREENING_POLICY`
 - Scope: MBP-10 Phase 1A screening only
 - Campaign: `phase1a_conservative_screening_v1`
@@ -204,8 +204,9 @@ SHA-256 in the cache manifest. Parallelism ends at independent cache-key
 construction and verification; worker count and the one-cache-key-per-worker
 scheduling rule are recorded in the RunSpec.
 
-For `phase1a_p5_outcome_replay_v1`, both the worker ceiling and maximum number
-of in-flight partitions are four. The operator may select one through four
+For `phase1a_p5_outcome_replay_v1` and
+`phase1a_p1_05_outcome_replay_v1`, both the worker ceiling and maximum number of
+in-flight partitions are four. The operator may select one through four
 workers. A semantic request index binds each exact cache request to the verified
 content-addressed artifact so an ordinary exact rerun reuses it without opening
 the raw source again.
@@ -233,13 +234,14 @@ a duplicate or regression rather than selecting a convenient barrier order.
 
 The contract dimension above is logical occupancy, not the compact summary key.
 For the frozen p5 inputs, every signal produces one result identity under every
-scenario and barrier cell, for 1,613,172 detail rows (`1,111 x 3 x 484`). Those
-rows retain `signal_id`, direction, and futures contract. The immutable
-Discovery occurrence addressed by `signal_id` remains the source of all
-original research variables, avoiding 1,452 duplicate variable objects per
-signal while preserving exact reconstruction.
-The final surface has 2,904 summaries (`3 x 2 x 484`) keyed by scenario,
-direction, take-profit, and stop-loss and aggregated across the seven contracts.
+scenario and barrier cell, for 1,613,172 detail rows (`1,111 x 3 x 484`). The
+frozen p1_05 inputs require 1,369,236 (`943 x 3 x 484`). Those rows retain
+`signal_id`, direction, and futures contract. The immutable Discovery
+occurrence addressed by `signal_id` remains the source of every original
+research variable, avoiding 1,452 duplicate variable objects per signal while
+preserving exact reconstruction. Each candidate's final surface has 2,904
+summaries (`3 x 2 x 484`) keyed by scenario, direction, take-profit, and
+stop-loss and aggregated across the seven contracts.
 
 The 20-active-session first-touch clock is distinct from portfolio
 continuation. An unresolved observation freezes as `CENSORED`; its cell remains
@@ -291,12 +293,42 @@ active attempt and must reproduce the uninterrupted canonical result bytes;
 attempt and checkpoint history remains append-preserved, and a terminal failed
 attempt cannot be reopened or continued after any input/hash drift.
 
-The first governed outcome candidate is
-`p5_01_range_expansion_flow_continuation`. Only after its complete 484-cell
-surfaces, checkpoint-resume equivalence, and DB/artifact lineage audit succeed
-may `p1_05_unconfirmed_move_reversal` reserve an outcome attempt. Cache
-partitions may be reused by verified content hash, but candidate RunSpecs,
-attempts, checkpoints, and result artifacts remain separate.
+The first governed outcome candidate,
+`p5_01_range_expansion_flow_continuation`, completed its 485-date resumed replay
+and both directional surfaces were screening-rejected. A rejection does not
+remove the predecessor gate. The required independent full uninterrupted replay
+matched all 485 resumed daily shards, checkpoints, summaries, and final result
+bytes. Its content-addressed proof SHA-256 is
+`b878bdfcd65a481f0710a5be5af5e4c77392260392c164ccd86db1cde6f1d309`;
+successful `VALIDATION` RunSpec `1303` and attempt `1302` own `PASSED`
+append-only equivalence-audit row `1`. Only that row authorized
+`p1_05_unconfirmed_move_reversal` to reserve an outcome attempt. Cache
+partitions were reusable by verified content hash, while candidate RunSpecs,
+attempts, checkpoints, and result artifacts remained separate.
+
+The p1_05 input is frozen at 943 signals (446 `LONG`, 497 `SHORT`), 216 signal
+dates, seven contracts, and 478 replay partitions from 2022-01-07 through
+2023-08-31. Its plan and immutable cache were prepared, and the final run reused
+all 478 verified cache partitions. The governed replay succeeded as manifest
+`4`, RunSpec `1306`, and attempt `1305`; it processed 854,765,427 ordered events,
+produced all 1,369,236 detail rows and 2,904 summaries, and completed checkpoint
+sequence 478. Its result SHA-256 is
+`0bd8f465bb3bb47a7f9f72662f905a19a416802a5d8ebff23cdeefd66fcc10ce`,
+and its final checkpoint SHA-256 is
+`ede238cf6c45287294cc1dce2927f63dd7d2d8a78dda76f5ff59ec1c102a96de`.
+Independent verification matched all 478 detail shards and checkpoints, all
+1,369,236 decoded rows, all 2,904 summaries, and the frozen selector. LONG has
+0 baseline-positive, 85 moderate-positive, 0 joint-positive, and 0 stable cells.
+SHORT has 5 baseline-positive, 383 moderate-positive, and 5 joint-positive
+cells, but the joint region splits into components of sizes `[2, 2, 1]` and has
+0 stable cells. The five SHORT joint cells are 52/96, 56/96, 92/88, 92/96, and
+96/88 TP/SL pips. No scenario/direction has a calendar-month-loaded positive
+cell.
+
+Both directions are therefore `SCREENING_REJECT`. Their selected TP/SL values
+are null, `positive_region_size = 0`, and both record the same three reasons:
+`JOINT_POSITIVE_REGION_NOT_SINGLE_CONTIGUOUS_COMPONENT`,
+`NO_INTERIOR_7_OF_9_STABLE_CELL`, and `NO_STABLE_REGION_MEDOID`.
 
 ## Adjacent stability
 
@@ -338,13 +370,15 @@ a promotion gate. Even after all of these conditions pass, the result is only
 
 ## What this policy does not claim
 
-The shared cache/replay software is implemented and covered by automated tests.
-That implementation status is not an executed research result. The frozen
-485-source-date p5 cache and event replay have not run, and neither `p5_01` nor
-`p1_05` has a barrier result, PnL, or survivor conclusion. Walk-forward folds
-and the sealed holdout have not run either. The runner must reject a survivor
-decision when a required input, cache binding, checkpoint equivalence result,
-lineage link, any of the 1,613,172 detail records, or any of the 2,904 aggregate
-summaries is absent. A later backtest must add point-in-time
-definition/status, actual cost evidence, its own registered campaign, numeric
-validation gates, and explicit authorization.
+The completed p5 screen supports only `SCREENING_REJECT` for each direction; it
+does not establish a tradable strategy or provide independent walk-forward or
+holdout evidence. The p5 uninterrupted-versus-resumed equivalence audit and the
+p1_05 economic replay have completed, and the verified frozen decision rejects
+both p1_05 directions. No p1_05 TP/SL pair was selected, so this policy provides
+no Production Buying Price, Sell Price, or Loss Price triplet. The runner must
+fail closed when a required input, cache binding, audit row, lineage link,
+candidate-specific detail record, or any of the 2,904 aggregate summaries is
+absent. A later backtest must add point-in-time definition/status, actual cost
+evidence, its own registered campaign, numeric validation gates, and explicit
+authorization; neither completed screen has `PASS_BACKTEST`, Paper, or Live
+authority.

@@ -1,7 +1,7 @@
 # Phase 1 Design: AI Research and Backtesting
 
-- Document version: 1.8.0-draft
-- Revised: 2026-08-06
+- Document version: 1.10.0-draft
+- Revised: 2026-08-09
 - Status: `DRAFT`
 - Parent document: [`DESIGN.md`](../DESIGN.md)
 - Input: Historical MBP-10 from the Data Source
@@ -340,13 +340,13 @@ descriptor-relative no-follow operations and verify the final pathname inode,
 so path, symlink, or same-size byte replacement cannot be certified under the
 original hash.
 
-The Phase 1A p5 v1 cache builder has a governed ceiling of four worker
-processes and four in-flight partitions. One worker owns one cache key at a
-time. The operator may lower the worker count to any value from one through
-four, and the actual value is recorded in the RunSpec runtime identity. A
-content-addressed semantic request index maps the exact source/date/contract
-request to its already verified cache artifact so an ordinary exact rerun does
-not reopen raw MBP-10.
+The Phase 1A p5 and p1_05 v1 cache builders have a governed ceiling of four
+worker processes and four in-flight partitions. One worker owns one cache key
+at a time. The operator may lower the worker count to any value from one
+through four, and the actual value is recorded in the RunSpec runtime identity.
+A content-addressed semantic request index maps the exact
+source/date/contract request to its already verified cache artifact so an
+ordinary exact rerun does not reopen raw MBP-10.
 
 Economic replay opens the verified cache partitions in strict source-time
 order once. The shared event stream fans out to the complete registered state
@@ -371,12 +371,15 @@ key within a source date is
 a duplicate or regression is a hard replay failure.
 
 The contract dimension above is portfolio occupancy state, not the identity of
-the final aggregate summary. For the frozen p5 input, the result ledger contains
-1,613,172 detail rows (`1,111 x 3 x 484`), one per signal, scenario, and barrier
-cell, with the signal's direction and futures contract retained in each row.
-The final compact surface contains 2,904 summaries (`3 x 2 x 484`), aggregated
-across the seven futures contracts and keyed by scenario, direction, take-profit
-ticks, and stop-loss ticks.
+the final aggregate summary. The completed frozen p5 result ledger contains
+1,613,172 detail rows (`1,111 x 3 x 484`), and the completed p1_05 result ledger
+contains 1,369,236 (`943 x 3 x 484`). Each row represents one signal, scenario,
+and barrier cell, with the signal's direction and futures contract retained. Each
+candidate's final compact surface contains 2,904 summaries (`3 x 2 x 484`),
+aggregated across the seven futures contracts and keyed by scenario, direction,
+take-profit ticks, and stop-loss ticks. The row's `signal_id` resolves to the
+immutable Discovery occurrence that preserves every original research
+variable.
 
 The first-touch label clock and portfolio clock are separate state variables.
 If neither registered barrier executes inside 20 active sessions, the
@@ -412,9 +415,34 @@ bytes as an uninterrupted run.
 Resume rebuilds compact economics by hash/schema-validating and consuming each
 prior daily detail shard in order, then releasing that shard before opening the
 next. Final artifact verification follows the same bounded-memory rule. The
-implementation must not retain the complete 1,613,172-row detail ledger as
+implementation must not retain either complete candidate detail ledger as
 Python objects. A lineage-only load may omit Parquet decoding, but it must still
 stream and compare the complete artifact SHA-256.
+
+Candidate order is a database-enforced research boundary. The completed p5
+resumed replay and its screening rejection were not enough by themselves to
+start p1_05. A separate full uninterrupted replay had to reproduce every p5
+daily shard, checkpoint, summary, and final-result byte, and its
+content-addressed proof had to be registered under a successful `VALIDATION`
+attempt and a `PASSED` append-only equivalence-audit row. The p1_05 RunSpec and
+downstream lineage must bind that audit identity plus the exact predecessor
+replay-manifest, run-fingerprint, result, input-lineage, cell-summary,
+detail-shard-manifest, and final-checkpoint hashes. Planning and cache
+construction do not reserve an economic attempt and may occur before this gate
+passes.
+
+The implemented boundary passed exactly as designed. Equivalence-audit row `1`,
+owned by `VALIDATION` RunSpec `1303` and attempt `1302`, byte-verified all 485 p5
+checkpoints. It authorized p1_05 RunSpec `1306`, whose governed replay completed
+478 checkpoints, 854,765,427 ordered events, 1,369,236 detail rows, and 2,904
+summaries under manifest `4` and attempt `1305`. Its result SHA-256 is
+`0bd8f465bb3bb47a7f9f72662f905a19a416802a5d8ebff23cdeefd66fcc10ce`.
+Independent verification reproduced the DB selector decisions: both LONG and
+SHORT are `SCREENING_REJECT`, with no stable cell, null selected TP/SL, and
+`positive_region_size = 0`. No scenario/direction has a calendar-month-loaded
+positive cell. Therefore the implementation produces no Production
+Buying/Sell/Loss triplet. This is screening evidence only; it does not satisfy
+the walk-forward, sealed-holdout, or `PASS_BACKTEST` requirements.
 
 Safe parallelism is limited to:
 
@@ -556,13 +584,13 @@ A strategy artifact that passes `VALIDATION.md` is handed to Phase 2 with:
 - Cost and execution models are applied.
 - Raw-source open-count tests prove that replay does not scan MBP-10 per
   occurrence, scenario, direction, or barrier cell.
-- Cache construction, chronological replay, and checkpoint-resume equivalence
-  gates in `VALIDATION.md` pass.
+- Cache construction, chronological replay, checkpoint-resume, and independent
+  uninterrupted-versus-resumed equivalence gates in `VALIDATION.md` pass.
 - Every registered scenario/direction/contract has all 484 logical occupancy
-  states. The detail ledger emits all 1,613,172 signal/scenario/cell records,
-  and the aggregate result emits exactly 2,904 unique
-  scenario/direction/take-profit/stop-loss summaries with complete occupancy
-  and censoring lineage.
+  states. The p5 detail ledger emits all 1,613,172 records and the p1_05 ledger
+  emits all 1,369,236; each aggregate result emits exactly 2,904 unique
+  scenario/direction/take-profit/stop-loss summaries with complete variable,
+  occupancy, and censoring lineage.
 - MBO-only features do not enter the MBP-10 research path.
 - Failed trials are preserved.
 - At least one strategy becomes Paper-eligible, or every preregistered family
@@ -573,7 +601,7 @@ A strategy artifact that passes `VALIDATION.md` is handed to Phase 2 with:
 ## 14. Remaining Implementation Questions
 
 - Measured per-worker peak memory and a machine-specific memory budget; the
-  current p5 worker and in-flight ceiling remains four
+  current Phase 1A worker and in-flight ceiling remains four
 - Feature storage schema
 - Whether an ML library is needed
 - Synthetic stress set

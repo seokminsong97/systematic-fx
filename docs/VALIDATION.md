@@ -1,7 +1,7 @@
 # Validation and Promotion Criteria
 
-- Document version: 1.1.0-draft
-- Revised: 2026-08-06
+- Document version: 1.3.0-draft
+- Revised: 2026-08-09
 - Status: `DRAFT`
 - Parent document: [`DESIGN.md`](DESIGN.md)
 - Research scope: [`RESEARCH_PLAN.md`](RESEARCH_PLAN.md)
@@ -234,11 +234,12 @@ survivor decision:
   input lineage, final result, and the cache-manifest report facts.
 - For every scenario, direction, and futures contract there are exactly 484
   logical barrier-cell occupancy states. The p5 detail ledger contains exactly
-  1,613,172 signal/scenario/cell rows (`1,111 x 3 x 484`), retaining direction,
-  contract, and occurrence lineage. Its compact aggregate contains exactly
-  2,904 scenario/direction/cell summaries (`3 x 2 x 484`). Missing, duplicate,
-  preselected, or silently pruned states, detail rows, or summaries are hard
-  failures.
+  1,613,172 signal/scenario/cell rows (`1,111 x 3 x 484`); the p1_05 ledger must
+  contain exactly 1,369,236 (`943 x 3 x 484`). Both retain direction, contract,
+  occurrence lineage, and lossless access to every original signal variable.
+  Each compact aggregate contains exactly 2,904 scenario/direction/cell
+  summaries (`3 x 2 x 484`). Missing, duplicate, preselected, or silently
+  pruned states, detail rows, summaries, or variable lineage are hard failures.
 - Each cell preserves its own occupancy, skipped signals, 20-session
   first-touch clock, immutable censor label, and eventual portfolio exit.
 - A reviewed golden fixture produces identical entries, fill prices, barrier
@@ -251,18 +252,26 @@ survivor decision:
   scenario, direction, contract, occurrence, time-range, or cell replay shards.
 - Checkpoint artifacts are content addressed and lineage bound. Clean runs and
   injected stops after every supported date boundary resume to byte-identical
-  final artifacts without duplicated or omitted events.
+  final artifacts without duplicated or omitted events. For the real p5
+  predecessor, an independent full uninterrupted replay must also reproduce
+  every persisted daily shard, checkpoint, compact summary, and final canonical
+  document from the completed resumed run byte for byte.
 - Resume and final verification process cumulative detail evidence one daily
   shard at a time. A mode that omits record decoding must still stream-verify
   every referenced shard SHA-256; filename, size, and read-only mode alone are
-  insufficient evidence. An instrumentation test rejects retention of the
-  complete 1,613,172-row ledger in memory.
+  insufficient evidence. An instrumentation test rejects retention of either
+  complete candidate ledger in memory.
 - No later-date state or checkpoint commits before the complete prior-date
   barrier; independent time-range, per-occurrence, and per-cell replay are
   prohibited.
 - `p1_05_unconfirmed_move_reversal` cannot reserve an outcome attempt until the
-  complete `p5_01_range_expansion_flow_continuation` run and its artifact/DB
-  lineage audit have succeeded.
+  complete `p5_01_range_expansion_flow_continuation` run and its independent
+  uninterrupted-versus-resumed audit have succeeded. The proof must be an
+  immutable, content-addressed artifact owned by a successful `VALIDATION`
+  attempt and a `PASSED` PostgreSQL equivalence-audit row. The p1_05 RunSpec,
+  checkpoints, and result must bind that audit row and the predecessor's exact
+  replay-manifest, run-fingerprint, result, input-lineage, cell-summary,
+  detail-shard-manifest, and final-checkpoint hashes.
 
 Required automated tests include:
 
@@ -279,6 +288,7 @@ single-worker and four-worker cache manifests are identical
 reference and shared replay produce identical golden outcomes
 20-session censor does not close or relabel portfolio continuation
 checkpoint at each supported date boundary resumes byte-identically
+full uninterrupted p5 replay reproduces the completed resumed artifact bytes
 terminal partition with zero valid quotes falls back to the prior executable partition
 contract with no pre-expiry executable quote fails closed
 terminal-resolution policy/result tampering breaks RunSpec or checkpoint lineage
@@ -286,11 +296,31 @@ missing or duplicate scenario/direction/contract/cell state fails closed
 p1_05 reservation fails before the governed p5_01 predecessor completes
 ```
 
-Passing these automated implementation tests is necessary but does not prove
-that the frozen 485-source-date p5 cache or replay has run. The real-data cache
-manifest, all 485 checkpoints through 2023-08-31, 1,613,172 detail rows, 2,904
-summaries, and uninterrupted-versus-resumed artifact comparison must exist
-before any barrier, PnL, or `SCREENING_SURVIVOR` interpretation is allowed.
+The real-data p5 cache, 485-date replay, 1,613,172 details, and 2,904 summaries
+have completed; both directions were screening-rejected. The separate full
+uninterrupted-versus-resumed comparison also passed across all 485 checkpoints
+and is registered as equivalence-audit row `1` under successful `VALIDATION`
+RunSpec `1303` and attempt `1302`. Its audit artifact SHA-256 is
+`b878bdfcd65a481f0710a5be5af5e4c77392260392c164ccd86db1cde6f1d309`.
+
+That registered proof authorized p1_05 RunSpec `1306` and attempt `1305`. The
+real-data p1_05 replay then completed all 478 partitions, processed 854,765,427
+ordered events, emitted all 1,369,236 details and 2,904 summaries, and committed
+result SHA-256
+`0bd8f465bb3bb47a7f9f72662f905a19a416802a5d8ebff23cdeefd66fcc10ce`
+with final-checkpoint SHA-256
+`ede238cf6c45287294cc1dce2927f63dd7d2d8a78dda76f5ff59ec1c102a96de`.
+Independent verification passed for all 478 detail shards and checkpoint files,
+all 1,369,236 decoded detail rows, the full checkpoint hash chain, all 2,904 DB
+and artifact summaries, and exact selector/decision reproduction. LONG has no
+baseline-positive or joint-positive cell. SHORT has five joint-positive cells,
+but their component sizes are `[2, 2, 1]`; both directions have zero stable
+cells and zero calendar-month-loaded positive cells. The registered decisions
+therefore reject both directions with null selected TP/SL and
+`positive_region_size = 0`. This bounded screen does not satisfy the data
+qualification, walk-forward, stress-validation, or sealed-holdout requirements
+for `PASS_BACKTEST`; it provides no Production Buying/Sell/Loss triplet and no
+Paper promotion evidence.
 
 ---
 

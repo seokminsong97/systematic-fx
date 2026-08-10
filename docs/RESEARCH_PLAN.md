@@ -1,7 +1,7 @@
 # Phase 1 Research Plan
 
-- Document version: 1.1.0-draft
-- Revised: 2026-08-06
+- Document version: 1.3.0-draft
+- Revised: 2026-08-09
 - Status: `DRAFT`
 - Parent documents: [`DESIGN.md`](DESIGN.md),
   [`PHASE_1_DESIGN.md`](phases/PHASE_1_DESIGN.md)
@@ -363,9 +363,17 @@ but it receives a distinct RunSpec, attempts, checkpoints, and result
 artifacts. These two candidates are not run concurrently, and their order must
 not be changed after seeing economic results.
 
-This ordering authorizes implementation and later governed execution only. It
-does not state that either candidate's event-level outcome research or economic
-screen has completed.
+The governed p5 replay has completed and both directional surfaces were
+screening-rejected. That economic result did not waive the ordering rule. The
+required separate full uninterrupted replay reproduced the resumed run's daily
+detail shards, checkpoint chain, cell summaries, and final canonical result
+byte for byte. Its content-addressed evidence is registered as successful
+`VALIDATION` RunSpec `1303`, attempt `1302`, and `PASSED` equivalence-audit row
+`1`; the audit artifact SHA-256 is
+`b878bdfcd65a481f0710a5be5af5e4c77392260392c164ccd86db1cde6f1d309`.
+Only that immutable DB row authorized the p1_05 replay RunSpec. Planning and
+constructing content-addressed p1_05 caches remained non-economic and did not
+reserve an attempt before the audit passed.
 
 The frozen p5 execution plan consumes all 99 Discovery artifacts and 1,111 p5
 signals: 529 `LONG`, 582 `SHORT`, 238 signal dates, and seven futures contracts.
@@ -377,6 +385,37 @@ not assumed to occur on that nominal date: after cache construction, each
 contract is reverse-scanned to the latest partition whose report proves a valid
 executable quote. This is a bounded Discovery screening run, not the later
 full-history walk-forward or sealed holdout test through 2026-07-31.
+
+The frozen p1_05 plan also consumes all 99 Discovery artifacts. It contains 943
+signals (446 `LONG`, 497 `SHORT`) across 216 signal dates and seven contracts,
+and requires 478 unique replay source dates/cache partitions from 2022-01-07
+through 2023-08-31. Its exact signal-manifest SHA-256 is
+`733728670870dd438e79dfadd9df80043a0f2baf9553733cf89382132fefba25`, its
+cache-request plan SHA-256 is
+`3ad39a9bff36e0eae1c87687bf38108b663394624582167bdbf5d848fe5b0252`, and
+its canonical configuration-parameters SHA-256 is
+`d74dff325e2bf4632970f74eeb6515b58960e4c2c090b7663247a8f37f61374a`.
+The checked-in TOML bytes have SHA-256
+`c7c756dbe5a7341dc362a08cf8ba71472fd5667bd21200446e9aee5d2470bb99`.
+The governed p1_05 replay then succeeded as manifest `4`, RunSpec `1306`, and
+attempt `1305`, with run fingerprint
+`40730e618651c613be15d303054898757a14f1a9671be6bde7567cc921c7e97e`.
+It consumed 854,765,427 ordered events and produced the complete 478-checkpoint,
+1,369,236-detail, and 2,904-summary evidence set. The canonical result SHA-256
+is `0bd8f465bb3bb47a7f9f72662f905a19a416802a5d8ebff23cdeefd66fcc10ce`,
+and the final checkpoint SHA-256 is
+`ede238cf6c45287294cc1dce2927f63dd7d2d8a78dda76f5ff59ec1c102a96de`.
+Independent verification reproduced the frozen selector and both registered
+decisions. LONG has zero baseline-positive and zero joint-positive cells; SHORT
+has five baseline-and-moderate joint-positive cells, but they split into
+components of sizes `[2, 2, 1]`. Neither direction has a stable cell, and no
+scenario/direction has a calendar-month-loaded positive cell. Both directions
+are therefore `SCREENING_REJECT`, with null selected TP/SL and
+`positive_region_size = 0`. The shared rejection reasons are
+`JOINT_POSITIVE_REGION_NOT_SINGLE_CONTIGUOUS_COMPONENT`,
+`NO_INTERIOR_7_OF_9_STABLE_CELL`, and `NO_STABLE_REGION_MEDOID`. No Production
+Buying/Sell/Loss triplet is available, and this result has no `PASS_BACKTEST` or
+Paper authority.
 
 ---
 
@@ -531,13 +570,14 @@ also in every checkpoint and final-result input lineage, whose cache-manifest
 reference binds the underlying report facts.
 
 The futures-contract dimension belongs to chronological occupancy. Output
-cardinality is separately frozen: the append-only detail ledger has 1,613,172
-signal/scenario/barrier-cell rows (`1,111 x 3 x 484`), while the compact result
-has 2,904 scenario/direction/barrier-cell summaries (`3 x 2 x 484`) aggregated
-across all seven contracts. Every detail row retains its `signal_id`, direction,
-and contract. That `signal_id` losslessly resolves to the immutable Discovery
-occurrence where all original research variables remain recorded; the outcome
-ledger does not duplicate that variable object 1,452 times per signal.
+cardinality is separately frozen. The p5 append-only detail ledger has
+1,613,172 signal/scenario/barrier-cell rows (`1,111 x 3 x 484`); p1_05 must
+produce 1,369,236 (`943 x 3 x 484`). Each candidate has exactly 2,904 compact
+scenario/direction/barrier-cell summaries (`3 x 2 x 484`) aggregated across all
+seven contracts. Every detail row retains its `signal_id`, direction, and
+contract. That `signal_id` losslessly resolves to the immutable Discovery
+occurrence where every original research variable remains recorded; the
+outcome ledger does not duplicate that variable object 1,452 times per signal.
 
 Checkpoints occur only after a complete source date. Resume must verify the
 RunSpec, code snapshot, dependency lock, cache manifest, preceding checkpoint,
@@ -547,8 +587,8 @@ byte-identical canonical final results.
 
 Prior detail evidence is recovered in daily-shard order and released after it
 updates the compact economic accumulators. Resume and final validation are
-therefore bounded to one detail shard in memory, not the cumulative
-1,613,172-row ledger.
+therefore bounded to one detail shard in memory, not either cumulative
+candidate ledger.
 
 Do not parallelize independent time ranges, signal occurrences, or barrier
 cells as separate replays. Scenario, direction, and contract states are also
@@ -557,28 +597,56 @@ workers. Pure vectorized arithmetic within one ordered event step is allowed.
 A later source date cannot commit before all state for the prior date has
 reached the checkpoint barrier.
 
-### 9.2 p5 operator sequence
+### 9.2 Ordered p5 audit and p1_05 operator sequence
 
 All checked-in migrations through
-`0015_phase1a_outcome_constraints_validated.sql` must be applied before the
-governed runner starts. The database URL is required in every mode through
-`SYSTEMATIC_FX_DATABASE_URL` or `--database-url`.
+`0021_phase1a_outcome_manifest_record_alias_hardening.sql` must be applied
+before the governed runner starts. The database URL is required in every mode
+through `SYSTEMATIC_FX_DATABASE_URL` or `--database-url`.
 
 ```bash
 uv run --locked --all-extras systematic-fx db migrate
 uv run --locked --all-extras systematic-fx research phase1a-p5-outcomes --plan-only --json
 uv run --locked --all-extras systematic-fx research phase1a-p5-outcomes --cache-only --max-cache-workers 4 --json
 uv run --locked --all-extras systematic-fx research phase1a-p5-outcomes --max-cache-workers 4 --json
+uv run --locked --all-extras systematic-fx research phase1a-p5-equivalence-audit --outcome-replay-manifest-id <p5_manifest_id> --json
+uv run --locked --all-extras systematic-fx research phase1a-p1-05-outcomes --plan-only --json
+uv run --locked --all-extras systematic-fx research phase1a-p1-05-outcomes --cache-only --max-cache-workers 4 --json
+uv run --locked --all-extras systematic-fx research phase1a-p1-05-outcomes --max-cache-workers 4 --json
 ```
 
-`--plan-only` is a read-only verification of the registered 99 artifacts,
-1,111 signals, and 485-partition plan. `--cache-only` may publish immutable
-cache and manifest artifacts below `data/derived`, but it does not reserve or
-start an economic replay attempt. With neither mode flag, the command runs the
-single chronological replay. Reissuing that exact full-run command is also the
-resume operation: it verifies the RunSpec, cache manifest, and latest
-source-date checkpoint and continues the same active attempt. There is no
-separate `--resume` mode, and a terminal failed attempt is never reopened.
+`--plan-only` is a read-only verification of the registered 99 artifacts and
+the selected candidate's exact signal/partition plan: 1,111/485 for p5 or
+943/478 for p1_05. `--cache-only` may publish immutable cache and manifest
+artifacts below `data/derived`, but it does not reserve or start an economic
+replay attempt. With neither mode flag, the command runs the single
+chronological replay. Reissuing that exact full-run command is also the resume
+operation: it verifies the RunSpec, cache manifest, and latest source-date
+checkpoint and continues the same active attempt. There is no separate
+`--resume` mode, and a terminal failed attempt is never reopened.
+
+The p1_05 full-run command fails closed until the separately registered p5
+uninterrupted-versus-resumed equivalence audit has passed. It then copies the
+audit ID, audit-artifact SHA-256, p5 manifest/run/result identities, input
+lineage, cell-summary hash, detail-shard-manifest hash, and final-checkpoint hash
+into its own RunSpec and every downstream lineage object. A successful p5
+economic replay or a locally matching file without that DB record is
+insufficient.
+
+The completed p1_05 RunSpec `1306` demonstrates that boundary: it binds audit
+row `1`, the audit artifact SHA-256, and all seven named predecessor replay
+hashes. Its exact runtime code provenance is Git object
+`d8adc2cd425ac8dda02fe32a2ef4a6571f15f9a5` plus code-snapshot SHA-256
+`be71a0d6664564e6f52391f9ffa45cb610400c51e79edea4d2fb8c962ca0b178`.
+
+`phase1a-p5-equivalence-audit` never rebuilds cache partitions, so it has no
+cache-worker option. It verifies and reuses the successful p5 manifest's
+immutable cache, executes the independent full replay, publishes the canonical
+audit artifact below `data/derived/outcomes/audits`, and registers the
+`VALIDATION` attempt and audit row. `--outcome-replay-manifest-id` selects the
+exact successful p5 subject; it may be omitted only when the database contains
+one unambiguous eligible subject. The command also accepts `--database-url` and
+`--json`.
 
 Progress is written to standard error: cache progress is shown at the first,
 every tenth, and final completed partition, and replay progress is shown after
