@@ -577,6 +577,7 @@ def _require_clean_bar_state_predecessor_connection(
                e.trial_budget AS experiment_trial_budget,
                e.trials_registered, e.frozen_at AS experiment_frozen_at,
                e.completed_at,
+               e.registration_artifact_id,
                registration.artifact_type AS registration_artifact_type,
                registration.metadata #>> '{artifact_schema}' AS registration_schema,
                registration.metadata #>> '{logical_identity,artifact_kind}'
@@ -638,9 +639,7 @@ def _require_clean_bar_state_predecessor_connection(
         or identity["experiment_frozen_at"] is None
         or identity["dataset_status"] in {"REJECTED", "RETIRED"}
     ):
-        raise BarStateRegistryStateError(
-            f"{predecessor_label} is not frozen and available"
-        )
+        raise BarStateRegistryStateError(f"{predecessor_label} is not frozen and available")
 
     experiment_id = int(identity["experiment_id"])
     catalog = connection.execute(
@@ -662,13 +661,18 @@ def _require_clean_bar_state_predecessor_connection(
                    SELECT count(*)::integer
                    FROM systematic_fx.research_run_specs AS all_specs
                    WHERE all_specs.experiment_id = %s
-               ) AS total_experiment_spec_count
+               ) AS total_experiment_spec_count,
+               (
+                   SELECT count(*)::integer
+                   FROM systematic_fx.research_run_specs AS all_specs
+                   WHERE all_specs.campaign_id = %s
+               ) AS total_campaign_spec_count
         FROM systematic_fx.experiment_trials AS t
         LEFT JOIN systematic_fx.research_run_specs AS r
           ON r.research_run_spec_id = t.research_run_spec_id
         WHERE t.experiment_id = %s
         """,
-        (experiment_id, experiment_id),
+        (experiment_id, identity["campaign_id"], experiment_id),
     ).fetchone()
     catalog = _row_or_error(catalog, label=f"{predecessor_label} candidate catalog")
     _assert_fields(
@@ -682,6 +686,274 @@ def _require_clean_bar_state_predecessor_connection(
             "distinct_candidate_count": BAR_STATE_CANDIDATE_COUNT,
             "distinct_spec_count": BAR_STATE_CANDIDATE_COUNT,
             "total_experiment_spec_count": BAR_STATE_CANDIDATE_COUNT,
+            "total_campaign_spec_count": BAR_STATE_CANDIDATE_COUNT,
+        },
+    )
+
+    preregistration = connection.execute(
+        """
+        WITH exact_code AS (
+            SELECT artifact.artifact_id, artifact.artifact_key,
+                   artifact.sha256, artifact.byte_size,
+                   artifact.metadata #>> '{artifact_identity_sha256}'
+                       AS artifact_identity_sha256,
+                   artifact.metadata #> '{logical_identity,lineage}' AS lineage
+            FROM systematic_fx.artifacts AS artifact
+            WHERE artifact.artifact_type = %s
+              AND artifact.artifact_key =
+                  %s || ':code_snapshot:' || artifact.sha256
+              AND artifact.media_type = 'application/json'
+              AND artifact.sha256 = artifact.metadata #>> '{content_sha256}'
+              AND artifact.artifact_key = artifact.metadata #>> '{artifact_key}'
+              AND artifact.artifact_type = artifact.metadata #>> '{artifact_type}'
+              AND artifact.metadata #>> '{artifact_schema}' =
+                  'systematic_fx.code_snapshot.v2'
+              AND artifact.metadata #> '{artifact_version}' = '1'::jsonb
+              AND artifact.metadata #>> '{record_count}' ~ '^(0|[1-9][0-9]*)$'
+              AND artifact.metadata #>> '{schema_sha256}' ~ '^[0-9a-f]{64}$'
+              AND artifact.metadata #>> '{file_suffix}' = '.json'
+              AND artifact.metadata #>> '{media_type}' = 'application/json'
+              AND artifact.metadata #>> '{identity_schema}' =
+                  'systematic_fx.bar_artifact_identity.v1'
+              AND artifact.metadata #>> '{root_kind}' = 'bar_patterns'
+              AND artifact.metadata #>> '{source_manifest_sha256}' = %s
+              AND artifact.metadata #>> '{logical_identity,artifact_kind}' =
+                  'CODE_SNAPSHOT'
+              AND artifact.metadata #>> '{logical_identity,campaign_key}' = %s
+              AND artifact.metadata #>> '{logical_identity,code_commit}' = %s
+              AND artifact.metadata #>>
+                      '{logical_identity,code_snapshot_sha256}' = artifact.sha256
+              AND systematic_fx.jsonb_has_exact_keys(
+                  artifact.metadata,
+                  ARRAY[
+                      'artifact_identity_sha256', 'artifact_key',
+                      'artifact_schema', 'artifact_type', 'artifact_version',
+                      'content_sha256', 'file_suffix', 'identity_schema',
+                      'logical_identity', 'media_type', 'record_count',
+                      'root_kind', 'schema_sha256', 'source_manifest_sha256'
+                  ]
+              )
+              AND systematic_fx.jsonb_has_exact_keys(
+                  artifact.metadata #> '{logical_identity}',
+                  ARRAY[
+                      'artifact_kind', 'campaign_key', 'code_commit',
+                      'code_snapshot_sha256', 'lineage', 'lineage_sha256'
+                  ]
+              )
+              AND systematic_fx.jsonb_has_exact_keys(
+                  artifact.metadata #> '{logical_identity,lineage}',
+                  ARRAY[
+                      'bar_dataset_manifest_sha256', 'candidate_catalog_sha256',
+                      'candidate_definition_sha256', 'candidate_key',
+                      'code_snapshot_sha256', 'config_file_sha256',
+                      'config_semantic_sha256', 'dependency_lock_sha256',
+                      'discovery_scope', 'discovery_scope_sha256',
+                      'ordered_run_set_sha256', 'parent_artifacts',
+                      'raw_source_manifest_sha256', 'run_fingerprint',
+                      'runtime_environment_sha256', 'schema',
+                      'training_plan_sha256'
+                  ]
+              )
+              AND artifact.metadata #>>
+                      '{logical_identity,lineage,schema}' =
+                  'systematic_fx.bar_state_artifact_lineage.v1'
+              AND artifact.metadata #>>
+                      '{logical_identity,lineage,bar_dataset_manifest_sha256}' = %s
+              AND artifact.metadata #>>
+                      '{logical_identity,lineage,raw_source_manifest_sha256}' = %s
+              AND artifact.metadata #>>
+                      '{logical_identity,lineage,config_file_sha256}' = %s
+              AND artifact.metadata #>>
+                      '{logical_identity,lineage,config_semantic_sha256}' = %s
+              AND artifact.metadata #>>
+                      '{logical_identity,lineage,candidate_catalog_sha256}' = %s
+              AND artifact.metadata #>>
+                      '{logical_identity,lineage,training_plan_sha256}' = %s
+              AND artifact.metadata #>>
+                      '{logical_identity,lineage,code_snapshot_sha256}' = artifact.sha256
+              AND artifact.metadata #>>
+                      '{logical_identity,lineage,discovery_scope_sha256}' = %s
+              AND systematic_fx.canonical_jsonb_sha256(
+                      artifact.metadata #> '{logical_identity,lineage,discovery_scope}'
+                  ) = %s
+              AND artifact.metadata #>
+                      '{logical_identity,lineage,candidate_definition_sha256}' =
+                  'null'::jsonb
+              AND artifact.metadata #>
+                      '{logical_identity,lineage,candidate_key}' = 'null'::jsonb
+              AND artifact.metadata #>
+                      '{logical_identity,lineage,run_fingerprint}' = 'null'::jsonb
+              AND artifact.metadata #>
+                      '{logical_identity,lineage,parent_artifacts}' = '[]'::jsonb
+              AND artifact.metadata #>>
+                      '{logical_identity,lineage_sha256}' =
+                  systematic_fx.canonical_jsonb_sha256(
+                      artifact.metadata #> '{logical_identity,lineage}'
+                  )
+              AND artifact.metadata #>> '{artifact_identity_sha256}' =
+                  systematic_fx.canonical_jsonb_sha256(
+                      artifact.metadata - 'artifact_identity_sha256' - 'content_sha256'
+                  )
+        ),
+        exact_registration AS (
+            SELECT registration.artifact_id
+            FROM systematic_fx.artifacts AS registration
+            JOIN exact_code AS code ON true
+            WHERE registration.artifact_id = %s
+              AND registration.artifact_type = %s
+              AND registration.artifact_key = %s || ':registration:' || %s
+              AND registration.media_type = 'application/json'
+              AND registration.sha256 =
+                  registration.metadata #>> '{content_sha256}'
+              AND registration.artifact_key =
+                  registration.metadata #>> '{artifact_key}'
+              AND registration.artifact_type =
+                  registration.metadata #>> '{artifact_type}'
+              AND registration.metadata #>> '{artifact_schema}' =
+                  'systematic_fx.bar_state_registration_artifact.v1'
+              AND registration.metadata #> '{artifact_version}' = '1'::jsonb
+              AND registration.metadata #> '{record_count}' = '12'::jsonb
+              AND registration.metadata #>> '{schema_sha256}' ~ '^[0-9a-f]{64}$'
+              AND registration.metadata #>> '{file_suffix}' = '.json'
+              AND registration.metadata #>> '{media_type}' = 'application/json'
+              AND registration.metadata #>> '{identity_schema}' =
+                  'systematic_fx.bar_artifact_identity.v1'
+              AND registration.metadata #>> '{root_kind}' = 'bar_patterns'
+              AND registration.metadata #>> '{source_manifest_sha256}' = %s
+              AND registration.metadata #>>
+                      '{logical_identity,artifact_kind}' = 'REGISTRATION'
+              AND registration.metadata #>>
+                      '{logical_identity,campaign_key}' = %s
+              AND registration.metadata #>>
+                      '{logical_identity,campaign_definition_sha256}' = %s
+              AND registration.metadata #>>
+                      '{logical_identity,candidate_catalog_sha256}' = %s
+              AND systematic_fx.jsonb_has_exact_keys(
+                  registration.metadata,
+                  ARRAY[
+                      'artifact_identity_sha256', 'artifact_key',
+                      'artifact_schema', 'artifact_type', 'artifact_version',
+                      'content_sha256', 'file_suffix', 'identity_schema',
+                      'logical_identity', 'media_type', 'record_count',
+                      'root_kind', 'schema_sha256', 'source_manifest_sha256'
+                  ]
+              )
+              AND systematic_fx.jsonb_has_exact_keys(
+                  registration.metadata #> '{logical_identity}',
+                  ARRAY[
+                      'artifact_kind', 'campaign_definition_sha256',
+                      'campaign_key', 'candidate_catalog_sha256', 'lineage',
+                      'lineage_sha256'
+                  ]
+              )
+              AND systematic_fx.jsonb_has_exact_keys(
+                  registration.metadata #> '{logical_identity,lineage}',
+                  ARRAY[
+                      'bar_dataset_manifest_sha256', 'candidate_catalog_sha256',
+                      'candidate_definition_sha256', 'candidate_key',
+                      'code_snapshot_sha256', 'config_file_sha256',
+                      'config_semantic_sha256', 'dependency_lock_sha256',
+                      'discovery_scope', 'discovery_scope_sha256',
+                      'ordered_run_set_sha256', 'parent_artifacts',
+                      'raw_source_manifest_sha256', 'run_fingerprint',
+                      'runtime_environment_sha256', 'schema',
+                      'training_plan_sha256'
+                  ]
+              )
+              AND registration.metadata #>>
+                      '{logical_identity,lineage,schema}' =
+                  'systematic_fx.bar_state_artifact_lineage.v1'
+              AND registration.metadata #>>
+                      '{logical_identity,lineage,bar_dataset_manifest_sha256}' = %s
+              AND registration.metadata #>>
+                      '{logical_identity,lineage,raw_source_manifest_sha256}' = %s
+              AND registration.metadata #>>
+                      '{logical_identity,lineage,config_file_sha256}' = %s
+              AND registration.metadata #>>
+                      '{logical_identity,lineage,config_semantic_sha256}' = %s
+              AND registration.metadata #>>
+                      '{logical_identity,lineage,candidate_catalog_sha256}' = %s
+              AND registration.metadata #>>
+                      '{logical_identity,lineage,training_plan_sha256}' = %s
+              AND registration.metadata #>>
+                      '{logical_identity,lineage,code_snapshot_sha256}' = code.sha256
+              AND (
+                  (registration.metadata #> '{logical_identity,lineage}') -
+                      'parent_artifacts'
+              ) = (code.lineage - 'parent_artifacts')
+              AND registration.metadata #>
+                      '{logical_identity,lineage,parent_artifacts}' =
+                  jsonb_build_array(
+                      jsonb_build_object(
+                          'artifact_identity_sha256',
+                              code.artifact_identity_sha256,
+                          'artifact_key', code.artifact_key,
+                          'byte_size', code.byte_size,
+                          'content_sha256', code.sha256,
+                          'schema',
+                              'systematic_fx.bar_state_parent_artifact.v1'
+                      )
+                  )
+              AND registration.metadata #>>
+                      '{logical_identity,lineage_sha256}' =
+                  systematic_fx.canonical_jsonb_sha256(
+                      registration.metadata #> '{logical_identity,lineage}'
+                  )
+              AND registration.metadata #>> '{artifact_identity_sha256}' =
+                  systematic_fx.canonical_jsonb_sha256(
+                      registration.metadata - 'artifact_identity_sha256' -
+                          'content_sha256'
+                  )
+        )
+        SELECT count(*)::integer AS artifact_count,
+               (SELECT count(*)::integer FROM exact_code) AS exact_code_count,
+               (SELECT count(*)::integer FROM exact_registration)
+                   AS exact_registration_count
+        FROM systematic_fx.artifacts
+        WHERE artifact_type = %s
+        """,
+        (
+            predecessor.artifact_type,
+            predecessor.artifact_type,
+            BAR_STATE_BAR_DATASET_MANIFEST_SHA256,
+            predecessor.campaign_key,
+            successor.predecessor_code_commit,
+            BAR_STATE_BAR_DATASET_MANIFEST_SHA256,
+            BAR_STATE_RAW_SOURCE_MANIFEST_SHA256,
+            predecessor.config_file_sha256,
+            predecessor.config_semantic_sha256,
+            predecessor.candidate_catalog_sha256,
+            BAR_STATE_FROZEN_SPLIT_SHA256,
+            frozen_bar_state_discovery_scope().sha256,
+            frozen_bar_state_discovery_scope().sha256,
+            identity["registration_artifact_id"],
+            predecessor.artifact_type,
+            predecessor.artifact_type,
+            predecessor.campaign_definition_sha256,
+            BAR_STATE_BAR_DATASET_MANIFEST_SHA256,
+            predecessor.campaign_key,
+            predecessor.campaign_definition_sha256,
+            predecessor.candidate_catalog_sha256,
+            BAR_STATE_BAR_DATASET_MANIFEST_SHA256,
+            BAR_STATE_RAW_SOURCE_MANIFEST_SHA256,
+            predecessor.config_file_sha256,
+            predecessor.config_semantic_sha256,
+            predecessor.candidate_catalog_sha256,
+            BAR_STATE_FROZEN_SPLIT_SHA256,
+            predecessor.artifact_type,
+        ),
+    ).fetchone()
+    preregistration = _row_or_error(
+        preregistration,
+        label=f"{predecessor_label} preregistration artifacts",
+    )
+    _assert_fields(
+        label=f"{predecessor_label} preregistration artifacts",
+        row=preregistration,
+        expected={
+            "artifact_count": 2,
+            "exact_code_count": 1,
+            "exact_registration_count": 1,
         },
     )
 
@@ -710,9 +982,9 @@ def _require_clean_bar_state_predecessor_connection(
         FROM systematic_fx.research_run_attempts AS a
         JOIN systematic_fx.research_run_specs AS r
           ON r.research_run_spec_id = a.research_run_spec_id
-        WHERE r.campaign_id = %s AND r.experiment_id = %s
+        WHERE r.campaign_id = %s
         """,
-        (list(expected_attempt_numbers), identity["campaign_id"], experiment_id),
+        (list(expected_attempt_numbers), identity["campaign_id"]),
     ).fetchone()
     attempts = _row_or_error(attempts, label=f"{predecessor_label} failed attempts")
     _assert_fields(
@@ -737,9 +1009,7 @@ def _require_clean_bar_state_predecessor_connection(
     ).fetchone()
     link_row = _row_or_error(link_row, label=f"{predecessor_label} artifact links")
     if link_row["linked_artifact_count"] != 0:
-        raise BarStateRegistryStateError(
-            f"{predecessor_label} has linked governed evidence"
-        )
+        raise BarStateRegistryStateError(f"{predecessor_label} has linked governed evidence")
 
     return BarStatePredecessorGateReport(
         predecessor_campaign_id=int(identity["campaign_id"]),

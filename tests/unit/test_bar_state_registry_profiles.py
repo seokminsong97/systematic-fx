@@ -83,6 +83,7 @@ def _predecessor_rows(
         "trials_registered": 12,
         "experiment_frozen_at": object(),
         "completed_at": None,
+        "registration_artifact_id": 47,
         "registration_artifact_type": predecessor.artifact_type,
         "registration_schema": BAR_STATE_ARTIFACT_SCHEMA_BY_KIND["REGISTRATION"],
         "registration_kind": "REGISTRATION",
@@ -96,6 +97,12 @@ def _predecessor_rows(
         "distinct_candidate_count": 12,
         "distinct_spec_count": 12,
         "total_experiment_spec_count": 12,
+        "total_campaign_spec_count": 12,
+    }
+    preregistration = {
+        "artifact_count": 2,
+        "exact_code_count": 1,
+        "exact_registration_count": 1,
     }
     attempts = {
         "attempt_count": attempt_count,
@@ -104,7 +111,13 @@ def _predecessor_rows(
         "distinct_spec_count": 12,
         "distinct_spec_attempt_count": attempt_count,
     }
-    return [identity, catalog, attempts, {"linked_artifact_count": 0}]
+    return [
+        identity,
+        catalog,
+        preregistration,
+        attempts,
+        {"linked_artifact_count": 0},
+    ]
 
 
 def test_v2a_predecessor_gate_requires_exact_failed_v2_without_research_evidence() -> None:
@@ -122,13 +135,14 @@ def test_v2a_predecessor_gate_requires_exact_failed_v2_without_research_evidence
         failed_attempt_count=12,
         linked_artifact_count=0,
     )
-    assert len(connection.calls) == 4
+    assert len(connection.calls) == 5
     assert connection.calls[0][1] == (
         BAR_STATE_V2_PROFILE.campaign_key,
         BAR_STATE_V2_PROFILE.experiment_key,
     )
-    assert "a.started_at IS NOT NULL" in connection.calls[2][0]
-    assert connection.calls[2][1] == ([1], 41, 43)
+    assert connection.calls[1][1] == (43, 41, 43)
+    assert "a.started_at IS NOT NULL" in connection.calls[3][0]
+    assert connection.calls[3][1] == ([1], 41)
     assert connection.calls[-1][1] == (41,)
 
 
@@ -151,8 +165,9 @@ def test_v2b_predecessor_gate_requires_two_exact_failed_attempts_per_v2a_spec() 
         BAR_STATE_V2A_PROFILE.campaign_key,
         BAR_STATE_V2A_PROFILE.experiment_key,
     )
-    assert connection.calls[2][1] == ([1, 2], 41, 43)
-    assert "a.result_summary = jsonb_build_object" in connection.calls[2][0]
+    assert connection.calls[3][1] == ([1, 2], 41)
+    assert "a.result_summary = jsonb_build_object" in connection.calls[3][0]
+    assert "parent_artifacts" in connection.calls[2][0]
 
 
 @pytest.mark.parametrize(
@@ -161,9 +176,13 @@ def test_v2b_predecessor_gate_requires_two_exact_failed_attempts_per_v2a_spec() 
         (0, "holdout_revealed_at", object(), BarStateRegistryDriftError, "drifted"),
         (0, "code_commit", "f" * 40, BarStateRegistryDriftError, "drifted"),
         (1, "invalid_binding_count", 1, BarStateRegistryDriftError, "drifted"),
-        (2, "failed_count", 11, BarStateRegistryDriftError, "drifted"),
-        (2, "exact_failed_count", 11, BarStateRegistryDriftError, "drifted"),
-        (3, "linked_artifact_count", 1, BarStateRegistryStateError, "governed evidence"),
+        (1, "total_campaign_spec_count", 13, BarStateRegistryDriftError, "drifted"),
+        (2, "artifact_count", 3, BarStateRegistryDriftError, "drifted"),
+        (2, "exact_code_count", 0, BarStateRegistryDriftError, "drifted"),
+        (2, "exact_registration_count", 0, BarStateRegistryDriftError, "drifted"),
+        (3, "failed_count", 11, BarStateRegistryDriftError, "drifted"),
+        (3, "exact_failed_count", 11, BarStateRegistryDriftError, "drifted"),
+        (4, "linked_artifact_count", 1, BarStateRegistryStateError, "governed evidence"),
     ],
 )
 def test_v2a_predecessor_gate_rejects_any_identity_lifecycle_or_evidence_drift(
@@ -205,7 +224,7 @@ def test_v2b_predecessor_gate_rejects_missing_or_malformed_second_attempt(
     value: int,
 ) -> None:
     rows = _predecessor_rows(BAR_STATE_V2B_PROFILE)
-    rows[2][field] = value
+    rows[3][field] = value
 
     with pytest.raises(BarStateRegistryDriftError, match="drifted"):
         _require_clean_bar_state_predecessor_connection(
