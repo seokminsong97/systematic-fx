@@ -1,10 +1,26 @@
 # Bar State-Conditional Model V2
 
-- Status: design draft; frozen configuration implemented; Discovery not executed
+- Status: Discovery execution failed at the frozen optimizer cap; campaign closed
 - Campaign key: `bar_state_conditional_v2`
 - Authorized stage: Discovery only
 - Parent exposure: `bar_pattern_discovery_v1` (216 candidates, no finalist)
 - Qualification: screening only
+
+## 0. Immutable Execution Record
+
+V2 was executed from code commit
+`2ca2b0b6158c1d1e9d880c2ed65ec7d7582de189`. The deterministic
+`300 seconds x STATE x discovery_inner_2` training fit reached the frozen
+5,000-iteration SAGA cap and emitted a convergence warning. Under the policy
+below, that warning is a hard failure and the fitted coefficients cannot be
+used.
+
+The failure occurred before signal decisions, OOS portfolio economics, GLOBAL
+results, or TERMINAL results were computed or published. No governed V2
+artifact link was created. Walk-forward and holdout remained sealed. V2 is not
+resumed by changing its cap: the train-only optimizer-cap qualification and any
+subsequent work belong to the separately identified
+`bar_state_conditional_v2a` campaign.
 
 ## 1. Research Decision
 
@@ -105,8 +121,8 @@ regularization and the deprecated `penalty` argument is deliberately omitted.
 version.
 The canonical policy separately records the elastic-net declaration and the
 exact runtime keyword arguments. A convergence warning or failure is a hard
-candidate failure, not a reason to raise `max_iter`, change tolerance, or try a
-new seed.
+candidate failure. This rule closed V2 at `max_iter=5000`; it did not authorize
+changing the cap, tolerance, or seed inside V2.
 
 For one fitted row:
 
@@ -318,5 +334,6 @@ nested V2 split SHA-256    9a4833aa53fe03788ddf224efcd24abbcc492498b915f174b6473
 bootstrap calendar SHA-256 0f00faa36d08feebec1fce003268823ff02aa52b9817a84edbfcc8f863a324f1
 ```
 
-Changing any listed policy or identity requires V2 to remain unexecuted or to
-close under its existing identity before a new version is registered.
+Changing any listed policy or identity requires V2 to close under its existing
+identity before a new version is registered. That closure occurred at the
+frozen convergence failure. V2A is a new campaign, not a V2 mutation or retry.

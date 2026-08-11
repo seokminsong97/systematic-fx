@@ -18,7 +18,11 @@ from systematic_fx.research.bar_state_features import (
     STATE_FEATURE_NAMES,
 )
 from systematic_fx.research.bar_state_labels import LABEL_HORIZON_ACTIVE_DAYS
-from systematic_fx.research.bar_state_model import FROZEN_MODEL_HYPERPARAMETERS
+from systematic_fx.research.bar_state_model import (
+    BAR_STATE_V2_MODEL_HYPERPARAMETERS,
+    BAR_STATE_V2A_MODEL_HYPERPARAMETERS,
+    FROZEN_MODEL_HYPERPARAMETERS,
+)
 from systematic_fx.research.bar_state_portfolio import (
     DEFAULT_STATE_EXECUTION_SCENARIOS,
     STATE_VOLATILITY_MULTIPLIERS,
@@ -71,6 +75,19 @@ def test_actual_sklearn_kwargs_match_deprecation_free_config_contract() -> None:
         "OMITTED_SKLEARN_1_9_L1_RATIO_IMPLIES_ELASTICNET"
     )
     assert FROZEN_MODEL_HYPERPARAMETERS.as_dict()["n_jobs"] == ("OMITTED_SKLEARN_1_9_NO_EFFECT")
+
+
+def test_v2a_sklearn_kwargs_change_only_the_campaign_owned_iteration_cap() -> None:
+    predecessor = frozen_model_policy(max_iter=5_000)
+    successor = frozen_model_policy(max_iter=50_000)
+    predecessor_arguments = predecessor["sklearn_arguments"]
+    successor_arguments = successor["sklearn_arguments"]
+
+    assert predecessor_arguments.pop("max_iter") == 5_000
+    assert successor_arguments.pop("max_iter") == 50_000
+    assert successor == predecessor
+    assert BAR_STATE_V2_MODEL_HYPERPARAMETERS is FROZEN_MODEL_HYPERPARAMETERS
+    assert BAR_STATE_V2A_MODEL_HYPERPARAMETERS.max_iter == 50_000
 
 
 def test_selection_family_and_bootstrap_constants_match_config_contract() -> None:

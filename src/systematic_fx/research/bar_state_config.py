@@ -1,9 +1,10 @@
-"""Frozen State-Conditional Bar Model V2 configuration and candidate catalog.
+"""Frozen State-Conditional Bar Model V2/V2A configurations and candidate catalogs.
 
-The V2 catalog is intentionally small: two signal clocks, two preregistered
+The shared catalog is intentionally small: two signal clocks, two preregistered
 feature sets, and three confidence margins produce exactly twelve candidates.
 Each candidate emits one of ``LONG``, ``SHORT``, or ``NO_TRADE``; direction is
-not doubled into separate variants.
+not doubled into separate variants.  V2A is an administrative successor whose
+sole candidate-policy change is a larger optimizer iteration cap.
 """
 
 from __future__ import annotations
@@ -29,6 +30,27 @@ BAR_STATE_CONFIG_SEMANTIC_SHA256: Final = (
 )
 BAR_STATE_CONFIG_ID: Final = "bar_state_conditional_v2"
 BAR_STATE_CAMPAIGN_KEY: Final = "bar_state_conditional_v2"
+BAR_STATE_CANDIDATE_CATALOG_SHA256: Final = (
+    "3e24dc08e9027ec604b5ab433368a54c4f7a4c89577599b79de372f62262120d"
+)
+BAR_STATE_CAMPAIGN_DEFINITION_SHA256: Final = (
+    "4502e2ec1c40f344fce27066223a25e6b2f7456736e09fe0d96faab4171134f9"
+)
+BAR_STATE_V2A_CONFIG_RELATIVE_PATH: Final = Path("configs/research/bar_state_conditional_v2a.toml")
+BAR_STATE_V2A_CONFIG_FILE_SHA256: Final = (
+    "ecc4837c67e1c42ae69bfe0c74744e8aba9ba7cd99584b2dc0c091f6579f0a52"
+)
+BAR_STATE_V2A_CONFIG_SEMANTIC_SHA256: Final = (
+    "2e2e3c6ee68af86fffa864ce736c24802eea7901a63d4ebda583327df06f156a"
+)
+BAR_STATE_V2A_CONFIG_ID: Final = "bar_state_conditional_v2a"
+BAR_STATE_V2A_CAMPAIGN_KEY: Final = "bar_state_conditional_v2a"
+BAR_STATE_V2A_CANDIDATE_CATALOG_SHA256: Final = (
+    "97bbdacd0d655a1ca4e81085f3f25fb32da0bf31329bbd670ba89778611084d6"
+)
+BAR_STATE_V2A_CAMPAIGN_DEFINITION_SHA256: Final = (
+    "8a332ad6998bb8bf48c3de94bc0ca660905a08acb848580ee5e31d9c42f8033c"
+)
 BAR_STATE_SCHEMA_VERSION: Final = 1
 BAR_STATE_CANDIDATE_COUNT: Final = 12
 BAR_STATE_MAXIMUM_FINALISTS: Final = 4
@@ -51,7 +73,172 @@ BAR_STATE_BAR_DATASET_MANIFEST_SHA256: Final = (
 
 
 class BarStateConfigError(ValueError):
-    """The frozen V2 state-model definition is missing or has drifted."""
+    """A frozen bar-state campaign definition is missing or has drifted."""
+
+
+@dataclass(frozen=True, slots=True)
+class BarStateCampaignProfile:
+    """One immutable administrative and optimizer identity for the shared engine."""
+
+    version_id: str
+    config_id: str
+    campaign_key: str
+    campaign_name: str
+    engine_version: str
+    config_relative_path: Path
+    config_file_sha256: str
+    config_semantic_sha256: str
+    candidate_catalog_sha256: str
+    campaign_definition_sha256: str
+    model_max_iter: int
+    amends_campaign_key: str | None = None
+    predecessor_campaign_definition_sha256: str | None = None
+    predecessor_code_commit: str | None = None
+    predecessor_gate_policy: str | None = None
+
+    def __post_init__(self) -> None:
+        for field in (
+            "version_id",
+            "config_id",
+            "campaign_key",
+            "campaign_name",
+            "engine_version",
+        ):
+            value = getattr(self, field)
+            if not isinstance(value, str) or not value or value != value.strip():
+                raise BarStateConfigError(f"campaign profile {field} must be canonical")
+        if (
+            not isinstance(self.config_relative_path, Path)
+            or self.config_relative_path.is_absolute()
+            or ".." in self.config_relative_path.parts
+        ):
+            raise BarStateConfigError("campaign config path must be relative and contained")
+        for field in (
+            "config_file_sha256",
+            "config_semantic_sha256",
+            "candidate_catalog_sha256",
+            "campaign_definition_sha256",
+        ):
+            value = getattr(self, field)
+            if (
+                not isinstance(value, str)
+                or len(value) != 64
+                or any(character not in "0123456789abcdef" for character in value)
+            ):
+                raise BarStateConfigError(f"campaign profile {field} must be a SHA-256")
+        if (
+            isinstance(self.model_max_iter, bool)
+            or not isinstance(self.model_max_iter, int)
+            or self.model_max_iter <= 0
+        ):
+            raise BarStateConfigError("campaign model_max_iter must be a positive integer")
+        if self.amends_campaign_key is not None and (
+            not isinstance(self.amends_campaign_key, str)
+            or not self.amends_campaign_key
+            or self.amends_campaign_key == self.campaign_key
+        ):
+            raise BarStateConfigError("amended campaign identity is invalid")
+        predecessor_fields = (
+            self.predecessor_campaign_definition_sha256,
+            self.predecessor_code_commit,
+            self.predecessor_gate_policy,
+        )
+        if any(value is None for value in predecessor_fields) != all(
+            value is None for value in predecessor_fields
+        ):
+            raise BarStateConfigError("predecessor gate identity must be complete or absent")
+        if self.amends_campaign_key is None and any(
+            value is not None for value in predecessor_fields
+        ):
+            raise BarStateConfigError("predecessor gate requires an amended campaign")
+        if self.predecessor_campaign_definition_sha256 is not None and (
+            len(self.predecessor_campaign_definition_sha256) != 64
+            or any(
+                character not in "0123456789abcdef"
+                for character in self.predecessor_campaign_definition_sha256
+            )
+        ):
+            raise BarStateConfigError("predecessor campaign definition SHA-256 is invalid")
+        if self.predecessor_code_commit is not None and (
+            len(self.predecessor_code_commit) != 40
+            or any(
+                character not in "0123456789abcdef" for character in self.predecessor_code_commit
+            )
+        ):
+            raise BarStateConfigError("predecessor code commit is invalid")
+        if self.predecessor_gate_policy is not None and (
+            not self.predecessor_gate_policy
+            or self.predecessor_gate_policy != self.predecessor_gate_policy.strip()
+        ):
+            raise BarStateConfigError("predecessor gate policy is invalid")
+
+    @property
+    def artifact_type(self) -> str:
+        return self.campaign_key
+
+    @property
+    def experiment_key(self) -> str:
+        return f"{self.campaign_key}:experiment:frozen_candidate_catalog:v1"
+
+
+BAR_STATE_V2_PROFILE: Final = BarStateCampaignProfile(
+    version_id="V2",
+    config_id=BAR_STATE_CONFIG_ID,
+    campaign_key=BAR_STATE_CAMPAIGN_KEY,
+    campaign_name="Frozen conditional candle-state Discovery v2",
+    engine_version="bar_state_conditional_discovery_v2",
+    config_relative_path=BAR_STATE_CONFIG_RELATIVE_PATH,
+    config_file_sha256=BAR_STATE_CONFIG_FILE_SHA256,
+    config_semantic_sha256=BAR_STATE_CONFIG_SEMANTIC_SHA256,
+    candidate_catalog_sha256=BAR_STATE_CANDIDATE_CATALOG_SHA256,
+    campaign_definition_sha256=BAR_STATE_CAMPAIGN_DEFINITION_SHA256,
+    model_max_iter=5_000,
+)
+BAR_STATE_V2A_PROFILE: Final = BarStateCampaignProfile(
+    version_id="V2A",
+    config_id=BAR_STATE_V2A_CONFIG_ID,
+    campaign_key=BAR_STATE_V2A_CAMPAIGN_KEY,
+    campaign_name="Frozen conditional candle-state Discovery v2a",
+    engine_version="bar_state_conditional_discovery_v2a",
+    config_relative_path=BAR_STATE_V2A_CONFIG_RELATIVE_PATH,
+    config_file_sha256=BAR_STATE_V2A_CONFIG_FILE_SHA256,
+    config_semantic_sha256=BAR_STATE_V2A_CONFIG_SEMANTIC_SHA256,
+    candidate_catalog_sha256=BAR_STATE_V2A_CANDIDATE_CATALOG_SHA256,
+    campaign_definition_sha256=BAR_STATE_V2A_CAMPAIGN_DEFINITION_SHA256,
+    model_max_iter=50_000,
+    amends_campaign_key=BAR_STATE_CAMPAIGN_KEY,
+    predecessor_campaign_definition_sha256=BAR_STATE_CAMPAIGN_DEFINITION_SHA256,
+    predecessor_code_commit="2ca2b0b6158c1d1e9d880c2ed65ec7d7582de189",
+    predecessor_gate_policy="REQUIRE_EXACT_FAILED_PREDECESSOR_WITH_NO_OOS_EVIDENCE",
+)
+BAR_STATE_CAMPAIGN_PROFILES: Final = (
+    BAR_STATE_V2_PROFILE,
+    BAR_STATE_V2A_PROFILE,
+)
+
+
+def bar_state_campaign_profile(version_id: str = "V2") -> BarStateCampaignProfile:
+    """Resolve one exact registered profile without accepting arbitrary campaigns."""
+
+    matches = tuple(item for item in BAR_STATE_CAMPAIGN_PROFILES if item.version_id == version_id)
+    if len(matches) != 1:
+        raise BarStateConfigError(f"unknown bar-state campaign profile: {version_id!r}")
+    return matches[0]
+
+
+def require_bar_state_campaign_profile(
+    profile: BarStateCampaignProfile,
+) -> BarStateCampaignProfile:
+    """Return the canonical member or reject a self-consistent unregistered profile."""
+
+    if not isinstance(profile, BarStateCampaignProfile):
+        raise BarStateConfigError("profile must be a BarStateCampaignProfile")
+    matches = tuple(
+        item for item in BAR_STATE_CAMPAIGN_PROFILES if item.version_id == profile.version_id
+    )
+    if len(matches) != 1 or matches[0] != profile:
+        raise BarStateConfigError("bar-state campaign profile is not exactly registered")
+    return matches[0]
 
 
 @dataclass(frozen=True, slots=True)
@@ -211,8 +398,11 @@ BAR_STATE_EXECUTION_SCENARIOS: Final = (
 )
 
 
-def frozen_model_policy() -> dict[str, object]:
-    """Return the exact sklearn family and arguments allowed in V2."""
+def frozen_model_policy(*, max_iter: int = 5_000) -> dict[str, object]:
+    """Return the shared sklearn policy with one explicit optimizer cap."""
+
+    if isinstance(max_iter, bool) or not isinstance(max_iter, int) or max_iter <= 0:
+        raise BarStateConfigError("model max_iter must be a positive integer")
 
     return {
         "coefficient_refit_policy": "EXPANDING_PRIOR_MATURED_ROWS_ONLY",
@@ -240,7 +430,7 @@ def frozen_model_policy() -> dict[str, object]:
             "class_weight": "balanced",
             "fit_intercept": True,
             "l1_ratio_decimal": "0.5",
-            "max_iter": 5_000,
+            "max_iter": max_iter,
             "random_state": 20_260_809,
             "solver": "saga",
             "tol_decimal": "0.00000001",
@@ -400,6 +590,7 @@ class BarStateCandidate:
     feature_set: BarStateFeatureSetSpec
     confidence_margin: FrozenRatio
     cost_model_id: str = BAR_STATE_COST_MODEL_ID
+    model_max_iter: int = 5_000
 
     def __post_init__(self) -> None:
         if self.timeframe_seconds not in BAR_STATE_SIGNAL_TIMEFRAMES_SECONDS:
@@ -409,7 +600,13 @@ class BarStateCandidate:
         if self.confidence_margin not in BAR_STATE_CONFIDENCE_MARGINS:
             raise BarStateConfigError("candidate margin is outside the frozen catalog")
         if self.cost_model_id != BAR_STATE_COST_MODEL_ID:
-            raise BarStateConfigError("candidate cost model differs from V2")
+            raise BarStateConfigError("candidate cost model differs from the frozen policy")
+        if (
+            isinstance(self.model_max_iter, bool)
+            or not isinstance(self.model_max_iter, int)
+            or self.model_max_iter <= 0
+        ):
+            raise BarStateConfigError("candidate model_max_iter must be a positive integer")
         expected = (
             f"bsv2_tf{self.timeframe_seconds:04d}_"
             f"fs{self.feature_set.feature_set_id.lower()}_cm{_margin_code(self.confidence_margin)}"
@@ -443,7 +640,7 @@ class BarStateCandidate:
                 "segment_policy": "RESET_ON_CONTRACT_QUALITY_OR_SOURCE_SEGMENT_BOUNDARY",
             },
             "label_policy": frozen_label_policy(),
-            "model_policy": frozen_model_policy(),
+            "model_policy": frozen_model_policy(max_iter=self.model_max_iter),
             "prediction_policy": {
                 "long_rule": "SCORE_GREATER_THAN_OR_EQUAL_TO_MARGIN",
                 "margin": margin,
@@ -462,8 +659,13 @@ class BarStateCandidate:
         return canonical_sha256(self.as_dict())
 
 
-def frozen_bar_state_candidates() -> tuple[BarStateCandidate, ...]:
-    """Return all twelve V2 candidates in their frozen stable order."""
+def frozen_bar_state_candidates(
+    *,
+    profile: BarStateCampaignProfile = BAR_STATE_V2_PROFILE,
+) -> tuple[BarStateCandidate, ...]:
+    """Return one profile's twelve candidates in their shared stable order."""
+
+    profile = require_bar_state_campaign_profile(profile)
 
     candidates = tuple(
         BarStateCandidate(
@@ -474,6 +676,7 @@ def frozen_bar_state_candidates() -> tuple[BarStateCandidate, ...]:
             timeframe_seconds=timeframe,
             feature_set=feature_set,
             confidence_margin=margin,
+            model_max_iter=profile.model_max_iter,
         )
         for timeframe in BAR_STATE_SIGNAL_TIMEFRAMES_SECONDS
         for feature_set in BAR_STATE_FEATURE_SETS
@@ -490,8 +693,9 @@ def frozen_bar_state_candidates() -> tuple[BarStateCandidate, ...]:
 
 @dataclass(frozen=True, slots=True)
 class BarStateResearchConfig:
-    """Immutable identity and complete catalog for the V2 Discovery campaign."""
+    """Immutable identity and complete catalog for one Discovery campaign."""
 
+    profile: BarStateCampaignProfile
     path: Path
     sha256: str
     semantic_sha256: str
@@ -512,57 +716,91 @@ class BarStateResearchConfig:
         raise KeyError(f"unknown state-model candidate: {candidate_key}")
 
     def as_dict(self) -> dict[str, object]:
-        return {
+        document: dict[str, object] = {
             "authorized_stage": BAR_STATE_AUTHORIZED_STAGE,
             "bar_dataset_manifest_sha256": BAR_STATE_BAR_DATASET_MANIFEST_SHA256,
-            "campaign_key": BAR_STATE_CAMPAIGN_KEY,
+            "campaign_key": self.profile.campaign_key,
             "candidate_catalog_sha256": self.candidate_catalog_sha256,
             "candidate_count": len(self.candidates),
             "candidates": [item.as_dict() for item in self.candidates],
             "config_file_sha256": self.sha256,
-            "config_id": BAR_STATE_CONFIG_ID,
+            "config_id": self.profile.config_id,
             "config_semantic_sha256": self.semantic_sha256,
             "maximum_finalists": BAR_STATE_MAXIMUM_FINALISTS,
             "outer_split_plan_sha256": BAR_STATE_OUTER_SPLIT_SHA256,
             "schema_version": BAR_STATE_SCHEMA_VERSION,
         }
+        if self.profile.amends_campaign_key is not None:
+            document["optimizer_cap_amendment"] = {
+                "amendment_scope": "OPTIMIZER_MAX_ITER_CAP_ONLY",
+                "predecessor_campaign_definition_sha256": (
+                    self.profile.predecessor_campaign_definition_sha256
+                ),
+                "predecessor_campaign_key": self.profile.amends_campaign_key,
+                "predecessor_code_commit": self.profile.predecessor_code_commit,
+                "predecessor_gate_policy": self.profile.predecessor_gate_policy,
+            }
+        return document
 
 
 def load_bar_state_config(
     project_root: Path,
     *,
-    config_path: Path = BAR_STATE_CONFIG_RELATIVE_PATH,
+    config_path: Path | None = None,
+    profile: BarStateCampaignProfile = BAR_STATE_V2_PROFILE,
 ) -> BarStateResearchConfig:
-    """Load the sole byte- and semantic-exact V2 configuration."""
+    """Load a byte- and semantic-exact profile; V2 remains the default."""
 
+    profile = require_bar_state_campaign_profile(profile)
     root = project_root.expanduser().resolve()
-    requested = config_path if config_path.is_absolute() else root / config_path
+    selected_path = profile.config_relative_path if config_path is None else config_path
+    requested = selected_path if selected_path.is_absolute() else root / selected_path
     resolved = requested.expanduser().resolve()
     try:
         document = load_toml_document(resolved)
     except HypothesisConfigError as error:
         raise BarStateConfigError(str(error)) from error
     semantic_sha256 = canonical_sha256(document)
-    if semantic_sha256 != BAR_STATE_CONFIG_SEMANTIC_SHA256:
+    if semantic_sha256 != profile.config_semantic_sha256:
         raise BarStateConfigError(
-            "bar_state_conditional_v2.toml differs from the frozen semantic definition"
+            f"{profile.config_relative_path.name} differs from the frozen semantic definition"
         )
     raw = resolved.read_bytes()
     file_sha256 = hashlib.sha256(raw).hexdigest()
-    if file_sha256 != BAR_STATE_CONFIG_FILE_SHA256:
+    if file_sha256 != profile.config_file_sha256:
         raise BarStateConfigError(
-            "bar_state_conditional_v2.toml differs from the frozen byte identity"
+            f"{profile.config_relative_path.name} differs from the frozen byte identity"
         )
     if (
         document.get("schema_version") != BAR_STATE_SCHEMA_VERSION
-        or document.get("config_id") != BAR_STATE_CONFIG_ID
-        or document.get("campaign_key") != BAR_STATE_CAMPAIGN_KEY
+        or document.get("config_id") != profile.config_id
+        or document.get("campaign_key") != profile.campaign_key
         or document.get("authorized_stage") != BAR_STATE_AUTHORIZED_STAGE
     ):
         raise BarStateConfigError("state-model root identity differs from the frozen campaign")
-    return BarStateResearchConfig(
+    config = BarStateResearchConfig(
+        profile=profile,
         path=resolved,
         sha256=file_sha256,
         semantic_sha256=semantic_sha256,
-        candidates=frozen_bar_state_candidates(),
+        candidates=frozen_bar_state_candidates(profile=profile),
+    )
+    if config.candidate_catalog_sha256 != profile.candidate_catalog_sha256:
+        raise BarStateConfigError("candidate catalog differs from the frozen campaign profile")
+    if config.definition_sha256 != profile.campaign_definition_sha256:
+        raise BarStateConfigError("campaign definition differs from the frozen campaign profile")
+    return config
+
+
+def load_bar_state_v2a_config(
+    project_root: Path,
+    *,
+    config_path: Path | None = None,
+) -> BarStateResearchConfig:
+    """Load the explicit optimizer-cap amendment without changing the V2 default."""
+
+    return load_bar_state_config(
+        project_root,
+        config_path=config_path,
+        profile=BAR_STATE_V2A_PROFILE,
     )

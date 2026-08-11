@@ -1,25 +1,44 @@
 from __future__ import annotations
 
 from collections import Counter
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
 from systematic_fx.backtest.bar_replay import BAR_EXECUTION_SCENARIOS
 from systematic_fx.research.bar_state_config import (
+    BAR_STATE_CAMPAIGN_DEFINITION_SHA256,
+    BAR_STATE_CAMPAIGN_KEY,
+    BAR_STATE_CAMPAIGN_PROFILES,
+    BAR_STATE_CANDIDATE_CATALOG_SHA256,
     BAR_STATE_CANDIDATE_COUNT,
     BAR_STATE_CONFIG_FILE_SHA256,
     BAR_STATE_CONFIG_RELATIVE_PATH,
     BAR_STATE_CONFIG_SEMANTIC_SHA256,
     BAR_STATE_ECONOMIC_MULTIPLIERS,
     BAR_STATE_EXECUTION_SCENARIOS,
+    BAR_STATE_V2_PROFILE,
+    BAR_STATE_V2A_CAMPAIGN_DEFINITION_SHA256,
+    BAR_STATE_V2A_CAMPAIGN_KEY,
+    BAR_STATE_V2A_CANDIDATE_CATALOG_SHA256,
+    BAR_STATE_V2A_CONFIG_FILE_SHA256,
+    BAR_STATE_V2A_CONFIG_RELATIVE_PATH,
+    BAR_STATE_V2A_CONFIG_SEMANTIC_SHA256,
+    BAR_STATE_V2A_PROFILE,
     MORPHOLOGY_FEATURE_IDS,
     STATE_FEATURE_IDS,
     BarStateCandidate,
     BarStateConfigError,
+    bar_state_campaign_profile,
+    frozen_bar_state_candidates,
+    frozen_model_policy,
     load_bar_state_config,
+    load_bar_state_v2a_config,
+    require_bar_state_campaign_profile,
 )
 from systematic_fx.research.bar_state_features import BarStateFeatureSpec
+from systematic_fx.research.hypotheses import canonical_sha256, load_toml_document
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -37,6 +56,7 @@ def _contains_float(value: object) -> bool:
 def test_loader_freezes_file_semantics_and_twelve_candidate_catalog() -> None:
     config = load_bar_state_config(ROOT)
 
+    assert config.profile is BAR_STATE_V2_PROFILE
     assert config.sha256 == BAR_STATE_CONFIG_FILE_SHA256
     assert config.semantic_sha256 == BAR_STATE_CONFIG_SEMANTIC_SHA256
     assert len(config.candidates) == BAR_STATE_CANDIDATE_COUNT == 12
@@ -54,8 +74,142 @@ def test_loader_freezes_file_semantics_and_twelve_candidate_catalog() -> None:
         "1/10": 4,
         "3/20": 4,
     }
-    assert len(config.candidate_catalog_sha256) == 64
-    assert len(config.definition_sha256) == 64
+    assert config.candidate_catalog_sha256 == BAR_STATE_CANDIDATE_CATALOG_SHA256
+    assert config.definition_sha256 == BAR_STATE_CAMPAIGN_DEFINITION_SHA256
+
+
+def test_v2a_loader_freezes_distinct_admin_identity_and_hashes() -> None:
+    config = load_bar_state_v2a_config(ROOT)
+
+    assert config.profile is BAR_STATE_V2A_PROFILE
+    assert config.path == ROOT / BAR_STATE_V2A_CONFIG_RELATIVE_PATH
+    assert config.sha256 == BAR_STATE_V2A_CONFIG_FILE_SHA256
+    assert config.semantic_sha256 == BAR_STATE_V2A_CONFIG_SEMANTIC_SHA256
+    assert config.candidate_catalog_sha256 == BAR_STATE_V2A_CANDIDATE_CATALOG_SHA256
+    assert config.definition_sha256 == BAR_STATE_V2A_CAMPAIGN_DEFINITION_SHA256
+    assert config.as_dict()["campaign_key"] == BAR_STATE_V2A_CAMPAIGN_KEY
+    assert config.as_dict()["optimizer_cap_amendment"] == {
+        "amendment_scope": "OPTIMIZER_MAX_ITER_CAP_ONLY",
+        "predecessor_campaign_definition_sha256": (BAR_STATE_CAMPAIGN_DEFINITION_SHA256),
+        "predecessor_campaign_key": BAR_STATE_CAMPAIGN_KEY,
+        "predecessor_code_commit": "2ca2b0b6158c1d1e9d880c2ed65ec7d7582de189",
+        "predecessor_gate_policy": ("REQUIRE_EXACT_FAILED_PREDECESSOR_WITH_NO_OOS_EVIDENCE"),
+    }
+
+
+def test_v2a_candidate_policy_diff_is_exactly_the_optimizer_cap() -> None:
+    v2 = frozen_bar_state_candidates(profile=BAR_STATE_V2_PROFILE)
+    v2a = frozen_bar_state_candidates(profile=BAR_STATE_V2A_PROFILE)
+
+    assert tuple(item.candidate_key for item in v2a) == tuple(item.candidate_key for item in v2)
+    for predecessor, successor in zip(v2, v2a, strict=True):
+        predecessor_document = predecessor.as_dict()
+        successor_document = successor.as_dict()
+        predecessor_arguments = predecessor_document["model_policy"]["sklearn_arguments"]
+        successor_arguments = successor_document["model_policy"]["sklearn_arguments"]
+        assert predecessor_arguments.pop("max_iter") == 5_000
+        assert successor_arguments.pop("max_iter") == 50_000
+        assert successor_document == predecessor_document
+
+
+def test_v2a_hashes_pin_model_policy_catalog_campaign_and_all_candidates() -> None:
+    config = load_bar_state_v2a_config(ROOT)
+    expected_candidates = {
+        "bsv2_tf0300_fsmorphology_cm005": (
+            "ef9d158d5909beaee7727aa5c71c99be2c44053399325c0438f508cfa0742eda"
+        ),
+        "bsv2_tf0300_fsmorphology_cm010": (
+            "62fa347ad4d2824e3220df29834bf4bfedd58d9df16c161b95fbfd2ab36defb7"
+        ),
+        "bsv2_tf0300_fsmorphology_cm015": (
+            "2620affd7d6bc99001b667d52173d90b24ee379134c6053ed27f6cad52ee4d6a"
+        ),
+        "bsv2_tf0300_fsstate_cm005": (
+            "315c7ac44d828afe96f4a3ec2eb38e047fe7a2e7c9c268dabe01f557807383ac"
+        ),
+        "bsv2_tf0300_fsstate_cm010": (
+            "6d8c80b71bccb9d25c69a173585c9dfe47a888a0fe5918240f0e95063d69035b"
+        ),
+        "bsv2_tf0300_fsstate_cm015": (
+            "b8530e604700b64a8e39cee7e4c6719bfd1294c8f4c64e25345a731442301ec0"
+        ),
+        "bsv2_tf1800_fsmorphology_cm005": (
+            "eb5404c6a507b05d243fdb1e81aa8ab9a93cb0a3bc958321b2a12a03600e44ee"
+        ),
+        "bsv2_tf1800_fsmorphology_cm010": (
+            "375d9a388e1346b3557703beee061c408371683b1aa27c2d7b6fa8862ea298da"
+        ),
+        "bsv2_tf1800_fsmorphology_cm015": (
+            "0367e3821e20fe2eb07ec278a3d3faff2bf90e15c8d1c2b1de241763ee5cf7d3"
+        ),
+        "bsv2_tf1800_fsstate_cm005": (
+            "a98c2d8e60da3ffc8dbf84461d0873627dfbec47847891f23c44a6785685ae1e"
+        ),
+        "bsv2_tf1800_fsstate_cm010": (
+            "57f4d5577456ff4ca3f30d82bb731b07c5638fa1b5f4a86b26d039d954bd19a3"
+        ),
+        "bsv2_tf1800_fsstate_cm015": (
+            "696f5eac1caa452082cb51c0aef9c0f856daa96e31e89267b5d05f081242ef91"
+        ),
+    }
+
+    assert canonical_sha256(frozen_model_policy(max_iter=50_000)) == (
+        "844cd3964e2871fecd13b7f7a76f07016b150b853c290c4188e275cd2226874f"
+    )
+    assert {item.candidate_key: item.definition_sha256 for item in config.candidates} == (
+        expected_candidates
+    )
+    assert config.candidate_catalog_sha256 == BAR_STATE_V2A_CANDIDATE_CATALOG_SHA256
+    assert config.definition_sha256 == BAR_STATE_V2A_CAMPAIGN_DEFINITION_SHA256
+
+
+def test_v2a_config_records_train_only_qualification_and_predecessor_gate() -> None:
+    document = load_toml_document(ROOT / BAR_STATE_V2A_CONFIG_RELATIVE_PATH)
+    qualification = document["optimizer_cap_amendment"]
+
+    assert document["amendment_scope"] == "OPTIMIZER_MAX_ITER_CAP_ONLY"
+    assert document["model"]["actual_sklearn_kwargs"]["max_iter"] == 50_000
+    assert qualification["qualification_training_row_count"] == 26_735
+    assert qualification["qualification_training_rows_sha256"] == (
+        "d860672ce1f0496284596974d36f07f30897d9891751c2d8760e67328da6b3e0"
+    )
+    assert qualification["v2_n_iter"] == 5_000
+    assert qualification["v2_convergence_warning"] is True
+    assert qualification["diagnostic_n_iter"] == 25_000
+    assert qualification["diagnostic_convergence_warning"] is True
+    assert qualification["selected_n_iter"] == qualification["confirmation_n_iter"] == 33_542
+    assert qualification["selected_convergence_warning"] is False
+    assert qualification["confirmation_convergence_warning"] is False
+    assert qualification["coefficient_sha256"] == (
+        "22691a2e3a322cfaca78db45e01a44d63134f36d600ac73861d2ed6c8cf43a55"
+    )
+    assert qualification["intercept_sha256"] == (
+        "dde5a31d4a64146b74f33d8b0cf3dde9a98945a1ae706c97c36f24adb9a96d99"
+    )
+    assert qualification["oos_economic_evidence_accessed"] is False
+    assert qualification["sealed_walk_forward_accessed"] is False
+    assert qualification["sealed_holdout_accessed"] is False
+
+
+def test_campaign_profile_lookup_and_allowlist_reject_forged_profiles() -> None:
+    assert BAR_STATE_CAMPAIGN_PROFILES == (BAR_STATE_V2_PROFILE, BAR_STATE_V2A_PROFILE)
+    assert bar_state_campaign_profile() is BAR_STATE_V2_PROFILE
+    assert bar_state_campaign_profile("V2A") is BAR_STATE_V2A_PROFILE
+    assert require_bar_state_campaign_profile(BAR_STATE_V2A_PROFILE) is BAR_STATE_V2A_PROFILE
+    assert BAR_STATE_V2A_PROFILE.artifact_type == BAR_STATE_V2A_CAMPAIGN_KEY
+    assert BAR_STATE_V2A_PROFILE.experiment_key == (
+        "bar_state_conditional_v2a:experiment:frozen_candidate_catalog:v1"
+    )
+
+    forged = replace(BAR_STATE_V2A_PROFILE, model_max_iter=50_001)
+    with pytest.raises(BarStateConfigError, match="not exactly registered"):
+        require_bar_state_campaign_profile(forged)
+    with pytest.raises(BarStateConfigError, match="not exactly registered"):
+        frozen_bar_state_candidates(profile=forged)
+    with pytest.raises(BarStateConfigError, match="not exactly registered"):
+        load_bar_state_config(ROOT, profile=forged)
+    with pytest.raises(BarStateConfigError, match="unknown"):
+        bar_state_campaign_profile("v2a")
 
 
 def test_candidate_payload_is_complete_and_has_no_binary_floats() -> None:

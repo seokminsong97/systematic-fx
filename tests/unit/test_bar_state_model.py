@@ -17,7 +17,10 @@ from systematic_fx.research.bar_state_labels import (
     StatePathLabel,
 )
 from systematic_fx.research.bar_state_model import (
+    BAR_STATE_V2_MODEL_HYPERPARAMETERS,
+    BAR_STATE_V2A_MODEL_HYPERPARAMETERS,
     BarStateModelError,
+    BarStateModelHyperparameters,
     CanonicalBarStateModel,
     StateTradeDecision,
     classify_state_probabilities,
@@ -104,6 +107,47 @@ def test_model_fit_is_byte_deterministic_and_json_round_trips_without_pickle() -
     assert loaded.predict_probabilities(rows[0].values) == first.predict_probabilities(
         rows[0].values
     )
+
+
+def test_v2a_fit_and_decoder_require_the_explicit_expected_hyperparameters() -> None:
+    rows, labels = _training_data()
+    model = fit_bar_state_model(
+        rows,
+        labels,
+        model_id="model_v2a",
+        hyperparameters=BAR_STATE_V2A_MODEL_HYPERPARAMETERS,
+    )
+
+    assert model.hyperparameters is BAR_STATE_V2A_MODEL_HYPERPARAMETERS
+    assert model.as_dict()["hyperparameters"]["max_iter"] == 50_000
+    loaded = CanonicalBarStateModel.from_canonical_bytes(
+        model.canonical_bytes,
+        expected_hyperparameters=BAR_STATE_V2A_MODEL_HYPERPARAMETERS,
+    )
+    assert loaded == model
+    with pytest.raises(BarStateModelError, match="hyperparameters drifted"):
+        CanonicalBarStateModel.from_canonical_bytes(model.canonical_bytes)
+
+    predecessor = fit_bar_state_model(rows, labels, model_id="model_v2")
+    with pytest.raises(BarStateModelError, match="hyperparameters drifted"):
+        CanonicalBarStateModel.from_canonical_bytes(
+            predecessor.canonical_bytes,
+            expected_hyperparameters=BAR_STATE_V2A_MODEL_HYPERPARAMETERS,
+        )
+
+
+def test_v2a_model_policy_diff_is_only_the_positive_iteration_cap() -> None:
+    predecessor = BAR_STATE_V2_MODEL_HYPERPARAMETERS.as_dict()
+    successor = BAR_STATE_V2A_MODEL_HYPERPARAMETERS.as_dict()
+
+    assert predecessor.pop("max_iter") == 5_000
+    assert successor.pop("max_iter") == 50_000
+    assert successor == predecessor
+    assert BarStateModelHyperparameters(max_iter=50_000) == (BAR_STATE_V2A_MODEL_HYPERPARAMETERS)
+    with pytest.raises(BarStateModelError, match="positive integer"):
+        BarStateModelHyperparameters(max_iter=0)
+    with pytest.raises(BarStateModelError, match="positive integer"):
+        BarStateModelHyperparameters(max_iter=True)
 
 
 def test_canonical_model_loader_rejects_unknown_or_drifted_fields() -> None:

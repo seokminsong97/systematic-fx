@@ -66,7 +66,7 @@ class StateTradeDecision(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class BarStateModelHyperparameters:
-    """The sole frozen V2 model fit, deliberately not a search dimension."""
+    """The frozen objective plus an explicit campaign-owned iteration cap."""
 
     solver: str = "saga"
     c: Fraction = Fraction(1, 10)
@@ -85,10 +85,12 @@ class BarStateModelHyperparameters:
         if self.class_weight != "balanced" or not self.fit_intercept:
             raise BarStateModelError("class weighting/intercept differs from the frozen model")
         if (
-            self.max_iter != 5_000
-            or self.tolerance != Fraction(1, 100_000_000)
-            or self.random_state != 20_260_809
+            isinstance(self.max_iter, bool)
+            or not isinstance(self.max_iter, int)
+            or self.max_iter <= 0
         ):
+            raise BarStateModelError("optimizer max_iter must be a positive integer")
+        if self.tolerance != Fraction(1, 100_000_000) or self.random_state != 20_260_809:
             raise BarStateModelError("optimizer controls differ from the frozen model")
 
     def as_dict(self) -> dict[str, object]:
@@ -112,7 +114,10 @@ class BarStateModelHyperparameters:
         }
 
 
-FROZEN_MODEL_HYPERPARAMETERS: Final = BarStateModelHyperparameters()
+BAR_STATE_V2_MODEL_HYPERPARAMETERS: Final = BarStateModelHyperparameters()
+BAR_STATE_V2A_MODEL_HYPERPARAMETERS: Final = BarStateModelHyperparameters(max_iter=50_000)
+# Backward-compatible public name used by the original V2 engine and artifacts.
+FROZEN_MODEL_HYPERPARAMETERS: Final = BAR_STATE_V2_MODEL_HYPERPARAMETERS
 
 
 def _canonical_bytes(value: object) -> bytes:
@@ -306,8 +311,18 @@ class CanonicalBarStateModel:
         return classify_state_probabilities(probabilities, margin=margin)
 
     @classmethod
-    def from_canonical_bytes(cls, raw: bytes) -> CanonicalBarStateModel:
-        """Strictly load the portable JSON representation without executable state."""
+    def from_canonical_bytes(
+        cls,
+        raw: bytes,
+        *,
+        expected_hyperparameters: BarStateModelHyperparameters = (FROZEN_MODEL_HYPERPARAMETERS),
+    ) -> CanonicalBarStateModel:
+        """Strictly load JSON under one explicit campaign hyperparameter policy."""
+
+        if not isinstance(expected_hyperparameters, BarStateModelHyperparameters):
+            raise BarStateModelError(
+                "expected_hyperparameters must be BarStateModelHyperparameters"
+            )
 
         if not isinstance(raw, bytes) or not raw.endswith(b"\n"):
             raise BarStateModelError("canonical model bytes must end with LF")
@@ -323,7 +338,7 @@ class CanonicalBarStateModel:
             raise BarStateModelError("canonical model fields differ from the frozen schema")
         if document.get("artifact_encoding") != "CANONICAL_JSON_FLOAT_HEX_NO_PICKLE":
             raise BarStateModelError("canonical model encoding is invalid")
-        if document.get("hyperparameters") != FROZEN_MODEL_HYPERPARAMETERS.as_dict():
+        if document.get("hyperparameters") != expected_hyperparameters.as_dict():
             raise BarStateModelError("canonical model hyperparameters drifted")
         coefficients_raw = document.get("coefficients_hex")
         if not isinstance(coefficients_raw, list) or not coefficients_raw:
@@ -355,6 +370,7 @@ class CanonicalBarStateModel:
                 optimizer_iterations=tuple(
                     int(value) for value in document["optimizer_iterations"]
                 ),
+                hyperparameters=expected_hyperparameters,
             )
         except (KeyError, TypeError, ValueError) as error:
             raise BarStateModelError("canonical model fields are invalid") from error
@@ -526,6 +542,8 @@ def classify_state_probabilities(
 
 
 __all__ = [
+    "BAR_STATE_V2A_MODEL_HYPERPARAMETERS",
+    "BAR_STATE_V2_MODEL_HYPERPARAMETERS",
     "DECISION_MARGINS",
     "FROZEN_MODEL_HYPERPARAMETERS",
     "STATE_MODEL_CLASSES",
