@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from datetime import date
+from decimal import Decimal
 from typing import Any
 
 import pytest
@@ -8,9 +10,11 @@ import pytest
 from systematic_fx.db.bar_state_registry import (
     BAR_STATE_ARTIFACT_SCHEMA_BY_KIND,
     BAR_STATE_BAR_DATASET_MANIFEST_SHA256,
+    BAR_STATE_CAMPAIGN_SPLIT_POLICY_SHA256,
     BAR_STATE_COST_VERSION,
     BAR_STATE_DATASET_KEY,
     BAR_STATE_EXECUTION_VERSION,
+    BAR_STATE_EXPERIMENT_CONFIG_SHA256_BY_PROFILE,
     BAR_STATE_FEATURE_VERSION,
     BAR_STATE_OUTCOME_VERSION,
     BAR_STATE_RAW_SOURCE_MANIFEST_SHA256,
@@ -58,6 +62,10 @@ def _predecessor_rows(
         "campaign_key": predecessor.campaign_key,
         "name": predecessor.campaign_name,
         "status": "FROZEN",
+        "selected_start_date": date(2022, 1, 3),
+        "selected_end_date": date(2026, 7, 31),
+        "roll_cutoff_date": None,
+        "campaign_split_policy_sha256": BAR_STATE_CAMPAIGN_SPLIT_POLICY_SHA256,
         "data_manifest_sha256": BAR_STATE_BAR_DATASET_MANIFEST_SHA256,
         "feature_version": BAR_STATE_FEATURE_VERSION,
         "outcome_version": BAR_STATE_OUTCOME_VERSION,
@@ -76,9 +84,21 @@ def _predecessor_rows(
         "experiment_id": 43,
         "experiment_key": predecessor.experiment_key,
         "experiment_status": "FROZEN",
+        "pattern_id": None,
+        "parent_experiment_id": None,
+        "hypothesis": ("Completed candle state predicts next-open 20-day first-touch direction"),
         "primary_family": "CONDITIONAL_BAR_STATE_MODEL",
         "model_family": "ELASTIC_NET_MULTINOMIAL_LOGISTIC",
         "direction": "BOTH",
+        "tick_size": Decimal("0.00005"),
+        "tick_value": Decimal("6.25"),
+        "experiment_code_commit": successor.predecessor_code_commit,
+        "experiment_config_sha256": BAR_STATE_EXPERIMENT_CONFIG_SHA256_BY_PROFILE[
+            predecessor.version_id
+        ],
+        "experiment_documents_sha256": BAR_STATE_EXPERIMENT_CONFIG_SHA256_BY_PROFILE[
+            predecessor.version_id
+        ],
         "experiment_trial_budget": 12,
         "trials_registered": 12,
         "experiment_frozen_at": object(),
@@ -227,6 +247,31 @@ def test_v2b_predecessor_gate_rejects_missing_or_malformed_second_attempt(
     rows[3][field] = value
 
     with pytest.raises(BarStateRegistryDriftError, match="drifted"):
+        _require_clean_bar_state_predecessor_connection(
+            _Connection(rows),  # type: ignore[arg-type]
+            successor_profile=BAR_STATE_V2B_PROFILE,
+        )
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("selected_start_date", date(2022, 1, 4)),
+        ("campaign_split_policy_sha256", "0" * 64),
+        ("parent_experiment_id", 99),
+        ("tick_size", Decimal("0.00006")),
+        ("experiment_config_sha256", "0" * 64),
+        ("experiment_documents_sha256", "0" * 64),
+    ],
+)
+def test_v2b_predecessor_gate_rejects_control_plane_identity_drift(
+    field: str,
+    value: object,
+) -> None:
+    rows = _predecessor_rows(BAR_STATE_V2B_PROFILE)
+    rows[0][field] = value
+
+    with pytest.raises(BarStateRegistryDriftError, match=rf"field '{field}' drifted"):
         _require_clean_bar_state_predecessor_connection(
             _Connection(rows),  # type: ignore[arg-type]
             successor_profile=BAR_STATE_V2B_PROFILE,

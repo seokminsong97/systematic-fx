@@ -14,6 +14,7 @@ import re
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import date
 from decimal import Decimal
 from functools import wraps
 from pathlib import Path
@@ -88,6 +89,13 @@ BAR_STATE_ELIGIBLE_CALENDAR_VERSION: Final = "bar_dataset_eligible_calendar_v1"
 BAR_STATE_ELIGIBLE_CALENDAR_SHA256: Final = (
     "a8b57ad2ffcb68accc0e792c08082cf51090b87bf963800178f88dd27af9da14"
 )
+BAR_STATE_CAMPAIGN_SPLIT_POLICY_SHA256: Final = (
+    "5da1027fb2003c521b4be2eee0d2bf1238e4784467f43f7d9b9ac978223f5552"
+)
+BAR_STATE_EXPERIMENT_CONFIG_SHA256_BY_PROFILE: Final = {
+    "V2": "8378983f7db68b443d385b7cc646f0294391293ccd1873dbc3a2458ad1384c49",
+    "V2A": "ae3ab3f4e0a77e4e0ddf83d0bca969514f94734f0009ec85deb4cf573a490769",
+}
 BAR_STATE_RANDOM_SEED: Final = 20_260_809
 BAR_STATE_CANDIDATE_CATALOG_SHA256: Final = BAR_STATE_V2_PROFILE.candidate_catalog_sha256
 BAR_STATE_CAMPAIGN_DEFINITION_SHA256: Final = BAR_STATE_V2_PROFILE.campaign_definition_sha256
@@ -565,7 +573,11 @@ def _require_clean_bar_state_predecessor_connection(
 
     identity = connection.execute(
         """
-        SELECT c.campaign_id, c.campaign_key, c.name, c.status, c.data_manifest_sha256,
+        SELECT c.campaign_id, c.campaign_key, c.name, c.status,
+               c.selected_start_date, c.selected_end_date, c.roll_cutoff_date,
+               systematic_fx.canonical_jsonb_sha256(c.split_policy)
+                   AS campaign_split_policy_sha256,
+               c.data_manifest_sha256,
                c.feature_version, c.outcome_version, c.cost_model_version,
                c.execution_model_version, c.code_commit, c.config_sha256,
                c.trial_budget, c.finalist_budget, c.frozen_at,
@@ -573,7 +585,16 @@ def _require_clean_bar_state_predecessor_connection(
                d.dataset_key, d.manifest_sha256 AS raw_manifest_sha256,
                d.status AS dataset_status,
                e.experiment_id, e.experiment_key, e.status AS experiment_status,
+               e.pattern_id, e.parent_experiment_id, e.hypothesis,
                e.primary_family, e.model_family, e.direction,
+               e.tick_size, e.tick_value, e.code_commit AS experiment_code_commit,
+               e.config_sha256 AS experiment_config_sha256,
+               systematic_fx.canonical_jsonb_sha256(jsonb_build_object(
+                   'cost_assumptions', e.cost_assumptions,
+                   'execution_assumptions', e.execution_assumptions,
+                   'feature_versions', e.feature_definition_versions,
+                   'search_boundary', e.search_boundary
+               )) AS experiment_documents_sha256,
                e.trial_budget AS experiment_trial_budget,
                e.trials_registered, e.frozen_at AS experiment_frozen_at,
                e.completed_at,
@@ -607,6 +628,10 @@ def _require_clean_bar_state_predecessor_connection(
             "campaign_key": predecessor.campaign_key,
             "name": predecessor.campaign_name,
             "status": "FROZEN",
+            "selected_start_date": date(2022, 1, 3),
+            "selected_end_date": date(2026, 7, 31),
+            "roll_cutoff_date": None,
+            "campaign_split_policy_sha256": BAR_STATE_CAMPAIGN_SPLIT_POLICY_SHA256,
             "data_manifest_sha256": BAR_STATE_BAR_DATASET_MANIFEST_SHA256,
             "feature_version": BAR_STATE_FEATURE_VERSION,
             "outcome_version": BAR_STATE_OUTCOME_VERSION,
@@ -622,9 +647,23 @@ def _require_clean_bar_state_predecessor_connection(
             "raw_manifest_sha256": BAR_STATE_RAW_SOURCE_MANIFEST_SHA256,
             "experiment_key": predecessor.experiment_key,
             "experiment_status": "FROZEN",
+            "pattern_id": None,
+            "parent_experiment_id": None,
+            "hypothesis": (
+                "Completed candle state predicts next-open 20-day first-touch direction"
+            ),
             "primary_family": "CONDITIONAL_BAR_STATE_MODEL",
             "model_family": "ELASTIC_NET_MULTINOMIAL_LOGISTIC",
             "direction": "BOTH",
+            "tick_size": Decimal("0.00005"),
+            "tick_value": Decimal("6.25"),
+            "experiment_code_commit": successor.predecessor_code_commit,
+            "experiment_config_sha256": (
+                BAR_STATE_EXPERIMENT_CONFIG_SHA256_BY_PROFILE[predecessor.version_id]
+            ),
+            "experiment_documents_sha256": (
+                BAR_STATE_EXPERIMENT_CONFIG_SHA256_BY_PROFILE[predecessor.version_id]
+            ),
             "experiment_trial_budget": BAR_STATE_CANDIDATE_COUNT,
             "trials_registered": BAR_STATE_CANDIDATE_COUNT,
             "completed_at": None,
