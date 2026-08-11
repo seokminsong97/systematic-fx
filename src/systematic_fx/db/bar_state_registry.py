@@ -59,6 +59,7 @@ from systematic_fx.research.bar_state_artifacts import (
 from systematic_fx.research.bar_state_config import (
     BAR_STATE_V2_PROFILE,
     BAR_STATE_V2A_PROFILE,
+    BAR_STATE_V2B_PROFILE,
     BarStateCampaignProfile,
     require_bar_state_campaign_profile,
 )
@@ -302,7 +303,7 @@ class BarStateCampaignRegistrationReport:
 
 @dataclass(frozen=True, slots=True)
 class BarStatePredecessorGateReport:
-    """Metadata-only proof that V2A amends one cleanly failed V2 campaign."""
+    """Metadata-only proof that an amendment follows its exact failed predecessor."""
 
     predecessor_campaign_id: int
     predecessor_experiment_id: int
@@ -538,17 +539,29 @@ def _require_clean_bar_state_predecessor_connection(
     successor_profile: BarStateCampaignProfile,
 ) -> BarStatePredecessorGateReport:
     successor = require_bar_state_campaign_profile(successor_profile)
-    predecessor = BAR_STATE_V2_PROFILE
+    if successor == BAR_STATE_V2A_PROFILE:
+        predecessor = BAR_STATE_V2_PROFILE
+        expected_attempt_numbers = (1,)
+        expected_gate_policy = "REQUIRE_EXACT_FAILED_PREDECESSOR_WITH_NO_OOS_EVIDENCE"
+    elif successor == BAR_STATE_V2B_PROFILE:
+        predecessor = BAR_STATE_V2A_PROFILE
+        expected_attempt_numbers = (1, 2)
+        expected_gate_policy = (
+            "REQUIRE_EXACT_FAILED_PREDECESSOR_ATTEMPTS_1_AND_2_WITH_NO_GOVERNED_EVIDENCE"
+        )
+    else:
+        raise BarStateRegistryError("campaign profile lacks an exact predecessor gate")
     if (
-        successor != BAR_STATE_V2A_PROFILE
-        or successor.amends_campaign_key != predecessor.campaign_key
+        successor.amends_campaign_key != predecessor.campaign_key
         or successor.predecessor_campaign_definition_sha256
         != predecessor.campaign_definition_sha256
         or successor.predecessor_code_commit is None
-        or successor.predecessor_gate_policy
-        != "REQUIRE_EXACT_FAILED_PREDECESSOR_WITH_NO_OOS_EVIDENCE"
+        or successor.predecessor_gate_policy != expected_gate_policy
     ):
-        raise BarStateRegistryError("campaign profile lacks the exact V2 predecessor gate")
+        raise BarStateRegistryError("campaign profile lacks an exact predecessor gate")
+
+    predecessor_label = f"{predecessor.version_id} predecessor"
+    expected_attempt_count = BAR_STATE_CANDIDATE_COUNT * len(expected_attempt_numbers)
 
     identity = connection.execute(
         """
@@ -576,13 +589,18 @@ def _require_clean_bar_state_predecessor_connection(
         JOIN systematic_fx.artifacts AS registration
           ON registration.artifact_id = e.registration_artifact_id
         WHERE c.campaign_key = %s AND e.experiment_key = %s
+          AND (
+              SELECT count(*)
+              FROM systematic_fx.experiments AS campaign_experiment
+              WHERE campaign_experiment.campaign_id = c.campaign_id
+          ) = 1
         FOR SHARE OF c, e
         """,
         (predecessor.campaign_key, predecessor.experiment_key),
     ).fetchone()
-    identity = _row_or_error(identity, label="V2 predecessor campaign")
+    identity = _row_or_error(identity, label=f"{predecessor_label} campaign")
     _assert_fields(
-        label="V2 predecessor campaign",
+        label=f"{predecessor_label} campaign",
         row=identity,
         expected={
             "campaign_key": predecessor.campaign_key,
@@ -620,7 +638,9 @@ def _require_clean_bar_state_predecessor_connection(
         or identity["experiment_frozen_at"] is None
         or identity["dataset_status"] in {"REJECTED", "RETIRED"}
     ):
-        raise BarStateRegistryStateError("V2 predecessor is not frozen and available")
+        raise BarStateRegistryStateError(
+            f"{predecessor_label} is not frozen and available"
+        )
 
     experiment_id = int(identity["experiment_id"])
     catalog = connection.execute(
@@ -650,9 +670,9 @@ def _require_clean_bar_state_predecessor_connection(
         """,
         (experiment_id, experiment_id),
     ).fetchone()
-    catalog = _row_or_error(catalog, label="V2 predecessor candidate catalog")
+    catalog = _row_or_error(catalog, label=f"{predecessor_label} candidate catalog")
     _assert_fields(
-        label="V2 predecessor candidate catalog",
+        label=f"{predecessor_label} candidate catalog",
         row=catalog,
         expected={
             "trial_count": BAR_STATE_CANDIDATE_COUNT,
@@ -670,31 +690,40 @@ def _require_clean_bar_state_predecessor_connection(
         SELECT count(*)::integer AS attempt_count,
                count(*) FILTER (WHERE a.status = 'FAILED')::integer AS failed_count,
                count(*) FILTER (
-                   WHERE a.attempt_number = 1
+                   WHERE a.attempt_number = ANY(%s::integer[])
                      AND a.result_artifact_id IS NULL
                      AND a.trade_ledger_artifact_id IS NULL
                      AND a.reused_attempt_id IS NULL
                      AND a.started_at IS NOT NULL
                      AND a.finished_at IS NOT NULL
                      AND btrim(COALESCE(a.error_message, '')) <> ''
+                     AND a.result_summary = jsonb_build_object(
+                         'candidate_key',
+                             r.canonical_spec #>>
+                                 '{parameters,bar_state_candidate_key}',
+                         'run_fingerprint', r.run_fingerprint
+                     )
                )::integer AS exact_failed_count,
-               count(DISTINCT a.research_run_spec_id)::integer AS distinct_spec_count
+               count(DISTINCT a.research_run_spec_id)::integer AS distinct_spec_count,
+               count(DISTINCT (a.research_run_spec_id, a.attempt_number))::integer
+                   AS distinct_spec_attempt_count
         FROM systematic_fx.research_run_attempts AS a
         JOIN systematic_fx.research_run_specs AS r
           ON r.research_run_spec_id = a.research_run_spec_id
         WHERE r.campaign_id = %s AND r.experiment_id = %s
         """,
-        (identity["campaign_id"], experiment_id),
+        (list(expected_attempt_numbers), identity["campaign_id"], experiment_id),
     ).fetchone()
-    attempts = _row_or_error(attempts, label="V2 predecessor failed attempts")
+    attempts = _row_or_error(attempts, label=f"{predecessor_label} failed attempts")
     _assert_fields(
-        label="V2 predecessor failed attempts",
+        label=f"{predecessor_label} failed attempts",
         row=attempts,
         expected={
-            "attempt_count": BAR_STATE_CANDIDATE_COUNT,
-            "failed_count": BAR_STATE_CANDIDATE_COUNT,
-            "exact_failed_count": BAR_STATE_CANDIDATE_COUNT,
+            "attempt_count": expected_attempt_count,
+            "failed_count": expected_attempt_count,
+            "exact_failed_count": expected_attempt_count,
             "distinct_spec_count": BAR_STATE_CANDIDATE_COUNT,
+            "distinct_spec_attempt_count": expected_attempt_count,
         },
     )
 
@@ -703,22 +732,20 @@ def _require_clean_bar_state_predecessor_connection(
         SELECT count(*)::integer AS linked_artifact_count
         FROM systematic_fx.bar_state_artifact_links
         WHERE campaign_id = %s
-          AND artifact_role IN (
-              'FEATURE', 'LABEL', 'MODEL', 'OOS_TRADE',
-              'GLOBAL_RESULT', 'TERMINAL_RESULT'
-          )
         """,
         (identity["campaign_id"],),
     ).fetchone()
-    link_row = _row_or_error(link_row, label="V2 predecessor artifact links")
+    link_row = _row_or_error(link_row, label=f"{predecessor_label} artifact links")
     if link_row["linked_artifact_count"] != 0:
-        raise BarStateRegistryStateError("V2 predecessor has linked research evidence")
+        raise BarStateRegistryStateError(
+            f"{predecessor_label} has linked governed evidence"
+        )
 
     return BarStatePredecessorGateReport(
         predecessor_campaign_id=int(identity["campaign_id"]),
         predecessor_experiment_id=experiment_id,
         candidate_count=BAR_STATE_CANDIDATE_COUNT,
-        failed_attempt_count=BAR_STATE_CANDIDATE_COUNT,
+        failed_attempt_count=expected_attempt_count,
         linked_artifact_count=0,
     )
 
@@ -729,7 +756,7 @@ def require_clean_bar_state_predecessor(
     *,
     successor_profile: BarStateCampaignProfile = BAR_STATE_V2A_PROFILE,
 ) -> BarStatePredecessorGateReport:
-    """Prove from control-plane metadata that V2A follows only the clean failed V2 run."""
+    """Prove one amendment follows only its exact failed governed predecessor."""
 
     url = _nonempty(database_url, label="database_url")
     selected = require_bar_state_campaign_profile(successor_profile)

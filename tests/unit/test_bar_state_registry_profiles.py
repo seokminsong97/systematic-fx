@@ -23,6 +23,8 @@ from systematic_fx.db.bar_state_registry import (
 from systematic_fx.research.bar_state_config import (
     BAR_STATE_V2_PROFILE,
     BAR_STATE_V2A_PROFILE,
+    BAR_STATE_V2B_PROFILE,
+    BarStateCampaignProfile,
 )
 
 
@@ -44,19 +46,25 @@ class _Connection:
         return _Result(self._rows.pop(0))
 
 
-def _predecessor_rows() -> list[dict[str, Any]]:
+def _predecessor_rows(
+    successor: BarStateCampaignProfile = BAR_STATE_V2A_PROFILE,
+) -> list[dict[str, Any]]:
+    predecessor = (
+        BAR_STATE_V2_PROFILE if successor == BAR_STATE_V2A_PROFILE else BAR_STATE_V2A_PROFILE
+    )
+    attempt_count = 12 if successor == BAR_STATE_V2A_PROFILE else 24
     identity = {
         "campaign_id": 41,
-        "campaign_key": BAR_STATE_V2_PROFILE.campaign_key,
-        "name": BAR_STATE_V2_PROFILE.campaign_name,
+        "campaign_key": predecessor.campaign_key,
+        "name": predecessor.campaign_name,
         "status": "FROZEN",
         "data_manifest_sha256": BAR_STATE_BAR_DATASET_MANIFEST_SHA256,
         "feature_version": BAR_STATE_FEATURE_VERSION,
         "outcome_version": BAR_STATE_OUTCOME_VERSION,
         "cost_model_version": BAR_STATE_COST_VERSION,
         "execution_model_version": BAR_STATE_EXECUTION_VERSION,
-        "code_commit": BAR_STATE_V2A_PROFILE.predecessor_code_commit,
-        "config_sha256": BAR_STATE_V2_PROFILE.campaign_definition_sha256,
+        "code_commit": successor.predecessor_code_commit,
+        "config_sha256": predecessor.campaign_definition_sha256,
         "trial_budget": 12,
         "finalist_budget": 4,
         "frozen_at": object(),
@@ -66,7 +74,7 @@ def _predecessor_rows() -> list[dict[str, Any]]:
         "raw_manifest_sha256": BAR_STATE_RAW_SOURCE_MANIFEST_SHA256,
         "dataset_status": "READY",
         "experiment_id": 43,
-        "experiment_key": BAR_STATE_V2_PROFILE.experiment_key,
+        "experiment_key": predecessor.experiment_key,
         "experiment_status": "FROZEN",
         "primary_family": "CONDITIONAL_BAR_STATE_MODEL",
         "model_family": "ELASTIC_NET_MULTINOMIAL_LOGISTIC",
@@ -75,10 +83,10 @@ def _predecessor_rows() -> list[dict[str, Any]]:
         "trials_registered": 12,
         "experiment_frozen_at": object(),
         "completed_at": None,
-        "registration_artifact_type": BAR_STATE_V2_PROFILE.artifact_type,
+        "registration_artifact_type": predecessor.artifact_type,
         "registration_schema": BAR_STATE_ARTIFACT_SCHEMA_BY_KIND["REGISTRATION"],
         "registration_kind": "REGISTRATION",
-        "registration_campaign_key": BAR_STATE_V2_PROFILE.campaign_key,
+        "registration_campaign_key": predecessor.campaign_key,
     }
     catalog = {
         "trial_count": 12,
@@ -90,10 +98,11 @@ def _predecessor_rows() -> list[dict[str, Any]]:
         "total_experiment_spec_count": 12,
     }
     attempts = {
-        "attempt_count": 12,
-        "failed_count": 12,
-        "exact_failed_count": 12,
+        "attempt_count": attempt_count,
+        "failed_count": attempt_count,
+        "exact_failed_count": attempt_count,
         "distinct_spec_count": 12,
+        "distinct_spec_attempt_count": attempt_count,
     }
     return [identity, catalog, attempts, {"linked_artifact_count": 0}]
 
@@ -119,7 +128,31 @@ def test_v2a_predecessor_gate_requires_exact_failed_v2_without_research_evidence
         BAR_STATE_V2_PROFILE.experiment_key,
     )
     assert "a.started_at IS NOT NULL" in connection.calls[2][0]
+    assert connection.calls[2][1] == ([1], 41, 43)
     assert connection.calls[-1][1] == (41,)
+
+
+def test_v2b_predecessor_gate_requires_two_exact_failed_attempts_per_v2a_spec() -> None:
+    connection = _Connection(_predecessor_rows(BAR_STATE_V2B_PROFILE))
+
+    report = _require_clean_bar_state_predecessor_connection(
+        connection,  # type: ignore[arg-type]
+        successor_profile=BAR_STATE_V2B_PROFILE,
+    )
+
+    assert report == BarStatePredecessorGateReport(
+        predecessor_campaign_id=41,
+        predecessor_experiment_id=43,
+        candidate_count=12,
+        failed_attempt_count=24,
+        linked_artifact_count=0,
+    )
+    assert connection.calls[0][1] == (
+        BAR_STATE_V2A_PROFILE.campaign_key,
+        BAR_STATE_V2A_PROFILE.experiment_key,
+    )
+    assert connection.calls[2][1] == ([1, 2], 41, 43)
+    assert "a.result_summary = jsonb_build_object" in connection.calls[2][0]
 
 
 @pytest.mark.parametrize(
@@ -130,7 +163,7 @@ def test_v2a_predecessor_gate_requires_exact_failed_v2_without_research_evidence
         (1, "invalid_binding_count", 1, BarStateRegistryDriftError, "drifted"),
         (2, "failed_count", 11, BarStateRegistryDriftError, "drifted"),
         (2, "exact_failed_count", 11, BarStateRegistryDriftError, "drifted"),
-        (3, "linked_artifact_count", 1, BarStateRegistryStateError, "research evidence"),
+        (3, "linked_artifact_count", 1, BarStateRegistryStateError, "governed evidence"),
     ],
 )
 def test_v2a_predecessor_gate_rejects_any_identity_lifecycle_or_evidence_drift(
@@ -151,8 +184,31 @@ def test_v2a_predecessor_gate_rejects_any_identity_lifecycle_or_evidence_drift(
 
 
 def test_predecessor_gate_is_not_available_to_the_immutable_v2_profile() -> None:
-    with pytest.raises(BarStateRegistryError, match="exact V2 predecessor gate"):
+    with pytest.raises(BarStateRegistryError, match="exact predecessor gate"):
         _require_clean_bar_state_predecessor_connection(
             _Connection([]),  # type: ignore[arg-type]
             successor_profile=BAR_STATE_V2_PROFILE,
+        )
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("attempt_count", 23),
+        ("failed_count", 23),
+        ("exact_failed_count", 23),
+        ("distinct_spec_attempt_count", 23),
+    ],
+)
+def test_v2b_predecessor_gate_rejects_missing_or_malformed_second_attempt(
+    field: str,
+    value: int,
+) -> None:
+    rows = _predecessor_rows(BAR_STATE_V2B_PROFILE)
+    rows[2][field] = value
+
+    with pytest.raises(BarStateRegistryDriftError, match="drifted"):
+        _require_clean_bar_state_predecessor_connection(
+            _Connection(rows),  # type: ignore[arg-type]
+            successor_profile=BAR_STATE_V2B_PROFILE,
         )
