@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pyarrow as pa
@@ -15,6 +16,7 @@ from systematic_fx.research.bar_state_artifacts import (
     BarStateArtifactError,
     BarStateArtifactLineage,
     BarStateDiscoveryScope,
+    bar_state_artifact_root,
     bar_state_global_result_projection,
     bar_state_model_package_projection,
     bar_state_price_policy_from_selection,
@@ -27,14 +29,24 @@ from systematic_fx.research.bar_state_artifacts import (
     publish_bar_state_parquet,
     validate_bar_state_global_bootstrap,
 )
-from systematic_fx.research.hypotheses import canonical_json_bytes
+from systematic_fx.research.bar_state_config import (
+    BAR_STATE_V2_PROFILE,
+    BAR_STATE_V2A_PROFILE,
+    BarStateCampaignProfile,
+)
+from systematic_fx.research.bar_state_model import BAR_STATE_V2A_MODEL_HYPERPARAMETERS
+from systematic_fx.research.hypotheses import canonical_json_bytes, canonical_sha256
 
 
-def _lineage(**overrides: object) -> BarStateArtifactLineage:
+def _lineage(
+    *,
+    profile: BarStateCampaignProfile = BAR_STATE_V2_PROFILE,
+    **overrides: object,
+) -> BarStateArtifactLineage:
     values: dict[str, object] = {
-        "config_file_sha256": "1" * 64,
-        "config_semantic_sha256": "2" * 64,
-        "candidate_catalog_sha256": "3" * 64,
+        "config_file_sha256": profile.config_file_sha256,
+        "config_semantic_sha256": profile.config_semantic_sha256,
+        "candidate_catalog_sha256": profile.candidate_catalog_sha256,
         "training_plan_sha256": "4" * 64,
         "code_snapshot_sha256": "5" * 64,
         "dependency_lock_sha256": "6" * 64,
@@ -187,6 +199,73 @@ def test_json_model_requires_canonical_non_executable_document(tmp_path: Path) -
         )
 
 
+def test_v2a_artifact_namespace_is_disjoint_and_requires_its_exact_profile(
+    tmp_path: Path,
+) -> None:
+    document = {
+        "candidate_key": "bsv2_tf0300_fsmorphology_cm005",
+        "schema": BAR_STATE_ARTIFACT_SCHEMA_BY_KIND["MODEL"],
+    }
+    artifact = publish_bar_state_json(
+        tmp_path,
+        kind="MODEL",
+        artifact_key_suffix="tf0300_fsmorphology_cm005",
+        document=document,
+        record_count=1,
+        lineage=_lineage(
+            profile=BAR_STATE_V2A_PROFILE,
+            candidate_key="bsv2_tf0300_fsmorphology_cm005",
+            candidate_definition_sha256="9" * 64,
+            run_fingerprint="a" * 64,
+        ),
+        logical_identity={"candidate_key": "bsv2_tf0300_fsmorphology_cm005"},
+        profile=BAR_STATE_V2A_PROFILE,
+    )
+
+    assert artifact.descriptor.artifact_type == BAR_STATE_V2A_PROFILE.artifact_type
+    assert artifact.descriptor.artifact_key.startswith("bar_state_conditional_v2a:model:")
+    assert artifact.path.is_relative_to(tmp_path / bar_state_artifact_root(BAR_STATE_V2A_PROFILE))
+    assert (
+        load_verified_bar_state_json(
+            tmp_path,
+            artifact,
+            profile=BAR_STATE_V2A_PROFILE,
+        )
+        == document
+    )
+    with pytest.raises(BarStateArtifactError, match="campaign or schema"):
+        load_verified_bar_state_json(tmp_path, artifact)
+
+    with pytest.raises(BarStateArtifactError, match="lineage differs"):
+        publish_bar_state_json(
+            tmp_path,
+            kind="MODEL",
+            artifact_key_suffix="forged_v2_lineage",
+            document=document,
+            record_count=1,
+            lineage=_lineage(),
+            logical_identity={"candidate_key": "bsv2_tf0300_fsmorphology_cm005"},
+            profile=BAR_STATE_V2A_PROFILE,
+        )
+
+    forged_lineage = _lineage().as_dict()
+    forged_logical = {
+        **artifact.descriptor.logical_identity,
+        "lineage": forged_lineage,
+        "lineage_sha256": canonical_sha256(forged_lineage),
+    }
+    forged = replace(
+        artifact,
+        descriptor=replace(artifact.descriptor, logical_identity=forged_logical),
+    )
+    with pytest.raises(BarStateArtifactError, match="profile lineage"):
+        load_verified_bar_state_json(
+            tmp_path,
+            forged,
+            profile=BAR_STATE_V2A_PROFILE,
+        )
+
+
 def test_terminal_compact_summary_is_exactly_projected_from_immutable_result() -> None:
     document = _terminal_document()
     assert bar_state_terminal_compact_summary(document) == document["compact_summary"]
@@ -299,6 +378,67 @@ def test_model_package_projection_requires_exact_three_inner_and_optional_one_fi
             expected_candidate_key=candidate_key,
             expected_binding=binding,
         )
+
+
+def test_v2a_model_package_requires_the_50k_campaign_decoder() -> None:
+    from tests.integration.test_bar_state_registry_postgres import (
+        _gate_model_package_document,
+    )
+
+    candidate_key = "bsv2_tf0300_fsmorphology_cm005"
+    document, _binding = _gate_model_package_document(candidate_key, selected=False)
+    v2a_document = json.loads(json.dumps(document))
+    for wrapper in v2a_document["fold_models"]:
+        wrapper["model"]["hyperparameters"] = BAR_STATE_V2A_MODEL_HYPERPARAMETERS.as_dict()
+        wrapper["model_sha256"] = hashlib.sha256(
+            canonical_json_bytes(wrapper["model"]) + b"\n"
+        ).hexdigest()
+
+    projection = bar_state_model_package_projection(
+        v2a_document,
+        expected_candidate_key=candidate_key,
+        expected_binding=None,
+        profile=BAR_STATE_V2A_PROFILE,
+    )
+    assert projection.record_count == 3
+    with pytest.raises(BarStateArtifactError, match="strict decoding"):
+        bar_state_model_package_projection(
+            v2a_document,
+            expected_candidate_key=candidate_key,
+            expected_binding=None,
+        )
+
+
+def test_v2a_global_models_require_the_50k_campaign_decoder() -> None:
+    from systematic_fx.research.bar_state_run import load_prepared_bar_state_run
+    from tests.integration.test_bar_state_registry_postgres import (
+        _gate_full_global_document,
+    )
+
+    prepared = load_prepared_bar_state_run(Path.cwd(), profile=BAR_STATE_V2A_PROFILE)
+    document = _gate_full_global_document(prepared.candidate_keys)
+    discovery = document["discovery_result"]
+    model_sha256_by_group: dict[tuple[int, str], str] = {}
+    for wrapper in discovery["discovery_final_fit_models"]:
+        wrapper["model"]["hyperparameters"] = BAR_STATE_V2A_MODEL_HYPERPARAMETERS.as_dict()
+        wrapper["model_sha256"] = hashlib.sha256(
+            canonical_json_bytes(wrapper["model"]) + b"\n"
+        ).hexdigest()
+        model_sha256_by_group[(wrapper["timeframe_seconds"], wrapper["feature_set_id"])] = wrapper[
+            "model_sha256"
+        ]
+    for binding in discovery["discovery_finalist_model_bindings"]:
+        binding["model_sha256"] = model_sha256_by_group[
+            (binding["timeframe_seconds"], binding["feature_set_id"])
+        ]
+
+    projection = bar_state_global_result_projection(
+        document,
+        profile=BAR_STATE_V2A_PROFILE,
+    )
+    assert projection.finalist_keys == tuple(discovery["finalist_keys"])
+    with pytest.raises(BarStateArtifactError, match="strict decoding"):
+        bar_state_global_result_projection(document)
 
 
 def test_global_projection_rejects_empty_duplicate_and_inconsistent_evidence() -> None:

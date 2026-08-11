@@ -20,6 +20,7 @@ from systematic_fx.db.bar_state_registry import (
 from systematic_fx.features.bars import TradeBar
 from systematic_fx.research import bar_state_run
 from systematic_fx.research.bar_state_artifacts import bar_state_price_policy_from_selection
+from systematic_fx.research.bar_state_config import BAR_STATE_V2A_PROFILE
 from systematic_fx.research.bar_state_features import (
     FEATURE_NAMES_BY_SET,
     BarStateFeatureRow,
@@ -46,6 +47,7 @@ from systematic_fx.research.bar_state_run import (
     _fit_models_and_build_signals,
     _load_partition_bars,
     _trade_arrow_schema,
+    _trade_spool_directory,
     _validate_duplicate_consensus,
     _validate_engine_result,
     _validate_final_fit_bindings,
@@ -294,6 +296,70 @@ def test_all_twelve_run_specs_bind_exact_candidate_policies(prepared) -> None:
         )
 
 
+def test_v2a_plan_uses_disjoint_identity_50k_candidates_and_checkpoint_namespace(
+    prepared,
+    tmp_path: Path,
+) -> None:
+    v2a = load_prepared_bar_state_run(ROOT, profile=BAR_STATE_V2A_PROFILE)
+    v2_specs = build_bar_state_run_specs(prepared, _provenance())
+    v2a_specs = build_bar_state_run_specs(v2a, _provenance())
+
+    assert v2a.profile == BAR_STATE_V2A_PROFILE
+    assert v2a.config.candidate_catalog_sha256 == BAR_STATE_V2A_PROFILE.candidate_catalog_sha256
+    assert {item.model_max_iter for item in v2a.config.candidates} == {50_000}
+    assert {item.campaign_id for item in v2a_specs} == {BAR_STATE_V2A_PROFILE.campaign_key}
+    assert {item.experiment_id for item in v2a_specs} == {BAR_STATE_V2A_PROFILE.experiment_key}
+    assert {item.engine_version for item in v2a_specs} == {BAR_STATE_V2A_PROFILE.engine_version}
+    assert {item.fingerprint for item in v2_specs}.isdisjoint(
+        {item.fingerprint for item in v2a_specs}
+    )
+
+    isolated = replace(v2a, data_root=tmp_path / "data")
+    checkpoint = _trade_spool_directory(isolated)
+    assert checkpoint == (
+        tmp_path
+        / "data"
+        / "derived"
+        / "bar_patterns"
+        / "checkpoints"
+        / BAR_STATE_V2A_PROFILE.campaign_key
+    )
+
+
+def test_v2a_predecessor_gate_runs_before_provenance_or_publication() -> None:
+    v2a = load_prepared_bar_state_run(ROOT, profile=BAR_STATE_V2A_PROFILE)
+    state: list[str] = []
+
+    def reject_predecessor(*args, **kwargs):
+        del args
+        assert kwargs == {"successor_profile": BAR_STATE_V2A_PROFILE}
+        state.append("PREDECESSOR")
+        raise BarStateRegistryError("predecessor rejected")
+
+    def forbidden(*args, **kwargs):
+        del args, kwargs
+        state.append("FORBIDDEN")
+        raise AssertionError("provenance/publication ran before predecessor gate")
+
+    services = replace(
+        bar_state_run._default_services(),
+        require_predecessor=reject_predecessor,
+        git_head=forbidden,
+        publish_json=forbidden,
+        publish_parquet=forbidden,
+        publish_parquet_file=forbidden,
+    )
+    with pytest.raises(bar_state_run.BarStateRunError, match="Discovery failed") as failure:
+        execute_prepared_bar_state_run(
+            v2a,
+            mode="RUN",
+            database_url="postgresql://not-opened",
+            services=services,
+        )
+    assert isinstance(failure.value.__cause__, BarStateRegistryError)
+    assert state == ["PREDECESSOR"]
+
+
 def test_registry_definition_rejects_self_consistent_but_unapproved_identity(
     prepared,
 ) -> None:
@@ -383,8 +449,9 @@ def test_fold_models_build_chronological_oos_signals_with_separate_dates(
     features, label_lookups = _synthetic_feature_labels(prepared)
     fit_calls: list[tuple[str, tuple[date, ...]]] = []
 
-    def fake_fit(rows, labels, *, model_id):
+    def fake_fit(rows, labels, *, model_id, hyperparameters):
         assert len(rows) == len(labels)
+        assert hyperparameters.max_iter == 5_000
         fit_calls.append((model_id, tuple(item.source_date for item in rows)))
         return _AlwaysLongModel(model_id)
 
@@ -434,8 +501,9 @@ def test_final_fit_is_group_deduplicated_and_uses_469_with_489_maturity(
     )
     fit_calls: list[tuple[date, ...]] = []
 
-    def fake_fit(rows, labels, *, model_id):
+    def fake_fit(rows, labels, *, model_id, hyperparameters):
         assert len(rows) == len(labels)
+        assert hyperparameters.max_iter == 5_000
         assert model_id == "bsv2_tf0300_fsmorphology_discovery_final_fit"
         fit_calls.append(tuple(item.source_date for item in rows))
         return _AlwaysLongModel(model_id)

@@ -43,23 +43,24 @@ from systematic_fx.research.bar_artifacts import (
 )
 from systematic_fx.research.bar_state_artifacts import (
     BAR_STATE_ARTIFACT_SCHEMA_BY_KIND,
-    BAR_STATE_ARTIFACT_TYPE,
     BAR_STATE_BAR_DATASET_MANIFEST_SHA256,
-    BAR_STATE_CAMPAIGN_KEY,
     BAR_STATE_RAW_SOURCE_MANIFEST_SHA256,
     BAR_STATE_SPLIT_PLAN_SHA256,
     BarStateArtifactError,
     BarStateArtifactKind,
     bar_state_candidate_selection_projection,
     bar_state_global_result_projection,
+    bar_state_lineage_matches_profile,
     bar_state_model_package_projection,
     bar_state_terminal_compact_summary,
     frozen_bar_state_discovery_scope,
     load_verified_bar_state_json,
 )
 from systematic_fx.research.bar_state_config import (
-    BAR_STATE_CONFIG_FILE_SHA256,
-    BAR_STATE_CONFIG_SEMANTIC_SHA256,
+    BAR_STATE_V2_PROFILE,
+    BAR_STATE_V2A_PROFILE,
+    BarStateCampaignProfile,
+    require_bar_state_campaign_profile,
 )
 from systematic_fx.research.hypotheses import canonical_json_bytes, canonical_sha256
 from systematic_fx.research.run_spec import RunSpec
@@ -69,12 +70,14 @@ from systematic_fx.validation.bar_state_splits import BAR_STATE_FROZEN_SPLIT_SHA
 BAR_STATE_CANDIDATE_COUNT: Final = 12
 BAR_STATE_FINALIST_BUDGET: Final = 4
 BAR_STATE_DATASET_KEY: Final = "glbx_mdp3_mbp_10_6e_fut_v1"
-BAR_STATE_EXPERIMENT_KEY: Final = f"{BAR_STATE_CAMPAIGN_KEY}:experiment:frozen_candidate_catalog:v1"
+BAR_STATE_CAMPAIGN_KEY: Final = BAR_STATE_V2_PROFILE.campaign_key
+BAR_STATE_ARTIFACT_TYPE: Final = BAR_STATE_V2_PROFILE.artifact_type
+BAR_STATE_EXPERIMENT_KEY: Final = BAR_STATE_V2_PROFILE.experiment_key
 BAR_STATE_REGISTRATION_SCHEMA: Final = BAR_STATE_ARTIFACT_SCHEMA_BY_KIND["REGISTRATION"]
 BAR_STATE_CAMPAIGN_DEFINITION_SCHEMA: Final = "systematic_fx.bar_state_campaign_definition.v1"
 BAR_STATE_TRIAL_PARAMETERS_SCHEMA: Final = "systematic_fx.bar_state_trial_parameters.v1"
 BAR_STATE_TERMINAL_SUMMARY_SCHEMA: Final = "systematic_fx.bar_state_terminal_summary.v1"
-BAR_STATE_ENGINE_VERSION: Final = "bar_state_conditional_discovery_v2"
+BAR_STATE_ENGINE_VERSION: Final = BAR_STATE_V2_PROFILE.engine_version
 BAR_STATE_FEATURE_VERSION: Final = "bar_state_features_v1"
 BAR_STATE_OUTCOME_VERSION: Final = "bar_state_twenty_day_first_touch_labels_v1"
 BAR_STATE_COST_VERSION: Final = "BAR_TRADE_ONLY_COSTS_V1"
@@ -85,12 +88,8 @@ BAR_STATE_ELIGIBLE_CALENDAR_SHA256: Final = (
     "a8b57ad2ffcb68accc0e792c08082cf51090b87bf963800178f88dd27af9da14"
 )
 BAR_STATE_RANDOM_SEED: Final = 20_260_809
-BAR_STATE_CANDIDATE_CATALOG_SHA256: Final = (
-    "3e24dc08e9027ec604b5ab433368a54c4f7a4c89577599b79de372f62262120d"
-)
-BAR_STATE_CAMPAIGN_DEFINITION_SHA256: Final = (
-    "4502e2ec1c40f344fce27066223a25e6b2f7456736e09fe0d96faab4171134f9"
-)
+BAR_STATE_CANDIDATE_CATALOG_SHA256: Final = BAR_STATE_V2_PROFILE.candidate_catalog_sha256
+BAR_STATE_CAMPAIGN_DEFINITION_SHA256: Final = BAR_STATE_V2_PROFILE.campaign_definition_sha256
 
 BarStateArtifactRole = Literal[
     "FEATURE",
@@ -224,8 +223,10 @@ class BarStateRegistryDefinition:
     training_plan: Mapping[str, object]
     training_plan_sha256: str
     candidates: tuple[Mapping[str, object], ...]
+    profile: BarStateCampaignProfile = BAR_STATE_V2_PROFILE
 
     def __post_init__(self) -> None:
+        profile = require_bar_state_campaign_profile(self.profile)
         for field in (
             "config_file_sha256",
             "config_semantic_sha256",
@@ -235,15 +236,18 @@ class BarStateRegistryDefinition:
         ):
             _sha256(getattr(self, field), label=field)
         approved_identities = {
-            "campaign_definition_sha256": BAR_STATE_CAMPAIGN_DEFINITION_SHA256,
-            "candidate_catalog_sha256": BAR_STATE_CANDIDATE_CATALOG_SHA256,
-            "config_file_sha256": BAR_STATE_CONFIG_FILE_SHA256,
-            "config_semantic_sha256": BAR_STATE_CONFIG_SEMANTIC_SHA256,
+            "campaign_definition_sha256": profile.campaign_definition_sha256,
+            "candidate_catalog_sha256": profile.candidate_catalog_sha256,
+            "config_file_sha256": profile.config_file_sha256,
+            "config_semantic_sha256": profile.config_semantic_sha256,
             "training_plan_sha256": BAR_STATE_FROZEN_SPLIT_SHA256,
         }
         for field, expected in approved_identities.items():
             if getattr(self, field) != expected:
-                raise BarStateRegistryError(f"{field} differs from the approved v2 preregistration")
+                raise BarStateRegistryError(
+                    f"{field} differs from the approved {profile.version_id.lower()} "
+                    "preregistration"
+                )
         campaign = _canonical_mapping(self.campaign_definition, label="campaign_definition")
         training = _canonical_mapping(self.training_plan, label="training_plan")
         if canonical_sha256(campaign) != self.campaign_definition_sha256:
@@ -270,6 +274,7 @@ class BarStateRegistryDefinition:
         object.__setattr__(self, "campaign_definition", campaign)
         object.__setattr__(self, "training_plan", training)
         object.__setattr__(self, "candidates", canonical_candidates)
+        object.__setattr__(self, "profile", profile)
 
     @property
     def candidate_keys(self) -> tuple[str, ...]:
@@ -293,6 +298,17 @@ class BarStateCampaignRegistrationReport:
     created_campaign: bool
     created_experiment: bool
     created_trials: int
+
+
+@dataclass(frozen=True, slots=True)
+class BarStatePredecessorGateReport:
+    """Metadata-only proof that V2A amends one cleanly failed V2 campaign."""
+
+    predecessor_campaign_id: int
+    predecessor_experiment_id: int
+    candidate_count: int
+    failed_attempt_count: int
+    linked_artifact_count: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -516,6 +532,215 @@ def _experiment_documents(
     )
 
 
+def _require_clean_bar_state_predecessor_connection(
+    connection: psycopg.Connection[dict[str, Any]],
+    *,
+    successor_profile: BarStateCampaignProfile,
+) -> BarStatePredecessorGateReport:
+    successor = require_bar_state_campaign_profile(successor_profile)
+    predecessor = BAR_STATE_V2_PROFILE
+    if (
+        successor != BAR_STATE_V2A_PROFILE
+        or successor.amends_campaign_key != predecessor.campaign_key
+        or successor.predecessor_campaign_definition_sha256
+        != predecessor.campaign_definition_sha256
+        or successor.predecessor_code_commit is None
+        or successor.predecessor_gate_policy
+        != "REQUIRE_EXACT_FAILED_PREDECESSOR_WITH_NO_OOS_EVIDENCE"
+    ):
+        raise BarStateRegistryError("campaign profile lacks the exact V2 predecessor gate")
+
+    identity = connection.execute(
+        """
+        SELECT c.campaign_id, c.campaign_key, c.name, c.status, c.data_manifest_sha256,
+               c.feature_version, c.outcome_version, c.cost_model_version,
+               c.execution_model_version, c.code_commit, c.config_sha256,
+               c.trial_budget, c.finalist_budget, c.frozen_at,
+               c.holdout_revealed_at, c.closed_at,
+               d.dataset_key, d.manifest_sha256 AS raw_manifest_sha256,
+               d.status AS dataset_status,
+               e.experiment_id, e.experiment_key, e.status AS experiment_status,
+               e.primary_family, e.model_family, e.direction,
+               e.trial_budget AS experiment_trial_budget,
+               e.trials_registered, e.frozen_at AS experiment_frozen_at,
+               e.completed_at,
+               registration.artifact_type AS registration_artifact_type,
+               registration.metadata #>> '{artifact_schema}' AS registration_schema,
+               registration.metadata #>> '{logical_identity,artifact_kind}'
+                   AS registration_kind,
+               registration.metadata #>> '{logical_identity,campaign_key}'
+                   AS registration_campaign_key
+        FROM systematic_fx.campaigns AS c
+        JOIN systematic_fx.datasets AS d ON d.dataset_id = c.dataset_id
+        JOIN systematic_fx.experiments AS e ON e.campaign_id = c.campaign_id
+        JOIN systematic_fx.artifacts AS registration
+          ON registration.artifact_id = e.registration_artifact_id
+        WHERE c.campaign_key = %s AND e.experiment_key = %s
+        FOR SHARE OF c, e
+        """,
+        (predecessor.campaign_key, predecessor.experiment_key),
+    ).fetchone()
+    identity = _row_or_error(identity, label="V2 predecessor campaign")
+    _assert_fields(
+        label="V2 predecessor campaign",
+        row=identity,
+        expected={
+            "campaign_key": predecessor.campaign_key,
+            "name": predecessor.campaign_name,
+            "status": "FROZEN",
+            "data_manifest_sha256": BAR_STATE_BAR_DATASET_MANIFEST_SHA256,
+            "feature_version": BAR_STATE_FEATURE_VERSION,
+            "outcome_version": BAR_STATE_OUTCOME_VERSION,
+            "cost_model_version": BAR_STATE_COST_VERSION,
+            "execution_model_version": BAR_STATE_EXECUTION_VERSION,
+            "code_commit": successor.predecessor_code_commit,
+            "config_sha256": successor.predecessor_campaign_definition_sha256,
+            "trial_budget": BAR_STATE_CANDIDATE_COUNT,
+            "finalist_budget": BAR_STATE_FINALIST_BUDGET,
+            "holdout_revealed_at": None,
+            "closed_at": None,
+            "dataset_key": BAR_STATE_DATASET_KEY,
+            "raw_manifest_sha256": BAR_STATE_RAW_SOURCE_MANIFEST_SHA256,
+            "experiment_key": predecessor.experiment_key,
+            "experiment_status": "FROZEN",
+            "primary_family": "CONDITIONAL_BAR_STATE_MODEL",
+            "model_family": "ELASTIC_NET_MULTINOMIAL_LOGISTIC",
+            "direction": "BOTH",
+            "experiment_trial_budget": BAR_STATE_CANDIDATE_COUNT,
+            "trials_registered": BAR_STATE_CANDIDATE_COUNT,
+            "completed_at": None,
+            "registration_artifact_type": predecessor.artifact_type,
+            "registration_schema": BAR_STATE_REGISTRATION_SCHEMA,
+            "registration_kind": "REGISTRATION",
+            "registration_campaign_key": predecessor.campaign_key,
+        },
+    )
+    if (
+        identity["frozen_at"] is None
+        or identity["experiment_frozen_at"] is None
+        or identity["dataset_status"] in {"REJECTED", "RETIRED"}
+    ):
+        raise BarStateRegistryStateError("V2 predecessor is not frozen and available")
+
+    experiment_id = int(identity["experiment_id"])
+    catalog = connection.execute(
+        """
+        SELECT count(*)::integer AS trial_count,
+               count(*) FILTER (WHERE t.status = 'REGISTERED')::integer
+                   AS registered_count,
+               count(*) FILTER (WHERE t.research_run_spec_id IS NOT NULL)::integer
+                   AS bound_count,
+               count(*) FILTER (
+                   WHERE t.research_run_spec_id IS NULL
+                      OR NOT systematic_fx.bar_state_run_spec_matches_trial(
+                          t.research_run_spec_id, t.experiment_trial_id
+                      )
+               )::integer AS invalid_binding_count,
+               count(DISTINCT t.trial_key)::integer AS distinct_candidate_count,
+               count(DISTINCT r.research_run_spec_id)::integer AS distinct_spec_count,
+               (
+                   SELECT count(*)::integer
+                   FROM systematic_fx.research_run_specs AS all_specs
+                   WHERE all_specs.experiment_id = %s
+               ) AS total_experiment_spec_count
+        FROM systematic_fx.experiment_trials AS t
+        LEFT JOIN systematic_fx.research_run_specs AS r
+          ON r.research_run_spec_id = t.research_run_spec_id
+        WHERE t.experiment_id = %s
+        """,
+        (experiment_id, experiment_id),
+    ).fetchone()
+    catalog = _row_or_error(catalog, label="V2 predecessor candidate catalog")
+    _assert_fields(
+        label="V2 predecessor candidate catalog",
+        row=catalog,
+        expected={
+            "trial_count": BAR_STATE_CANDIDATE_COUNT,
+            "registered_count": BAR_STATE_CANDIDATE_COUNT,
+            "bound_count": BAR_STATE_CANDIDATE_COUNT,
+            "invalid_binding_count": 0,
+            "distinct_candidate_count": BAR_STATE_CANDIDATE_COUNT,
+            "distinct_spec_count": BAR_STATE_CANDIDATE_COUNT,
+            "total_experiment_spec_count": BAR_STATE_CANDIDATE_COUNT,
+        },
+    )
+
+    attempts = connection.execute(
+        """
+        SELECT count(*)::integer AS attempt_count,
+               count(*) FILTER (WHERE a.status = 'FAILED')::integer AS failed_count,
+               count(*) FILTER (
+                   WHERE a.attempt_number = 1
+                     AND a.result_artifact_id IS NULL
+                     AND a.trade_ledger_artifact_id IS NULL
+                     AND a.reused_attempt_id IS NULL
+                     AND a.finished_at IS NOT NULL
+                     AND btrim(COALESCE(a.error_message, '')) <> ''
+               )::integer AS exact_failed_count,
+               count(DISTINCT a.research_run_spec_id)::integer AS distinct_spec_count
+        FROM systematic_fx.research_run_attempts AS a
+        JOIN systematic_fx.research_run_specs AS r
+          ON r.research_run_spec_id = a.research_run_spec_id
+        WHERE r.campaign_id = %s AND r.experiment_id = %s
+        """,
+        (identity["campaign_id"], experiment_id),
+    ).fetchone()
+    attempts = _row_or_error(attempts, label="V2 predecessor failed attempts")
+    _assert_fields(
+        label="V2 predecessor failed attempts",
+        row=attempts,
+        expected={
+            "attempt_count": BAR_STATE_CANDIDATE_COUNT,
+            "failed_count": BAR_STATE_CANDIDATE_COUNT,
+            "exact_failed_count": BAR_STATE_CANDIDATE_COUNT,
+            "distinct_spec_count": BAR_STATE_CANDIDATE_COUNT,
+        },
+    )
+
+    link_row = connection.execute(
+        """
+        SELECT count(*)::integer AS linked_artifact_count
+        FROM systematic_fx.bar_state_artifact_links
+        WHERE campaign_id = %s
+          AND artifact_role IN (
+              'FEATURE', 'LABEL', 'MODEL', 'OOS_TRADE',
+              'GLOBAL_RESULT', 'TERMINAL_RESULT'
+          )
+        """,
+        (identity["campaign_id"],),
+    ).fetchone()
+    link_row = _row_or_error(link_row, label="V2 predecessor artifact links")
+    if link_row["linked_artifact_count"] != 0:
+        raise BarStateRegistryStateError("V2 predecessor has linked research evidence")
+
+    return BarStatePredecessorGateReport(
+        predecessor_campaign_id=int(identity["campaign_id"]),
+        predecessor_experiment_id=experiment_id,
+        candidate_count=BAR_STATE_CANDIDATE_COUNT,
+        failed_attempt_count=BAR_STATE_CANDIDATE_COUNT,
+        linked_artifact_count=0,
+    )
+
+
+@_translate_psycopg_errors("bar-state predecessor gate")
+def require_clean_bar_state_predecessor(
+    database_url: str,
+    *,
+    successor_profile: BarStateCampaignProfile = BAR_STATE_V2A_PROFILE,
+) -> BarStatePredecessorGateReport:
+    """Prove from control-plane metadata that V2A follows only the clean failed V2 run."""
+
+    url = _nonempty(database_url, label="database_url")
+    selected = require_bar_state_campaign_profile(successor_profile)
+    with psycopg.connect(url, row_factory=dict_row) as connection:
+        _set_serializable(connection)
+        with connection.transaction():
+            return _require_clean_bar_state_predecessor_connection(
+                connection,
+                successor_profile=selected,
+            )
+
+
 @_translate_psycopg_errors("bar-state campaign registration")
 def register_bar_state_campaign(
     database_url: str,
@@ -530,17 +755,21 @@ def register_bar_state_campaign(
 ) -> BarStateCampaignRegistrationReport:
     """Atomically freeze the campaign, split calendar, experiment, and 12 trials."""
 
+    profile = require_bar_state_campaign_profile(definition.profile)
     url = _nonempty(database_url, label="database_url")
     commit = _nonempty(code_commit, label="code_commit")
     if _GIT_OBJECT_ID.fullmatch(commit) is None:
         raise BarStateRegistryError("code_commit must be a full lowercase Git object ID")
     if split_plan.sha256 != BAR_STATE_SPLIT_PLAN_SHA256:
         raise BarStateRegistryError("bar-state campaign requires the frozen split")
-    if registration_artifact.descriptor.artifact_type != BAR_STATE_ARTIFACT_TYPE:
-        raise BarStateRegistryError("registration artifact is outside the v2 campaign root")
+    if registration_artifact.descriptor.artifact_type != profile.artifact_type:
+        raise BarStateRegistryError("registration artifact is outside the campaign root")
     logical = registration_artifact.descriptor.logical_identity
+    registration_lineage = logical.get("lineage")
     if (
         logical.get("artifact_kind") != "REGISTRATION"
+        or logical.get("campaign_key") != profile.campaign_key
+        or not bar_state_lineage_matches_profile(registration_lineage, profile=profile)
         or registration_artifact.descriptor.artifact_schema
         != BAR_STATE_ARTIFACT_SCHEMA_BY_KIND["REGISTRATION"]
     ):
@@ -558,6 +787,11 @@ def register_bar_state_campaign(
             connection.transaction(),
             open_verified_bar_artifact(project_root, registration_artifact) as held,
         ):
+            if profile.amends_campaign_key is not None:
+                _require_clean_bar_state_predecessor_connection(
+                    connection,
+                    successor_profile=profile,
+                )
             if _read_json_artifact(held.descriptor) != expected_document:
                 raise BarStateRegistryDriftError("registration artifact document drift")
             dataset = connection.execute(
@@ -599,9 +833,9 @@ def register_bar_state_campaign(
                 RETURNING campaign_id
                 """,
                 (
-                    BAR_STATE_CAMPAIGN_KEY,
+                    profile.campaign_key,
                     dataset_id,
-                    "Frozen conditional candle-state Discovery v2",
+                    profile.campaign_name,
                     split_plan.eligible_dates[0],
                     split_plan.eligible_dates[-1],
                     BAR_STATE_BAR_DATASET_MANIFEST_SHA256,
@@ -628,16 +862,16 @@ def register_bar_state_campaign(
                 WHERE campaign_key = %s
                 FOR UPDATE
                 """,
-                (BAR_STATE_CAMPAIGN_KEY,),
+                (profile.campaign_key,),
             ).fetchone()
             campaign = _row_or_error(campaign, label="bar-state campaign")
             _assert_fields(
                 label="bar-state campaign",
                 row=campaign,
                 expected={
-                    "campaign_key": BAR_STATE_CAMPAIGN_KEY,
+                    "campaign_key": profile.campaign_key,
                     "dataset_id": dataset_id,
-                    "name": "Frozen conditional candle-state Discovery v2",
+                    "name": profile.campaign_name,
                     "status": "FROZEN",
                     "selected_start_date": split_plan.eligible_dates[0],
                     "selected_end_date": split_plan.eligible_dates[-1],
@@ -687,7 +921,7 @@ def register_bar_state_campaign(
                 RETURNING experiment_id
                 """,
                 (
-                    BAR_STATE_EXPERIMENT_KEY,
+                    profile.experiment_key,
                     campaign_id,
                     "CONDITIONAL_BAR_STATE_MODEL",
                     "Completed candle state predicts next-open 20-day first-touch direction",
@@ -718,14 +952,14 @@ def register_bar_state_campaign(
                 WHERE experiment_key = %s
                 FOR UPDATE
                 """,
-                (BAR_STATE_EXPERIMENT_KEY,),
+                (profile.experiment_key,),
             ).fetchone()
             experiment = _row_or_error(experiment, label="bar-state experiment")
             _assert_fields(
                 label="bar-state experiment",
                 row=experiment,
                 expected={
-                    "experiment_key": BAR_STATE_EXPERIMENT_KEY,
+                    "experiment_key": profile.experiment_key,
                     "campaign_id": campaign_id,
                     "pattern_id": None,
                     "parent_experiment_id": None,
@@ -846,14 +1080,15 @@ def _validate_bar_state_run_spec(
     split_plan: BarSplitPlan,
     candidate_key: str,
 ) -> dict[str, object]:
+    profile = require_bar_state_campaign_profile(definition.profile)
     key = _candidate_key(candidate_key)
-    if run_spec.campaign_id != BAR_STATE_CAMPAIGN_KEY:
+    if run_spec.campaign_id != profile.campaign_key:
         raise BarStateRegistryError("RunSpec belongs to a different campaign")
-    if run_spec.experiment_id != BAR_STATE_EXPERIMENT_KEY:
+    if run_spec.experiment_id != profile.experiment_key:
         raise BarStateRegistryError("RunSpec belongs to a different experiment")
     if run_spec.run_kind != "MODEL_FIT" or run_spec.direction != "BOTH":
         raise BarStateRegistryError("bar-state candidate RunSpec must be BOTH MODEL_FIT")
-    if run_spec.engine_version != BAR_STATE_ENGINE_VERSION:
+    if run_spec.engine_version != profile.engine_version:
         raise BarStateRegistryError("bar-state engine version drift")
     if run_spec.split_sha256 != definition.training_plan_sha256:
         raise BarStateRegistryError("RunSpec nested training split drift")
@@ -967,6 +1202,7 @@ def register_bar_state_run_spec(
 ) -> RunSpecRegistration:
     """Register and atomically bind one exact candidate before outcomes."""
 
+    profile = require_bar_state_campaign_profile(definition.profile)
     key = _candidate_key(candidate_key)
     trial_parameters = _validate_bar_state_run_spec(
         run_spec,
@@ -992,7 +1228,7 @@ def register_bar_state_run_spec(
                 WHERE e.experiment_key = %s AND t.trial_key = %s
                 FOR UPDATE OF t
                 """,
-                (BAR_STATE_EXPERIMENT_KEY, key),
+                (profile.experiment_key, key),
             ).fetchone()
             trial = _row_or_error(trial, label=f"candidate trial {key}")
             _assert_fields(
@@ -1004,9 +1240,9 @@ def register_bar_state_run_spec(
                     "parameters": trial_parameters,
                     "parameters_sha256": canonical_sha256(trial_parameters),
                     "experiment_id": registration.experiment_id,
-                    "experiment_key": BAR_STATE_EXPERIMENT_KEY,
+                    "experiment_key": profile.experiment_key,
                     "campaign_id": registration.campaign_id,
-                    "campaign_key": BAR_STATE_CAMPAIGN_KEY,
+                    "campaign_key": profile.campaign_key,
                 },
             )
             if trial["status"] not in {"REGISTERED", "RUNNING", "SUCCEEDED", "REJECTED"}:
@@ -1051,9 +1287,11 @@ def register_bar_state_artifact_link(
     split_key: str,
     shard_ordinal: int,
     artifact: PublishedBarArtifact,
+    profile: BarStateCampaignProfile = BAR_STATE_V2_PROFILE,
 ) -> BarStateArtifactLinkReport:
     """Register one exact Discovery artifact against a RUNNING candidate attempt."""
 
+    selected_profile = require_bar_state_campaign_profile(profile)
     attempt_id = _positive_integer(
         research_run_attempt_id,
         label="research_run_attempt_id",
@@ -1072,10 +1310,11 @@ def register_bar_state_artifact_link(
     if not isinstance(lineage, Mapping):
         raise BarStateRegistryError("artifact lacks bar-state lineage")
     if (
-        artifact.descriptor.artifact_type != BAR_STATE_ARTIFACT_TYPE
+        artifact.descriptor.artifact_type != selected_profile.artifact_type
         or artifact.descriptor.artifact_schema != BAR_STATE_ARTIFACT_SCHEMA_BY_KIND[expected_kind]
         or logical.get("artifact_kind") != expected_kind
-        or logical.get("campaign_key") != BAR_STATE_CAMPAIGN_KEY
+        or logical.get("campaign_key") != selected_profile.campaign_key
+        or not bar_state_lineage_matches_profile(lineage, profile=selected_profile)
         or lineage.get("discovery_scope_sha256") != frozen_bar_state_discovery_scope().sha256
     ):
         raise BarStateRegistryError("artifact role or Discovery lineage drift")
@@ -1090,7 +1329,11 @@ def register_bar_state_artifact_link(
     ):
         raise BarStateRegistryError("OOS trade artifact row-count identity drift")
     if role == "MODEL":
-        model_document = load_verified_bar_state_json(project_root, artifact)
+        model_document = load_verified_bar_state_json(
+            project_root,
+            artifact,
+            profile=selected_profile,
+        )
         raw_binding = logical.get("finalist_model_binding")
         if raw_binding is not None and not isinstance(raw_binding, Mapping):
             raise BarStateRegistryError("MODEL finalist binding must be an object or null")
@@ -1098,6 +1341,7 @@ def register_bar_state_artifact_link(
             model_document,
             expected_candidate_key=key,
             expected_binding=raw_binding,
+            profile=selected_profile,
         )
         if (
             artifact.descriptor.record_count != model_projection.record_count
@@ -1112,8 +1356,15 @@ def register_bar_state_artifact_link(
             raise BarStateRegistryError("MODEL artifact semantic identity drift")
     global_projection = None
     if role == "GLOBAL_RESULT":
-        global_document = load_verified_bar_state_json(project_root, artifact)
-        global_projection = bar_state_global_result_projection(global_document)
+        global_document = load_verified_bar_state_json(
+            project_root,
+            artifact,
+            profile=selected_profile,
+        )
+        global_projection = bar_state_global_result_projection(
+            global_document,
+            profile=selected_profile,
+        )
         if (
             logical.get("candidate_evidence_slice_sha256_by_key")
             != dict(global_projection.candidate_evidence_slice_sha256_by_key)
@@ -1146,7 +1397,11 @@ def register_bar_state_artifact_link(
         ):
             raise BarStateRegistryError("global artifact semantic hash catalog drift")
     if role == "TERMINAL_RESULT":
-        terminal_document = load_verified_bar_state_json(project_root, artifact)
+        terminal_document = load_verified_bar_state_json(
+            project_root,
+            artifact,
+            profile=selected_profile,
+        )
         terminal_compact = bar_state_terminal_compact_summary(terminal_document)
         terminal_result = _canonical_mapping(
             terminal_document.get("result"), label="terminal result"
@@ -1205,7 +1460,7 @@ def register_bar_state_artifact_link(
                   AND c.campaign_key = %s
                 FOR SHARE OF a, r, t, c
                 """,
-                (attempt_id, BAR_STATE_CAMPAIGN_KEY),
+                (attempt_id, selected_profile.campaign_key),
             ).fetchone()
             identity = _row_or_error(identity, label=f"bar-state attempt {attempt_id}")
             _assert_fields(
@@ -1400,11 +1655,13 @@ def _link_manifest(rows: Sequence[Mapping[str, Any]]) -> tuple[list[dict[str, ob
 def _global_candidate_selection(
     document: Mapping[str, object],
     candidate_key: str,
+    *,
+    profile: BarStateCampaignProfile = BAR_STATE_V2_PROFILE,
 ) -> tuple[Mapping[str, object], Mapping[str, object] | None, tuple[str, ...], str, str]:
     """Extract one exact candidate selection from the immutable global result."""
 
     try:
-        projection = bar_state_global_result_projection(document)
+        projection = bar_state_global_result_projection(document, profile=profile)
     except BarStateArtifactError as error:
         raise BarStateRegistryDriftError("global result semantic contract drift") from error
     try:
@@ -1434,9 +1691,11 @@ def register_terminal_bar_state_result(
     trial_status: BarStateTrialStatus,
     decision_label: str,
     compact_summary: Mapping[str, object],
+    profile: BarStateCampaignProfile = BAR_STATE_V2_PROFILE,
 ) -> BarStateTerminalReport:
     """Atomically pair one successful computation with its terminal trial."""
 
+    selected_profile = require_bar_state_campaign_profile(profile)
     attempt_id = _positive_integer(
         research_run_attempt_id,
         label="research_run_attempt_id",
@@ -1477,7 +1736,7 @@ def register_terminal_bar_state_result(
                   AND c.campaign_key = %s
                 FOR UPDATE OF a, t
                 """,
-                (attempt_id, BAR_STATE_CAMPAIGN_KEY),
+                (attempt_id, selected_profile.campaign_key),
             ).fetchone()
             identity = _row_or_error(identity, label=f"bar-state attempt {attempt_id}")
             _assert_fields(
@@ -1540,9 +1799,21 @@ def register_terminal_bar_state_result(
             global_artifact = _artifact_from_database_row(global_row)
             model_artifact = _artifact_from_database_row(model_row)
             oos_artifact = _artifact_from_database_row(oos_row)
-            terminal_document = load_verified_bar_state_json(project_root, terminal_artifact)
-            global_document = load_verified_bar_state_json(project_root, global_artifact)
-            model_document = load_verified_bar_state_json(project_root, model_artifact)
+            terminal_document = load_verified_bar_state_json(
+                project_root,
+                terminal_artifact,
+                profile=selected_profile,
+            )
+            global_document = load_verified_bar_state_json(
+                project_root,
+                global_artifact,
+                profile=selected_profile,
+            )
+            model_document = load_verified_bar_state_json(
+                project_root,
+                model_artifact,
+                profile=selected_profile,
+            )
             projected_compact = bar_state_terminal_compact_summary(terminal_document)
             (
                 global_selection,
@@ -1550,8 +1821,15 @@ def register_terminal_bar_state_result(
                 global_finalists,
                 selection_sha256,
                 binding_sha256,
-            ) = _global_candidate_selection(global_document, key)
-            global_projection = bar_state_global_result_projection(global_document)
+            ) = _global_candidate_selection(
+                global_document,
+                key,
+                profile=selected_profile,
+            )
+            global_projection = bar_state_global_result_projection(
+                global_document,
+                profile=selected_profile,
+            )
             selection_projection_sha256 = (
                 global_projection.candidate_selection_projection_sha256_by_key[key]
             )
@@ -1574,6 +1852,7 @@ def register_terminal_bar_state_result(
                 model_document,
                 expected_candidate_key=key,
                 expected_binding=global_binding,
+                profile=selected_profile,
             )
             model_package_projection_sha256 = model_projection.sha256
             terminal_evidence_slice = {
@@ -1719,9 +1998,11 @@ def abort_bar_state_run_attempt(
     candidate_key: str,
     run_fingerprint: str,
     error_message: str,
+    profile: BarStateCampaignProfile = BAR_STATE_V2_PROFILE,
 ) -> RunAttemptState:
     """Fail one active attempt without terminalizing its reusable candidate trial."""
 
+    selected_profile = require_bar_state_campaign_profile(profile)
     attempt_id = _positive_integer(
         research_run_attempt_id,
         label="research_run_attempt_id",
@@ -1750,7 +2031,7 @@ def abort_bar_state_run_attempt(
                   AND c.campaign_key = %s
                 FOR UPDATE OF a
                 """,
-                (attempt_id, BAR_STATE_CAMPAIGN_KEY),
+                (attempt_id, selected_profile.campaign_key),
             ).fetchone()
             row = _row_or_error(row, label=f"bar-state attempt {attempt_id}")
             _assert_fields(
@@ -1792,9 +2073,11 @@ def validate_reused_bar_state_attempt(
     *,
     reservation: RunAttemptReservation,
     candidate_key: str,
+    profile: BarStateCampaignProfile = BAR_STATE_V2_PROFILE,
 ) -> BarStateReuseValidationReport:
     """Reopen and rehash every artifact before accepting an exact duplicate."""
 
+    selected_profile = require_bar_state_campaign_profile(profile)
     if reservation.execute or reservation.status != "SKIPPED_DUPLICATE":
         raise BarStateRegistryError("reservation is not an exact duplicate")
     attempt_id = _positive_integer(
@@ -1834,7 +2117,7 @@ def validate_reused_bar_state_attempt(
               AND c.campaign_key = %s
             FOR SHARE OF duplicate, source, r, c, trial
             """,
-            (attempt_id, BAR_STATE_CAMPAIGN_KEY),
+            (attempt_id, selected_profile.campaign_key),
         ).fetchone()
         identity = _row_or_error(identity, label=f"duplicate attempt {attempt_id}")
         _assert_fields(
@@ -1879,7 +2162,11 @@ def validate_reused_bar_state_attempt(
             if (
                 artifact.descriptor.identity_sha256 != row["artifact_identity_sha256"]
                 or artifact.sha256 != row["content_sha256"]
+                or artifact.descriptor.artifact_type != selected_profile.artifact_type
+                or artifact.descriptor.logical_identity.get("campaign_key")
+                != selected_profile.campaign_key
                 or not isinstance(lineage, Mapping)
+                or not bar_state_lineage_matches_profile(lineage, profile=selected_profile)
                 or canonical_sha256(lineage) != row["lineage_sha256"]
             ):
                 raise BarStateRegistryDriftError("reused artifact link identity drift")
@@ -1926,14 +2213,17 @@ def validate_reused_bar_state_attempt(
     global_document = load_verified_bar_state_json(
         project_root,
         global_evidence.artifact,
+        profile=selected_profile,
     )
     terminal_document = load_verified_bar_state_json(
         project_root,
         terminal_evidence.artifact,
+        profile=selected_profile,
     )
     model_document = load_verified_bar_state_json(
         project_root,
         model_evidence.artifact,
+        profile=selected_profile,
     )
     projected_compact = bar_state_terminal_compact_summary(terminal_document)
     compact = _canonical_mapping(summary.get("compact_summary"), label="compact_summary")
@@ -1951,8 +2241,15 @@ def validate_reused_bar_state_attempt(
         frozen_finalists,
         selection_sha256,
         binding_sha256,
-    ) = _global_candidate_selection(global_document, key)
-    global_projection = bar_state_global_result_projection(global_document)
+    ) = _global_candidate_selection(
+        global_document,
+        key,
+        profile=selected_profile,
+    )
+    global_projection = bar_state_global_result_projection(
+        global_document,
+        profile=selected_profile,
+    )
     selection_projection_sha256 = global_projection.candidate_selection_projection_sha256_by_key[
         key
     ]
@@ -1964,6 +2261,7 @@ def validate_reused_bar_state_attempt(
         model_document,
         expected_candidate_key=key,
         expected_binding=global_binding,
+        profile=selected_profile,
     )
     model_package_projection_sha256 = model_projection.sha256
     model_logical = model_evidence.artifact.descriptor.logical_identity

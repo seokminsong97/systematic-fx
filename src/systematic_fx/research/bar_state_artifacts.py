@@ -43,8 +43,15 @@ from systematic_fx.research.bar_artifacts import (
 from systematic_fx.research.bar_state_config import (
     BAR_STATE_ECONOMIC_MULTIPLIERS,
     BAR_STATE_OUTER_SPLIT_SHA256,
+    BAR_STATE_V2_PROFILE,
+    BarStateCampaignProfile,
+    require_bar_state_campaign_profile,
 )
-from systematic_fx.research.bar_state_model import BarStateModelError, CanonicalBarStateModel
+from systematic_fx.research.bar_state_model import (
+    BarStateModelError,
+    BarStateModelHyperparameters,
+    CanonicalBarStateModel,
+)
 from systematic_fx.research.hypotheses import canonical_json_bytes, canonical_sha256
 from systematic_fx.validation.bar_state_splits import (
     BAR_STATE_BOOTSTRAP_EVALUATION_CALENDAR_SCHEMA,
@@ -54,8 +61,8 @@ from systematic_fx.validation.bar_state_splits import (
     frozen_bar_state_bootstrap_evaluation_calendar,
 )
 
-BAR_STATE_CAMPAIGN_KEY: Final = "bar_state_conditional_v2"
-BAR_STATE_ARTIFACT_TYPE: Final = BAR_STATE_CAMPAIGN_KEY
+BAR_STATE_CAMPAIGN_KEY: Final = BAR_STATE_V2_PROFILE.campaign_key
+BAR_STATE_ARTIFACT_TYPE: Final = BAR_STATE_V2_PROFILE.artifact_type
 BAR_STATE_ARTIFACT_ROOT: Final = BAR_PATTERN_ARTIFACT_ROOT / BAR_STATE_ARTIFACT_TYPE
 BAR_STATE_ARTIFACT_IDENTITY_SCHEMA: Final = "systematic_fx.bar_state_artifact_lineage.v1"
 BAR_STATE_DISCOVERY_SCOPE_SCHEMA: Final = "systematic_fx.bar_state_discovery_scope.v1"
@@ -292,6 +299,22 @@ _BAR_STATE_CANDIDATE_KEY = re.compile(
 
 class BarStateArtifactError(BarArtifactError):
     """A v2 artifact or its Discovery-only lineage is invalid."""
+
+
+def bar_state_artifact_root(
+    profile: BarStateCampaignProfile = BAR_STATE_V2_PROFILE,
+) -> Path:
+    """Return one exact campaign-owned namespace; V2 remains the default."""
+
+    selected = require_bar_state_campaign_profile(profile)
+    return BAR_PATTERN_ARTIFACT_ROOT / selected.artifact_type
+
+
+def _bar_state_model_hyperparameters(
+    profile: BarStateCampaignProfile,
+) -> BarStateModelHyperparameters:
+    selected = require_bar_state_campaign_profile(profile)
+    return BarStateModelHyperparameters(max_iter=selected.model_max_iter)
 
 
 def _sha256(value: object, *, label: str) -> str:
@@ -2090,9 +2113,12 @@ class BarStateGlobalResultProjection:
 
 def bar_state_global_result_projection(
     document: Mapping[str, object],
+    *,
+    profile: BarStateCampaignProfile = BAR_STATE_V2_PROFILE,
 ) -> BarStateGlobalResultProjection:
     """Validate the exact production GLOBAL schema and finalist-model bindings."""
 
+    model_hyperparameters = _bar_state_model_hyperparameters(profile)
     outer = _canonical_mapping(document, label="global result document")
     if (
         set(outer) != {"candidate_count", "discovery_result", "schema"}
@@ -2252,7 +2278,8 @@ def bar_state_global_result_projection(
         )
         try:
             parsed_model = CanonicalBarStateModel.from_canonical_bytes(
-                canonical_json_bytes(model_body) + b"\n"
+                canonical_json_bytes(model_body) + b"\n",
+                expected_hyperparameters=model_hyperparameters,
             )
         except (BarStateModelError, TypeError, ValueError) as error:
             raise BarStateArtifactError(
@@ -2355,10 +2382,11 @@ def validate_bar_state_global_bootstrap(
     document: Mapping[str, object],
     *,
     split_plan: BarStateSplitPlan | None = None,
+    profile: BarStateCampaignProfile = BAR_STATE_V2_PROFILE,
 ) -> str:
     """Authoritatively replay GLOBAL bootstrap evidence and optionally bind its source plan."""
 
-    projection = bar_state_global_result_projection(document)
+    projection = bar_state_global_result_projection(document, profile=profile)
     if split_plan is not None:
         expected_calendar = frozen_bar_state_bootstrap_evaluation_calendar(split_plan)
         outer = _canonical_mapping(document, label="global bootstrap-bound document")
@@ -2381,9 +2409,11 @@ def bar_state_model_package_binding(
     *,
     expected_candidate_key: str,
     expected_binding: Mapping[str, object] | None,
+    profile: BarStateCampaignProfile = BAR_STATE_V2_PROFILE,
 ) -> Mapping[str, object] | None:
     """Strictly decode a candidate MODEL package and recover its final-fit binding."""
 
+    model_hyperparameters = _bar_state_model_hyperparameters(profile)
     candidate_key, timeframe, feature_set = _bar_state_candidate_dimensions(expected_candidate_key)
     outer = _canonical_mapping(document, label="candidate MODEL package")
     if (
@@ -2448,7 +2478,8 @@ def bar_state_model_package_binding(
         model_sha256 = _sha256(wrapper.get("model_sha256"), label="candidate MODEL model_sha256")
         try:
             parsed_model = CanonicalBarStateModel.from_canonical_bytes(
-                canonical_json_bytes(model_body) + b"\n"
+                canonical_json_bytes(model_body) + b"\n",
+                expected_hyperparameters=model_hyperparameters,
             )
         except (BarStateModelError, TypeError, ValueError) as error:
             raise BarStateArtifactError("candidate MODEL failed strict decoding") from error
@@ -2479,6 +2510,7 @@ def bar_state_model_package_projection(
     *,
     expected_candidate_key: str,
     expected_binding: Mapping[str, object] | None,
+    profile: BarStateCampaignProfile = BAR_STATE_V2_PROFILE,
 ) -> BarStateModelPackageProjection:
     """Verify a MODEL package and hash its exact fold/final-fit model identities."""
 
@@ -2486,6 +2518,7 @@ def bar_state_model_package_projection(
         document,
         expected_candidate_key=expected_candidate_key,
         expected_binding=expected_binding,
+        profile=profile,
     )
     outer = _canonical_mapping(document, label="candidate MODEL package projection")
     raw_models = outer["fold_models"]
@@ -2910,6 +2943,31 @@ class BarStateArtifactLineage:
         return canonical_sha256(self.as_dict())
 
 
+def bar_state_lineage_matches_profile(
+    lineage: object,
+    *,
+    profile: BarStateCampaignProfile = BAR_STATE_V2_PROFILE,
+) -> bool:
+    """Return whether immutable lineage belongs to one exact campaign profile."""
+
+    selected = require_bar_state_campaign_profile(profile)
+    values: Mapping[str, object]
+    if isinstance(lineage, BarStateArtifactLineage):
+        values = lineage.as_dict()
+    elif isinstance(lineage, Mapping):
+        values = lineage
+    else:
+        return False
+    return all(
+        values.get(field) == expected
+        for field, expected in {
+            "candidate_catalog_sha256": selected.candidate_catalog_sha256,
+            "config_file_sha256": selected.config_file_sha256,
+            "config_semantic_sha256": selected.config_semantic_sha256,
+        }.items()
+    )
+
+
 def _artifact_kind(value: object) -> BarStateArtifactKind:
     if value not in BAR_STATE_ARTIFACT_SCHEMA_BY_KIND:
         raise BarStateArtifactError(
@@ -2928,27 +2986,31 @@ def bar_state_artifact_descriptor(
     logical_identity: Mapping[str, object],
     media_type: str,
     file_suffix: str,
+    profile: BarStateCampaignProfile = BAR_STATE_V2_PROFILE,
 ) -> BarArtifactDescriptor:
     """Build one campaign-namespaced descriptor with complete lineage."""
 
+    selected_profile = require_bar_state_campaign_profile(profile)
     kind = _artifact_kind(kind)
     suffix = _canonical_key(artifact_key_suffix, label="artifact_key_suffix")
     if not isinstance(lineage, BarStateArtifactLineage):
         raise BarStateArtifactError("lineage must be BarStateArtifactLineage")
+    if not bar_state_lineage_matches_profile(lineage, profile=selected_profile):
+        raise BarStateArtifactError("artifact lineage differs from its campaign profile")
     extra = _canonical_mapping(logical_identity, label="logical_identity")
     reserved = {"artifact_kind", "campaign_key", "lineage", "lineage_sha256"}
     if reserved.intersection(extra):
         raise BarStateArtifactError("logical_identity uses a reserved lineage key")
     logical = {
         "artifact_kind": kind,
-        "campaign_key": BAR_STATE_CAMPAIGN_KEY,
+        "campaign_key": selected_profile.campaign_key,
         "lineage": lineage.as_dict(),
         "lineage_sha256": lineage.sha256,
         **dict(extra),
     }
     return BarArtifactDescriptor(
-        artifact_key=f"{BAR_STATE_CAMPAIGN_KEY}:{kind.lower()}:{suffix}",
-        artifact_type=BAR_STATE_ARTIFACT_TYPE,
+        artifact_key=f"{selected_profile.campaign_key}:{kind.lower()}:{suffix}",
+        artifact_type=selected_profile.artifact_type,
         artifact_schema=BAR_STATE_ARTIFACT_SCHEMA_BY_KIND[kind],
         artifact_version=1,
         record_count=record_count,
@@ -2968,6 +3030,7 @@ def publish_bar_state_parquet(
     table: pa.Table,
     lineage: BarStateArtifactLineage,
     logical_identity: Mapping[str, object],
+    profile: BarStateCampaignProfile = BAR_STATE_V2_PROFILE,
 ) -> PublishedBarArtifact:
     """Publish one immutable feature, label, or OOS-trade Parquet shard."""
 
@@ -2985,6 +3048,7 @@ def publish_bar_state_parquet(
         logical_identity=logical_identity,
         media_type="application/vnd.apache.parquet",
         file_suffix=".parquet",
+        profile=profile,
     )
     return publish_bar_parquet_table(project_root, descriptor, table)
 
@@ -2999,6 +3063,7 @@ def publish_bar_state_parquet_open_file(
     schema: pa.Schema,
     lineage: BarStateArtifactLineage,
     logical_identity: Mapping[str, object],
+    profile: BarStateCampaignProfile = BAR_STATE_V2_PROFILE,
 ) -> PublishedBarArtifact:
     """Publish a large caller-streamed Parquet file without materializing it."""
 
@@ -3030,6 +3095,7 @@ def publish_bar_state_parquet_open_file(
         logical_identity=logical_identity,
         media_type="application/vnd.apache.parquet",
         file_suffix=".parquet",
+        profile=profile,
     )
     return publish_bar_artifact_open_file(project_root, descriptor, source)
 
@@ -3043,6 +3109,7 @@ def publish_bar_state_json(
     record_count: int,
     lineage: BarStateArtifactLineage,
     logical_identity: Mapping[str, object],
+    profile: BarStateCampaignProfile = BAR_STATE_V2_PROFILE,
 ) -> PublishedBarArtifact:
     """Publish one canonical non-executable model or summary document."""
 
@@ -3070,6 +3137,7 @@ def publish_bar_state_json(
         logical_identity=logical_identity,
         media_type="application/json",
         file_suffix=".json",
+        profile=profile,
     )
     if kind == "CODE_SNAPSHOT":
         return publish_bar_artifact_bytes(
@@ -3084,7 +3152,9 @@ def _validate_published_kind(
     artifact: PublishedBarArtifact,
     *,
     expected_kinds: frozenset[str],
+    profile: BarStateCampaignProfile = BAR_STATE_V2_PROFILE,
 ) -> BarStateArtifactKind:
+    selected_profile = require_bar_state_campaign_profile(profile)
     if not isinstance(artifact, PublishedBarArtifact):
         raise BarStateArtifactError("artifact must be PublishedBarArtifact")
     logical = artifact.descriptor.logical_identity
@@ -3092,14 +3162,16 @@ def _validate_published_kind(
     if kind not in expected_kinds:
         raise BarStateArtifactError(f"artifact kind {kind} is not valid for this loader")
     if (
-        artifact.descriptor.artifact_type != BAR_STATE_ARTIFACT_TYPE
+        artifact.descriptor.artifact_type != selected_profile.artifact_type
         or artifact.descriptor.artifact_schema != BAR_STATE_ARTIFACT_SCHEMA_BY_KIND[kind]
-        or logical.get("campaign_key") != BAR_STATE_CAMPAIGN_KEY
+        or logical.get("campaign_key") != selected_profile.campaign_key
     ):
         raise BarStateArtifactError("published artifact campaign or schema drift")
     lineage = logical.get("lineage")
     if not isinstance(lineage, Mapping):
         raise BarStateArtifactError("published artifact lacks canonical lineage")
+    if not bar_state_lineage_matches_profile(lineage, profile=selected_profile):
+        raise BarStateArtifactError("published artifact profile lineage or schema drift")
     if logical.get("lineage_sha256") != canonical_sha256(lineage):
         raise BarStateArtifactError("published artifact lineage hash drift")
     if lineage.get("discovery_scope_sha256") != frozen_bar_state_discovery_scope().sha256:
@@ -3112,10 +3184,15 @@ def load_verified_bar_state_json(
     artifact: PublishedBarArtifact,
     *,
     maximum_bytes: int = 64 * 1024 * 1024,
+    profile: BarStateCampaignProfile = BAR_STATE_V2_PROFILE,
 ) -> dict[str, object]:
     """Reopen, rehash, and strict-decode one campaign JSON artifact."""
 
-    kind = _validate_published_kind(artifact, expected_kinds=BAR_STATE_JSON_KINDS)
+    kind = _validate_published_kind(
+        artifact,
+        expected_kinds=BAR_STATE_JSON_KINDS,
+        profile=profile,
+    )
     if isinstance(maximum_bytes, bool) or not isinstance(maximum_bytes, int) or maximum_bytes <= 0:
         raise BarStateArtifactError("maximum_bytes must be a positive integer")
     with open_verified_bar_artifact(project_root, artifact) as held:
@@ -3142,6 +3219,7 @@ def load_verified_bar_state_parquet(
     artifact: PublishedBarArtifact,
     *,
     columns: Sequence[str] | None = None,
+    profile: BarStateCampaignProfile = BAR_STATE_V2_PROFILE,
 ) -> pa.Table:
     """Reopen, rehash, and decode one complete campaign Parquet artifact.
 
@@ -3150,7 +3228,11 @@ def load_verified_bar_state_parquet(
     are always checked against the descriptor before returning.
     """
 
-    _validate_published_kind(artifact, expected_kinds=BAR_STATE_PARQUET_KINDS)
+    _validate_published_kind(
+        artifact,
+        expected_kinds=BAR_STATE_PARQUET_KINDS,
+        profile=profile,
+    )
     if columns is not None and (
         isinstance(columns, (str, bytes))
         or any(not isinstance(item, str) or not item for item in columns)

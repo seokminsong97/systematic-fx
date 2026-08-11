@@ -36,9 +36,7 @@ from systematic_fx.db.bar_registry import register_published_bar_artifact
 from systematic_fx.db.bar_state_registry import (
     BAR_STATE_COST_VERSION,
     BAR_STATE_ELIGIBLE_CALENDAR_VERSION,
-    BAR_STATE_ENGINE_VERSION,
     BAR_STATE_EXECUTION_VERSION,
-    BAR_STATE_EXPERIMENT_KEY,
     BAR_STATE_FEATURE_VERSION,
     BAR_STATE_OUTCOME_VERSION,
     BAR_STATE_SPLIT_VERSION,
@@ -51,6 +49,7 @@ from systematic_fx.db.bar_state_registry import (
     register_bar_state_campaign,
     register_bar_state_run_spec,
     register_terminal_bar_state_result,
+    require_clean_bar_state_predecessor,
     validate_reused_bar_state_attempt,
 )
 from systematic_fx.db.migrations import discover_migrations
@@ -65,7 +64,6 @@ from systematic_fx.research.bar_pipeline import (
 from systematic_fx.research.bar_state_artifacts import (
     BAR_STATE_ARTIFACT_SCHEMA_BY_KIND,
     BAR_STATE_BAR_DATASET_MANIFEST_SHA256,
-    BAR_STATE_CAMPAIGN_KEY,
     BAR_STATE_RAW_SOURCE_MANIFEST_SHA256,
     BarStateArtifactError,
     BarStateArtifactLineage,
@@ -81,9 +79,11 @@ from systematic_fx.research.bar_state_artifacts import (
     validate_bar_state_global_bootstrap,
 )
 from systematic_fx.research.bar_state_config import (
-    BAR_STATE_CONFIG_RELATIVE_PATH,
+    BAR_STATE_V2_PROFILE,
+    BarStateCampaignProfile,
     BarStateResearchConfig,
     load_bar_state_config,
+    require_bar_state_campaign_profile,
 )
 from systematic_fx.research.bar_state_features import (
     BarStateFeatureRow,
@@ -100,6 +100,7 @@ from systematic_fx.research.bar_state_labels import (
 )
 from systematic_fx.research.bar_state_model import (
     BarStateModelError,
+    BarStateModelHyperparameters,
     CanonicalBarStateModel,
     fit_bar_state_model,
 )
@@ -157,6 +158,13 @@ _GIT_OBJECT_ID = re.compile(r"(?:[0-9a-f]{40}|[0-9a-f]{64})")
 
 class BarStateRunError(RuntimeError):
     """The v2 plan, provenance, orchestration, or computation is unsafe."""
+
+
+def _model_hyperparameters(
+    profile: BarStateCampaignProfile,
+) -> BarStateModelHyperparameters:
+    selected = require_bar_state_campaign_profile(profile)
+    return BarStateModelHyperparameters(max_iter=selected.model_max_iter)
 
 
 class BarStateEngine(Protocol):
@@ -225,6 +233,10 @@ class PreparedBarStateRun:
     outer_split_plan: BarSplitPlan
     split_plan: BarStateSplitPlan
     registry_definition: BarStateRegistryDefinition
+
+    @property
+    def profile(self) -> BarStateCampaignProfile:
+        return self.config.profile
 
     @property
     def candidate_keys(self) -> tuple[str, ...]:
@@ -362,13 +374,14 @@ class BarStateResearchRunReport:
 
 @dataclass(frozen=True, slots=True)
 class BarStateRunServices:
-    load_config: Callable[[Path], BarStateResearchConfig]
+    load_config: Callable[..., BarStateResearchConfig]
     plan_splits: Callable[[Sequence[Any]], BarStateSplitPlan]
     git_head: Callable[[Path], str]
     build_snapshot: Callable[..., CodeSnapshot]
     dependency_hash: Callable[[Path], str]
     runtime: Callable[[], dict[str, object]]
     postgres_runtime: Callable[..., dict[str, object]]
+    require_predecessor: Callable[..., Any]
     register_artifact: Callable[..., Any]
     register_campaign: Callable[..., Any]
     register_spec: Callable[..., Any]
@@ -483,6 +496,7 @@ def _registry_definition(
         training_plan=split_plan.as_dict(),
         training_plan_sha256=split_plan.sha256,
         candidates=tuple(item.as_dict() for item in config.candidates),
+        profile=config.profile,
     )
 
 
@@ -490,10 +504,12 @@ def prepare_bar_state_run(
     project_root: Path | str,
     dataset: LoadedBarDatasetManifest,
     *,
+    profile: BarStateCampaignProfile = BAR_STATE_V2_PROFILE,
     services: BarStateRunServices | None = None,
 ) -> PreparedBarStateRun:
     """Build the outcome-free v2 plan and prove its Discovery-only slice."""
 
+    selected_profile = require_bar_state_campaign_profile(profile)
     root, data = _strict_project_root(project_root)
     active = services or _default_services()
     if not isinstance(dataset, LoadedBarDatasetManifest):
@@ -505,7 +521,9 @@ def prepare_bar_state_run(
         or dataset.handoff_sha256 != BAR_STATE_EXPECTED_DATASET_HANDOFF_SHA256
     ):
         raise BarStateRunError("verified bar dataset lineage differs from v2")
-    config = active.load_config(root)
+    config = active.load_config(root, profile=selected_profile)
+    if config.profile != selected_profile:
+        raise BarStateRunError("loaded config belongs to another campaign profile")
     split = active.plan_splits(dataset.eligible_active_dates)
     require_frozen_bar_state_split(split)
     if split.outer_plan.sha256 != frozen_bar_state_discovery_scope().split_plan_sha256:
@@ -536,6 +554,7 @@ def load_prepared_bar_state_run(
     project_root: Path | str,
     *,
     manifest_path: Path | None = None,
+    profile: BarStateCampaignProfile = BAR_STATE_V2_PROFILE,
     services: BarStateRunServices | None = None,
 ) -> PreparedBarStateRun:
     """Load the actual held-file-verified bar manifest, then prepare v2."""
@@ -546,7 +565,7 @@ def load_prepared_bar_state_run(
         requested,
         expected_sha256=BAR_STATE_BAR_DATASET_MANIFEST_SHA256,
     )
-    return prepare_bar_state_run(root, dataset, services=services)
+    return prepare_bar_state_run(root, dataset, profile=profile, services=services)
 
 
 def _policy_documents(candidate: Mapping[str, object]) -> dict[str, dict[str, object]]:
@@ -613,10 +632,10 @@ def build_bar_state_run_specs(
         )
         specs.append(
             RunSpec(
-                campaign_id=BAR_STATE_CAMPAIGN_KEY,
-                experiment_id=BAR_STATE_EXPERIMENT_KEY,
+                campaign_id=prepared.profile.campaign_key,
+                experiment_id=prepared.profile.experiment_key,
                 run_kind="MODEL_FIT",
-                engine_version=BAR_STATE_ENGINE_VERSION,
+                engine_version=prepared.profile.engine_version,
                 source_manifest_hashes={
                     "raw_mbp10_source_manifest_v1": prepared.dataset.source_manifest_sha256,
                     "selected_trade_bar_dataset_manifest_v1": (
@@ -681,7 +700,7 @@ def _capture_provenance(
     config_matches = tuple(
         item.sha256
         for item in snapshot.files
-        if item.relative_path == BAR_STATE_CONFIG_RELATIVE_PATH.as_posix()
+        if item.relative_path == prepared.profile.config_relative_path.as_posix()
     )
     if config_matches != (prepared.config.sha256,):
         raise BarStateRunError("code snapshot does not bind the loaded v2 config")
@@ -698,7 +717,7 @@ def _capture_provenance(
     runtime["bar_state_run"] = {
         "authorized_stage": "DISCOVERY_ONLY",
         "dataset_handoff_sha256": prepared.dataset.handoff_sha256,
-        "engine_version": BAR_STATE_ENGINE_VERSION,
+        "engine_version": prepared.profile.engine_version,
         "orchestration": "BIND_AND_START_ALL_PENDING_BEFORE_OUTCOMES",
     }
     runtime_sha = canonical_sha256(runtime)
@@ -739,6 +758,7 @@ def _publish_code_snapshot(
             "code_commit": provenance.code_commit,
             "code_snapshot_sha256": provenance.snapshot.sha256,
         },
+        profile=prepared.profile,
     )
     if artifact.sha256 != provenance.snapshot.sha256:
         raise BarStateRunError("published code snapshot bytes differ from capture")
@@ -784,6 +804,7 @@ def _publish_registration(
             "campaign_definition_sha256": prepared.config.definition_sha256,
             "candidate_catalog_sha256": prepared.config.candidate_catalog_sha256,
         },
+        profile=prepared.profile,
     )
     return artifact, document
 
@@ -1115,7 +1136,11 @@ class _TradeSpool:
 
 def _trade_spool_directory(prepared: PreparedBarStateRun) -> Path:
     directory = (
-        prepared.data_root / "derived" / "bar_patterns" / "checkpoints" / BAR_STATE_CAMPAIGN_KEY
+        prepared.data_root
+        / "derived"
+        / "bar_patterns"
+        / "checkpoints"
+        / prepared.profile.campaign_key
     )
     directory.mkdir(mode=0o755, parents=True, exist_ok=True)
     if directory.is_symlink() or not directory.is_dir():
@@ -1447,6 +1472,7 @@ def _fit_models_and_build_signals(
                 train_rows,
                 train_labels,
                 model_id=model_id,
+                hyperparameters=_model_hyperparameters(prepared.profile),
             )
             fit_count += 1
             _notify(progress, stage="MODEL_FIT_COMPLETE", completed=fit_count, total=total_fits)
@@ -1628,6 +1654,7 @@ def _fit_discovery_finalist_models(
             rows,
             labels,
             model_id=(f"bsv2_tf{timeframe:04d}_fs{feature_set_id.lower()}_discovery_final_fit"),
+            hyperparameters=_model_hyperparameters(prepared.profile),
         )
         document: Mapping[str, object] = {
             "fit_key": "discovery_final_fit",
@@ -1993,6 +2020,7 @@ def _default_services() -> BarStateRunServices:
         dependency_hash=dependency_lock_sha256,
         runtime=runtime_environment,
         postgres_runtime=_postgres_runtime,
+        require_predecessor=require_clean_bar_state_predecessor,
         register_artifact=register_published_bar_artifact,
         register_campaign=register_bar_state_campaign,
         register_spec=register_bar_state_run_spec,
@@ -2128,13 +2156,15 @@ def _verify_model_document(
     expected_model_id: str,
     expected_timeframe_seconds: int,
     expected_feature_set_id: str,
+    expected_hyperparameters: BarStateModelHyperparameters,
 ) -> CanonicalBarStateModel:
     model_object = document.get("model")
     if not isinstance(model_object, Mapping):
         raise BarStateRunError("candidate model document lacks a canonical model")
     try:
         model = CanonicalBarStateModel.from_canonical_bytes(
-            canonical_json_bytes(model_object) + b"\n"
+            canonical_json_bytes(model_object) + b"\n",
+            expected_hyperparameters=expected_hyperparameters,
         )
     except (BarStateModelError, TypeError, ValueError) as error:
         raise BarStateRunError("candidate model document failed strict decoding") from error
@@ -2161,7 +2191,8 @@ def _validate_final_fit_bindings(
                 "candidate_count": len(candidates),
                 "discovery_result": dict(global_document),
                 "schema": BAR_STATE_ARTIFACT_SCHEMA_BY_KIND["GLOBAL_RESULT"],
-            }
+            },
+            profile=prepared.profile,
         )
         finalists = tuple(global_document["finalist_keys"])  # type: ignore[arg-type]
         global_models = tuple(global_document["discovery_final_fit_models"])  # type: ignore[arg-type]
@@ -2258,6 +2289,7 @@ def _validate_final_fit_bindings(
                 ),
                 expected_timeframe_seconds=group[0],
                 expected_feature_set_id=group[1],
+                expected_hyperparameters=_model_hyperparameters(prepared.profile),
             )
         inner_package_sha256 = tuple(canonical_sha256(document) for document in inner)
         prior_inner_package = inner_package_sha256_by_group.setdefault(
@@ -2284,6 +2316,7 @@ def _validate_final_fit_bindings(
             expected_model_id=(f"bsv2_tf{group[0]:04d}_fs{group[1].lower()}_discovery_final_fit"),
             expected_timeframe_seconds=group[0],
             expected_feature_set_id=group[1],
+            expected_hyperparameters=_model_hyperparameters(prepared.profile),
         )
         model_sha256 = final_model.sha256
         existing = final_document_by_group.setdefault(group, document)
@@ -2351,6 +2384,7 @@ def _validate_engine_result(
         validate_bar_state_global_bootstrap(
             global_artifact_document,
             split_plan=prepared.split_plan,
+            profile=prepared.profile,
         )
     except BarStateArtifactError as error:
         raise BarStateRunError(
@@ -2377,6 +2411,7 @@ def _publish_parquet_payload(
         "artifact_key_suffix": payload.artifact_key_suffix,
         "lineage": lineage,
         "logical_identity": payload.logical_identity,
+        "profile": prepared.profile,
     }
     if payload.table is not None:
         return services.publish_parquet(
@@ -2595,7 +2630,10 @@ def _publish_engine_result(
         "schema": BAR_STATE_ARTIFACT_SCHEMA_BY_KIND["GLOBAL_RESULT"],
     }
     try:
-        global_projection = bar_state_global_result_projection(global_document)
+        global_projection = bar_state_global_result_projection(
+            global_document,
+            profile=prepared.profile,
+        )
     except BarStateArtifactError as error:  # pragma: no cover - validated before publication
         raise BarStateRunError(
             "validated engine GLOBAL evidence drifted before publication"
@@ -2642,6 +2680,7 @@ def _publish_engine_result(
                 expected_binding=(
                     None if finalist_binding is None else finalist_binding  # type: ignore[arg-type]
                 ),
+                profile=prepared.profile,
             )
         except BarStateArtifactError as error:  # pragma: no cover - engine output is typed
             raise BarStateRunError("candidate MODEL package semantic projection drifted") from error
@@ -2673,6 +2712,7 @@ def _publish_engine_result(
                 "model_package_projection": dict(package_projection.projection),
                 "model_package_projection_sha256": package_projection.sha256,
             },
+            profile=prepared.profile,
         )
         models[candidate.candidate_key] = model
         candidate_oos: list[tuple[BarStateParquetPayload, PublishedBarArtifact]] = []
@@ -2754,6 +2794,7 @@ def _publish_engine_result(
                 sorted(model_package_projection_sha256_by_key.items())
             ),
         },
+        profile=prepared.profile,
     )
     terminals: dict[str, PublishedBarArtifact] = {}
     for candidate in result.candidate_results:
@@ -2809,6 +2850,7 @@ def _publish_engine_result(
                 ),
                 "trial_status": candidate.trial_status,
             },
+            profile=prepared.profile,
         )
     _notify(
         progress,
@@ -2839,6 +2881,8 @@ def _abort_active_attempts(
     database_url: str,
     active_attempts: Mapping[str, _ActiveAttempt],
     services: BarStateRunServices,
+    *,
+    profile: BarStateCampaignProfile,
 ) -> tuple[str, ...]:
     failures: list[str] = []
     for candidate_key, identity in tuple(active_attempts.items()):
@@ -2849,6 +2893,7 @@ def _abort_active_attempts(
                 candidate_key=candidate_key,
                 run_fingerprint=identity.run_fingerprint,
                 error_message="Governed bar-state Discovery aborted before complete publication",
+                profile=profile,
             )
         except Exception as cleanup_error:  # noqa: BLE001 - report unresolved ledger rows
             failures.append(f"{candidate_key}:{type(cleanup_error).__name__}")
@@ -2878,6 +2923,12 @@ def execute_prepared_bar_state_run(
     active_attempts: dict[str, _ActiveAttempt] = {}
     engine_result: BarStateEngineResult | None = None
     try:
+        if prepared.profile.amends_campaign_key is not None:
+            active.require_predecessor(
+                database_url,
+                successor_profile=prepared.profile,
+            )
+            _notify(progress, stage="PREDECESSOR_GATE_VERIFIED", completed=1, total=1)
         provenance = _capture_provenance(prepared, database_url, active)
         specs = build_bar_state_run_specs(prepared, provenance)
         code_artifact = _publish_code_snapshot(prepared, provenance, specs)
@@ -2956,6 +3007,7 @@ def execute_prepared_bar_state_run(
                     prepared.project_root,
                     reservation=reservation,
                     candidate_key=candidate_key,
+                    profile=prepared.profile,
                 )
         if duplicate_reports:
             _notify(
@@ -3045,6 +3097,7 @@ def execute_prepared_bar_state_run(
                     split_key=payload.split_key,
                     shard_ordinal=payload.shard_ordinal,
                     artifact=artifact,
+                    profile=prepared.profile,
                 )
             active.link_artifact(
                 database_url,
@@ -3055,6 +3108,7 @@ def execute_prepared_bar_state_run(
                 split_key="discovery",
                 shard_ordinal=0,
                 artifact=published.models[candidate_key],
+                profile=prepared.profile,
             )
             for payload, artifact in published.oos[candidate_key]:
                 active.link_artifact(
@@ -3066,6 +3120,7 @@ def execute_prepared_bar_state_run(
                     split_key=payload.split_key,
                     shard_ordinal=payload.shard_ordinal,
                     artifact=artifact,
+                    profile=prepared.profile,
                 )
             for role, artifact in (
                 ("GLOBAL_RESULT", published.global_artifact),
@@ -3080,6 +3135,7 @@ def execute_prepared_bar_state_run(
                     split_key="discovery",
                     shard_ordinal=0,
                     artifact=artifact,
+                    profile=prepared.profile,
                 )
             terminal = active.terminalize(
                 database_url,
@@ -3089,6 +3145,7 @@ def execute_prepared_bar_state_run(
                 trial_status=candidate.trial_status,
                 decision_label=candidate.decision_label,
                 compact_summary=candidate.compact_summary,
+                profile=prepared.profile,
             )
             if (
                 getattr(terminal, "research_run_attempt_id", None)
@@ -3127,7 +3184,12 @@ def execute_prepared_bar_state_run(
             finalist_keys=finalists,
         )
     except BaseException as error:
-        cleanup = _abort_active_attempts(database_url, active_attempts, active)
+        cleanup = _abort_active_attempts(
+            database_url,
+            active_attempts,
+            active,
+            profile=prepared.profile,
+        )
         suffix = "" if not cleanup else f"; cleanup failures={cleanup}"
         raise BarStateRunError(f"governed bar-state Discovery failed{suffix}") from error
     finally:
@@ -3140,6 +3202,7 @@ def run_governed_bar_state_discovery(
     mode: RunMode = "PLAN_ONLY",
     database_url: str | None = None,
     manifest_path: Path | None = None,
+    profile: BarStateCampaignProfile = BAR_STATE_V2_PROFILE,
     services: BarStateRunServices | None = None,
     progress: Callable[[BarStateRunProgress], None] | None = None,
 ) -> BarStateResearchRunReport:
@@ -3149,6 +3212,7 @@ def run_governed_bar_state_discovery(
     prepared = load_prepared_bar_state_run(
         project_root,
         manifest_path=manifest_path,
+        profile=profile,
         services=active,
     )
     return execute_prepared_bar_state_run(
