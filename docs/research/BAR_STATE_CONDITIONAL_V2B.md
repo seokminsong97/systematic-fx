@@ -1,6 +1,6 @@
 # Bar State-Conditional Model V2B
 
-- Status: frozen engineering successor; execution awaits control-plane governance
+- Status: Discovery complete; all twelve candidates rejected; no finalist
 - Campaign key: `bar_state_conditional_v2b`
 - Authorized stage: Discovery only
 - Predecessor: `bar_state_conditional_v2a`
@@ -130,7 +130,69 @@ campaign definition SHA   cee6838d9c85498818140bd02ae92483fe17c080d4909190eb0b83
 FEATURE schema SHA-256    da7e500759276e85483f070451595eb083f3c15e76541bc2a2bd86c6483ebef3
 ```
 
-V2B remains Discovery-only. Its execution is not authorized until profile-aware
-artifact registration, predecessor governance, and database migration gates are
-implemented and verified. No walk-forward or holdout access is part of this
+V2B remains Discovery-only. Profile-aware artifact registration, predecessor
+governance, and database migration gates were implemented and independently
+verified before execution. No walk-forward or holdout access is part of this
 amendment.
+
+## 7. Completed Discovery Result
+
+The governed V2B Discovery run completed on 2026-08-11. It trained all twelve
+frozen inner-fold models, built all candidate signals, replayed all 349,725
+candidate decision records, and published complete evidence before making the
+mechanical selection decision. The registered control-plane identities are:
+
+```text
+campaign / experiment       140 / 7452
+first attempts              1563 through 1574: SUCCEEDED
+duplicate-check attempts    1575 through 1586: SKIPPED_DUPLICATE
+trial decisions             12 REJECTED, 0 finalists
+governed evidence links     144
+global result SHA-256       6b377c9f40bd385d6feb174dd8de60be6835772c9dd17f21aac7380ea630c245
+```
+
+The 144 links comprise 48 FEATURE, 48 LABEL, 12 MODEL, 12 OOS_TRADE,
+12 GLOBAL_RESULT, and 12 TERMINAL_RESULT links. All candidates bind the same
+single GLOBAL_RESULT identity. The exact duplicate run reopened and revalidated
+the governed evidence for all twelve candidates, reused the original terminal
+results, and reproduced an empty finalist list. A final held-file audit rehashed
+all 144 links and validated the 45 unique governed research artifacts: four
+FEATURE, four LABEL, twelve MODEL, twelve OOS_TRADE, one GLOBAL_RESULT, and
+twelve TERMINAL_RESULT identities. Physical Parquet schema and row-count checks
+passed for every FEATURE, LABEL, and OOS_TRADE artifact; the GLOBAL and terminal
+semantic projections agreed for all twelve candidates.
+
+The result is not a marginal multiplicity rejection. Across the 588 registered
+State cells, zero passed the preregistered deterministic/economic gates and zero
+passed Benjamini-Hochberg in the full family of 804 hypotheses. Every candidate
+failed Baseline net EV, Moderate net PnL, calendar-loaded PnL, profit factor,
+worst-fold EV, Severe net EV, positive-fold, neighborhood, and stable-component
+requirements. The best Moderate cell anywhere in the frozen grid was still
+negative:
+
+```text
+candidate                    bsv2_tf0300_fsstate_cm015
+cell                         tpm4_1_slm4_1
+fully loaded net EV          -4.977777777777777777777777778 ticks per fill
+fills                        180
+profit factor                0.8468899521531100478468899522
+fold EVs                     -4.151724..., -0.222222..., -17.058823... ticks
+```
+
+Directional support ranged from 15 to 10,426 raw signals and from 15 to 260
+distinct signal days. Some sparse candidates additionally failed support and
+minimum-fill gates, but the better-supported candidates still failed the common
+economic and stability gates. The 895,984 executed trade records reported by
+the GLOBAL_RESULT are accumulated across candidates, 49 grid cells, and three
+cost scenarios; they are not 895,984 independent trades.
+
+The 5-minute STATE feature extractor excluded 40,242 rows that lacked a
+causally completed 30-minute ATR-return input, exactly as preregistered. No
+other feature group reported an exclusion reason.
+
+The frozen scientific conclusion is therefore **Discovery rejection**. This
+does not prove that every possible state representation lacks information; it
+does show that this exact state-conditional model, threshold family, execution
+policy, and cost model provide no defensible candidate for further validation.
+There is no selected TP/SL pair and no Production Buying, Sell, or Loss Price.
+Walk-forward and holdout remain sealed and unauthorized.

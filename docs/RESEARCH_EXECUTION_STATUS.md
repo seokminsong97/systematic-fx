@@ -1,9 +1,10 @@
 # Phase 1 Research Execution Status
 
 - Started: 2026-08-03
-- Updated: 2026-08-09
+- Updated: 2026-08-11
 - Campaigns: `phase1_discovery_v1`, `phase1a_conservative_screening_v1`, and
-  `bar_pattern_discovery_v1`
+  `bar_pattern_discovery_v1`; the completed state-model lineage is
+  `bar_state_conditional_v2` -> `v2a` -> `v2b`
 - Campaign mode: `SCREENING_ONLY`
 - Maximum positive label: `SCREENING_SURVIVOR`, `research_eligible = false`
 - Governing plan: [`RESEARCH_PLAN.md`](RESEARCH_PLAN.md)
@@ -24,6 +25,12 @@ The separate `bar_pattern_discovery_v1` branch screens fixed 5-minute,
 entry. It is also screening-only and cannot produce `PASS_BACKTEST`, Paper, or
 Live authority. Its exact methodology and completed result are recorded in
 [`research/BAR_PATTERN_DISCOVERY_V1.md`](research/BAR_PATTERN_DISCOVERY_V1.md).
+
+The `bar_state_conditional_v2b` engineering successor completed its governed
+Discovery run with twelve rejected candidates and no finalist. Its predecessor
+failures, exact schema-only amendment, and completed result are recorded in
+[`research/BAR_STATE_CONDITIONAL_V2B.md`](research/BAR_STATE_CONDITIONAL_V2B.md).
+No walk-forward or holdout access is authorized for this branch.
 
 A-priori proposals belong in `experiments` with no `pattern_id`. Only patterns
 actually observed in a registered Discovery exposure belong in
@@ -81,6 +88,9 @@ The implementation order is fixed:
     and run Discovery without opening walk-forward or holdout data. **COMPLETE:
     216 OF 216 COMPUTED; 102 SUPPORT-REJECTED; 114 ECONOMIC-REJECTED; NO
     FINALISTS**
+12. Train and screen the twelve frozen state-conditional candidates under the
+    governed V2 lineage. **COMPLETE UNDER V2B: 12 OF 12 TRAINED; 12 REJECTED;
+    ZERO DETERMINISTIC-GATE OR BH-PASSING STATE CELLS; NO FINALISTS**
 
 ## 4. Verified External Contracts
 
@@ -596,3 +606,38 @@ a weakened post-result gate.
 
 There is no finalist and therefore no Buying Price, Sell Price, or Loss Price
 triplet. No walk-forward or holdout run is authorized for v1.
+
+## 15. State-Conditional V2B Discovery Completed Without a Finalist
+
+The state-model lineage required two explicitly governed engineering
+successors. Frozen V2 stopped during train-only fitting when the 5,000-iteration
+SAGA ceiling failed to converge, before predictions or economic evidence were
+produced. V2A raised only that computational ceiling to 50,000 under a new
+identity; it completed in-memory fitting and replay but failed strict staging of
+the first FEATURE Parquet because PyArrow normalized nested-list child names
+from `item` to `element`. V2A published no governed research-evidence link.
+V2B changed only those two FEATURE schema child names to explicit `element`,
+again under a new identity and exact failed-predecessor gate.
+
+V2B then completed the frozen Discovery campaign as campaign `140`, experiment
+`7452`. Attempts `1563`-`1574` succeeded and their exact duplicate attempts
+`1575`-`1586` were independently reopened and registered as
+`SKIPPED_DUPLICATE`. The database contains 144 governed links: 48 FEATURE,
+48 LABEL, and 12 each of MODEL, OOS_TRADE, GLOBAL_RESULT, and TERMINAL_RESULT.
+All twelve trials are `REJECTED`; the finalist set is empty. The canonical
+GLOBAL_RESULT SHA-256 is
+`6b377c9f40bd385d6feb174dd8de60be6835772c9dd17f21aac7380ea630c245`.
+
+All twelve inner-fold models trained, and the engine evaluated 349,725 candidate
+decision records. Across 588 State cells, zero passed the deterministic and
+economic gates and zero passed BH within the frozen 804-hypothesis family. The
+best Moderate cell still had fully loaded net EV of approximately `-4.98` ticks
+per fill, profit factor `0.847`, and a negative worst-fold EV. This is a broad
+economic rejection under the frozen policy, not a finalist lost only to the
+multiplicity correction.
+
+The result authorizes no walk-forward, holdout, Paper, or Live continuation.
+No selected TP/SL or Production Buying/Sell/Loss price exists. The conclusion
+is limited to the exact V2B representation, thresholds, execution rules, costs,
+and Discovery interval; it is not a claim that every possible market-state
+representation is uninformative.
