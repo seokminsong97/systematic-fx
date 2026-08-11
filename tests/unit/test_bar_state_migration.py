@@ -10,6 +10,7 @@ from systematic_fx.research.bar_state_config import (
     BAR_STATE_CONFIG_SEMANTIC_SHA256,
     BAR_STATE_V2_PROFILE,
     BAR_STATE_V2A_PROFILE,
+    BAR_STATE_V2B_PROFILE,
     load_bar_state_config,
 )
 from systematic_fx.research.hypotheses import canonical_sha256
@@ -182,4 +183,76 @@ def test_migration_0026_dispatches_exact_v2_and_v2a_profiles() -> None:
     assert "bar_state_governance_profile(NEW.campaign_key)" in sql
     assert "profile.experiment_key = NEW.experiment_key" in sql
     assert "VALUES (26, 'bar_state_v2a_optimizer_cap_amendment', :'migration_checksum')" in sql
+    assert "PLACEHOLDER" not in sql
+
+
+def test_migration_0027_dispatches_v2b_and_freezes_its_exact_v2a_predecessor() -> None:
+    migrations = {item.version: item for item in discover_migrations(ROOT / "migrations")}
+    migration = migrations[27]
+    assert migration.name == "bar_state_v2b_parquet_schema_amendment"
+    assert migration.checksum == (
+        "f0f69db031dc555b260da1fceef5f1fb4087f25717f1472ae4b006e77182cdb8"
+    )
+    sql = migration.path.read_text(encoding="utf-8")
+
+    assert migrations[24].checksum == (
+        "4aa845757f1a220c8d5595d4db6053f6374d99d067ab7e20c3e40ea22d610010"
+    )
+    assert migrations[25].checksum == (
+        "e08aa486bf9a65b2875e92866ae5e939fc56dc5d871010dfdb4b9085550749dd"
+    )
+    assert migrations[26].checksum == (
+        "232badda3e76fca79f93fcff059de6f3404fc797eb26a93c9483fd554cfe20bb"
+    )
+    for profile in (BAR_STATE_V2_PROFILE, BAR_STATE_V2A_PROFILE, BAR_STATE_V2B_PROFILE):
+        config = load_bar_state_config(ROOT, profile=profile)
+        for identity in (
+            profile.campaign_key,
+            profile.campaign_name,
+            profile.experiment_key,
+            profile.artifact_type,
+            profile.engine_version,
+            profile.config_file_sha256,
+            profile.config_semantic_sha256,
+            profile.candidate_catalog_sha256,
+            profile.campaign_definition_sha256,
+        ):
+            assert f"'{identity}'" in sql
+        assert str(profile.model_max_iter) in sql
+        for candidate in config.candidates:
+            assert f"'{candidate.candidate_key}'" in sql
+            assert f"'{candidate.definition_sha256}'" in sql
+
+    assert BAR_STATE_V2B_PROFILE.predecessor_code_commit is not None
+    assert f"'{BAR_STATE_V2B_PROFILE.predecessor_code_commit}'" in sql
+    assert f"'{BAR_STATE_V2B_PROFILE.predecessor_gate_policy}'" in sql
+    assert "CREATE FUNCTION systematic_fx.bar_state_preregistration_is_exact" in sql
+    assert "bar_state_v2a_predecessor_is_clean_v26" in sql
+    assert "campaign.selected_start_date = DATE '2022-01-03'" in sql
+    assert "campaign.selected_end_date = DATE '2026-07-31'" in sql
+    assert "campaign.roll_cutoff_date IS NULL" in sql
+    assert "5da1027fb2003c521b4be2eee0d2bf1238e4784467f43f7d9b9ac978223f5552" in sql
+    assert "8378983f7db68b443d385b7cc646f0294391293ccd1873dbc3a2458ad1384c49" in sql
+    assert "ae3ab3f4e0a77e4e0ddf83d0bca969514f94734f0009ec85deb4cf573a490769" in sql
+    assert "experiment.pattern_id IS NULL" in sql
+    assert "experiment.parent_experiment_id IS NULL" in sql
+    assert "experiment.tick_size = 0.00005" in sql
+    assert "experiment.tick_value = 6.25" in sql
+    assert "attempt.attempt_number IN (1, 2)" in sql
+    assert "attempt.started_at IS NOT NULL" in sql
+    assert ") = 24" in sql
+    assert "attempt.result_summary = jsonb_build_object" in sql
+    assert "profile_version IN ('V2A', 'V2B')" in sql
+    assert "campaigns_require_bar_state_v2b_predecessor" in sql
+    assert "aa_artifacts_freeze_bar_state_predecessor" in sql
+    assert "BEFORE INSERT OR UPDATE ON systematic_fx.experiments" in sql
+    assert "experiments_freeze_bar_state_predecessor" in sql
+    assert "enforce_bar_state_v2_predecessor_runspec_freeze" in sql
+    assert "experiment_trials_freeze_bar_state_predecessor" in sql
+    assert "research_run_attempts_freeze_bar_state_v2a_predecessor" in sql
+    assert "bar_state_artifact_links_freeze_predecessor" in sql
+    assert "bar_state_artifact_links_enforce_v2b_feature_schema" in sql
+    assert "^([0-9a-f]{40}|[0-9a-f]{64})$" in sql
+    assert "da7e500759276e85483f070451595eb083f3c15e76541bc2a2bd86c6483ebef3" in sql
+    assert "VALUES (27, 'bar_state_v2b_parquet_schema_amendment', :'migration_checksum')" in sql
     assert "PLACEHOLDER" not in sql

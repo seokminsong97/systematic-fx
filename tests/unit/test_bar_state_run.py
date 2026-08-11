@@ -18,6 +18,7 @@ from systematic_fx.db.bar_state_registry import (
     _validate_bar_state_run_spec,
     register_terminal_bar_state_result,
 )
+from systematic_fx.db.migrations import discover_migrations
 from systematic_fx.features.bars import TradeBar
 from systematic_fx.research import bar_state_run
 from systematic_fx.research.bar_artifacts import (
@@ -47,6 +48,7 @@ from systematic_fx.research.bar_state_run import (
     BAR_STATE_DATASET_MANIFEST_RELATIVE_PATH,
     BAR_STATE_DISCOVERY_ONE_SECOND_ROW_COUNT,
     BAR_STATE_DISCOVERY_OUTCOME_SPAN_COUNT,
+    BAR_STATE_SUPPORTED_MIGRATIONS,
     BarStateCandidateEngineArtifacts,
     BarStateEngineResult,
     BarStateParquetPayload,
@@ -76,6 +78,27 @@ from tests.integration.test_bar_state_registry_postgres import (
 )
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def test_bar_state_runner_supports_exact_v2b_migration_chain() -> None:
+    migrations = discover_migrations(ROOT / "migrations")
+    migration_by_version = {item.version: item for item in migrations}
+
+    assert tuple(item.version for item in migrations) == BAR_STATE_SUPPORTED_MIGRATIONS
+    assert BAR_STATE_SUPPORTED_MIGRATIONS == tuple(range(1, 28))
+    assert migration_by_version[24].checksum == (
+        "4aa845757f1a220c8d5595d4db6053f6374d99d067ab7e20c3e40ea22d610010"
+    )
+    assert migration_by_version[25].checksum == (
+        "e08aa486bf9a65b2875e92866ae5e939fc56dc5d871010dfdb4b9085550749dd"
+    )
+    assert migration_by_version[26].checksum == (
+        "232badda3e76fca79f93fcff059de6f3404fc797eb26a93c9483fd554cfe20bb"
+    )
+    assert migration_by_version[27].name == "bar_state_v2b_parquet_schema_amendment"
+    assert migration_by_version[27].checksum == (
+        "f0f69db031dc555b260da1fceef5f1fb4087f25717f1472ae4b006e77182cdb8"
+    )
 
 
 @pytest.fixture(scope="module")

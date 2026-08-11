@@ -12,6 +12,7 @@ import json
 import os
 import re
 import threading
+from collections.abc import Callable, Mapping
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeoutError
 from dataclasses import replace
@@ -41,7 +42,11 @@ from systematic_fx.db.bar_state_registry import (
 )
 from systematic_fx.db.bootstrap import _url_database_name
 from systematic_fx.db.migrations import apply_migrations, discover_migrations
-from systematic_fx.db.run_registry import reserve_run_attempt, start_run_attempt
+from systematic_fx.db.run_registry import (
+    RunAttemptReservation,
+    reserve_run_attempt,
+    start_run_attempt,
+)
 from systematic_fx.research.bar_state_artifacts import (
     BAR_STATE_ARTIFACT_SCHEMA_BY_KIND,
     BAR_STATE_BAR_DATASET_MANIFEST_SHA256,
@@ -60,6 +65,7 @@ from systematic_fx.research.bar_state_artifacts import (
 from systematic_fx.research.bar_state_config import (
     BAR_STATE_V2_PROFILE,
     BAR_STATE_V2A_PROFILE,
+    BAR_STATE_V2B_PROFILE,
     BarStateCampaignProfile,
 )
 from systematic_fx.research.bar_state_features import FEATURE_NAMES_BY_SET
@@ -71,6 +77,8 @@ from systematic_fx.research.bar_state_model import (
 )
 from systematic_fx.research.bar_state_run import (
     BarStateRunProvenance,
+    PreparedBarStateRun,
+    _feature_arrow_schema,
     _publish_code_snapshot,
     _publish_registration,
     _validate_duplicate_consensus,
@@ -87,11 +95,14 @@ from systematic_fx.validation.bar_state_splits import (
 ROOT = Path(__file__).resolve().parents[2]
 DATABASE_ENV = "SYSTEMATIC_FX_BAR_STATE_GATE_DATABASE_URL"
 V2A_DATABASE_ENV = "SYSTEMATIC_FX_BAR_STATE_V2A_GATE_DATABASE_URL"
+V2B_DATABASE_ENV = "SYSTEMATIC_FX_BAR_STATE_V2B_GATE_DATABASE_URL"
 EXPECTED_MIGRATION_0024_SHA256 = "4aa845757f1a220c8d5595d4db6053f6374d99d067ab7e20c3e40ea22d610010"
 EXPECTED_MIGRATION_0025_SHA256 = "e08aa486bf9a65b2875e92866ae5e939fc56dc5d871010dfdb4b9085550749dd"
 EXPECTED_MIGRATION_0026_SHA256 = "232badda3e76fca79f93fcff059de6f3404fc797eb26a93c9483fd554cfe20bb"
+EXPECTED_MIGRATION_0027_SHA256 = "f0f69db031dc555b260da1fceef5f1fb4087f25717f1472ae4b006e77182cdb8"
 SAFE_DATABASE_NAME = re.compile(r"systematic_fx_bar_state_gate_[0-9a-f]{12}")
 SAFE_V2A_DATABASE_NAME = re.compile(r"systematic_fx_bar_state_v2a_gate_[0-9a-f]{12}")
+SAFE_V2B_DATABASE_NAME = re.compile(r"systematic_fx_bar_state_v2b_gate_[0-9a-f]{12}")
 
 
 @lru_cache(maxsize=1)
@@ -146,7 +157,7 @@ def _gate_model(
         optimizer_iterations=(1,) * len(STATE_MODEL_CLASSES),
         hyperparameters=(
             BAR_STATE_V2A_MODEL_HYPERPARAMETERS
-            if profile.version_id == "V2A"
+            if profile.version_id in {"V2A", "V2B"}
             else BAR_STATE_V2_MODEL_HYPERPARAMETERS
         ),
     )
@@ -179,6 +190,21 @@ def _disposable_v2a_database_url() -> str:
         )
     if database_name in {"systematic_fx", "systematic_fx_test", "postgres"}:
         raise RuntimeError("bar-state V2A release gate refuses persistent databases")
+    return database_url
+
+
+def _disposable_v2b_database_url() -> str:
+    database_url = os.environ.get(V2B_DATABASE_ENV)
+    if not database_url:
+        pytest.skip(f"{V2B_DATABASE_ENV} is not set")
+    database_name = _url_database_name(database_url, label=V2B_DATABASE_ENV)
+    if database_name is None or SAFE_V2B_DATABASE_NAME.fullmatch(database_name) is None:
+        raise RuntimeError(
+            f"{V2B_DATABASE_ENV} must target a disposable database named "
+            "systematic_fx_bar_state_v2b_gate_<12 lowercase hex characters>"
+        )
+    if database_name in {"systematic_fx", "systematic_fx_test", "postgres"}:
+        raise RuntimeError("bar-state V2B release gate refuses persistent databases")
     return database_url
 
 
@@ -892,6 +918,15 @@ def _publish_shared_evidence(
     profile: BarStateCampaignProfile = BAR_STATE_V2_PROFILE,
 ) -> tuple[dict[str, list[object]], object, object]:
     table = pa.table({"gate_value": pa.array([1], type=pa.int64())})
+    feature_schema = _feature_arrow_schema(profile=profile)
+    feature_table = (
+        pa.Table.from_arrays(
+            [pa.array([], type=field.type) for field in feature_schema],
+            schema=feature_schema,
+        )
+        if profile.version_id == "V2B"
+        else table
+    )
     shared: dict[str, list[object]] = {"FEATURE": [], "LABEL": []}
     for role in ("FEATURE", "LABEL"):
         for shard in range(4):
@@ -900,7 +935,7 @@ def _publish_shared_evidence(
                     artifact_root,
                     kind=role,
                     artifact_key_suffix=f"gate-{role.lower()}-{shard}",
-                    table=table,
+                    table=feature_table if role == "FEATURE" else table,
                     lineage=lineage,
                     logical_identity={
                         "shard_ordinal": shard,
@@ -1141,7 +1176,7 @@ def _register_gate_campaign(
     *,
     profile: BarStateCampaignProfile,
     code_commit: str,
-) -> tuple[object, BarStateRunProvenance, tuple, dict[str, object]]:
+) -> tuple[PreparedBarStateRun, BarStateRunProvenance, tuple, dict[str, object]]:
     prepared = load_prepared_bar_state_run(ROOT, profile=profile)
     provenance = _provenance(database_url, code_commit=code_commit)
     specs = build_bar_state_run_specs(prepared, provenance)
@@ -1181,21 +1216,175 @@ def _register_gate_campaign(
     return prepared, provenance, specs, registrations
 
 
+def _complete_gate_campaign_lifecycle(
+    database_url: str,
+    artifact_root: Path,
+    *,
+    prepared: PreparedBarStateRun,
+    provenance: BarStateRunProvenance,
+    specs: tuple,
+    profile: BarStateCampaignProfile,
+    pre_link_probe: Callable[[Mapping[str, RunAttemptReservation]], None] | None = None,
+) -> tuple[dict[str, object], dict[str, object]]:
+    reservations = {
+        candidate_key: reserve_run_attempt(database_url, run_fingerprint=spec.fingerprint)
+        for candidate_key, spec in zip(prepared.candidate_keys, specs, strict=True)
+    }
+    for reservation in reservations.values():
+        start_run_attempt(
+            database_url,
+            research_run_attempt_id=reservation.research_run_attempt_id,
+        )
+    if pre_link_probe is not None:
+        pre_link_probe(reservations)
+    shared_lineage = _shared_lineage(prepared, provenance, specs)
+    shared, global_result, _ = _publish_shared_evidence(
+        artifact_root,
+        shared_lineage,
+        candidate_keys=prepared.candidate_keys,
+        profile=profile,
+    )
+    global_document = load_verified_bar_state_json(
+        artifact_root,
+        global_result,
+        profile=profile,
+    )
+    finalist_keys = prepared.candidate_keys[:4]
+    capped_key = prepared.candidate_keys[4]
+    candidate_evidence: dict[str, dict[str, object]] = {}
+    for candidate_key, candidate, spec in zip(
+        prepared.candidate_keys,
+        prepared.config.candidates,
+        specs,
+        strict=True,
+    ):
+        lineage = _candidate_lineage(
+            shared_lineage,
+            candidate_key=candidate_key,
+            candidate_definition_sha256=candidate.definition_sha256,
+            run_fingerprint=spec.fingerprint,
+        )
+        candidate_evidence[candidate_key] = _publish_candidate_evidence(
+            artifact_root,
+            candidate_key=candidate_key,
+            global_document=global_document,
+            lineage=lineage,
+            trial_status=("SUCCEEDED" if candidate_key in finalist_keys else "REJECTED"),
+            capped=candidate_key == capped_key,
+            profile=profile,
+        )
+    for candidate_key in prepared.candidate_keys:
+        attempt_id = reservations[candidate_key].research_run_attempt_id
+        for role in ("FEATURE", "LABEL"):
+            for shard_ordinal, artifact in enumerate(shared[role]):
+                register_bar_state_artifact_link(
+                    database_url,
+                    artifact_root,
+                    research_run_attempt_id=attempt_id,
+                    candidate_key=candidate_key,
+                    artifact_role=role,
+                    split_key="discovery",
+                    shard_ordinal=shard_ordinal,
+                    artifact=artifact,
+                    profile=profile,
+                )
+        for role in ("MODEL", "OOS_TRADE"):
+            register_bar_state_artifact_link(
+                database_url,
+                artifact_root,
+                research_run_attempt_id=attempt_id,
+                candidate_key=candidate_key,
+                artifact_role=role,
+                split_key="discovery",
+                shard_ordinal=0,
+                artifact=candidate_evidence[candidate_key][role],
+                profile=profile,
+            )
+        for role, artifact in (
+            ("GLOBAL_RESULT", global_result),
+            ("TERMINAL_RESULT", candidate_evidence[candidate_key]["TERMINAL_RESULT"]),
+        ):
+            register_bar_state_artifact_link(
+                database_url,
+                artifact_root,
+                research_run_attempt_id=attempt_id,
+                candidate_key=candidate_key,
+                artifact_role=role,
+                split_key="discovery",
+                shard_ordinal=0,
+                artifact=artifact,
+                profile=profile,
+            )
+    for candidate_key in prepared.candidate_keys:
+        trial_status = "SUCCEEDED" if candidate_key in finalist_keys else "REJECTED"
+        report = register_terminal_bar_state_result(
+            database_url,
+            artifact_root,
+            research_run_attempt_id=reservations[candidate_key].research_run_attempt_id,
+            candidate_key=candidate_key,
+            trial_status=trial_status,
+            decision_label=(
+                "DISCOVERY_FINALIST" if trial_status == "SUCCEEDED" else "DISCOVERY_REJECT"
+            ),
+            compact_summary=candidate_evidence[candidate_key]["COMPACT_SUMMARY"],
+            profile=profile,
+        )
+        assert report.trial_status == trial_status
+    with psycopg.connect(database_url, row_factory=dict_row) as connection:
+        terminal_counts = connection.execute(
+            """
+            SELECT
+                count(*) FILTER (WHERE attempt.status = 'SUCCEEDED') AS attempts,
+                count(*) FILTER (WHERE trial.status = 'SUCCEEDED') AS finalists,
+                count(*) FILTER (WHERE trial.status = 'REJECTED') AS rejects,
+                count(*) FILTER (
+                    WHERE attempt.status = 'SUCCEEDED'
+                      AND trial.status IN ('SUCCEEDED', 'REJECTED')
+                      AND attempt.result_summary = trial.result_summary
+                ) AS exact_pairs
+            FROM systematic_fx.research_run_attempts AS attempt
+            JOIN systematic_fx.research_run_specs AS run_spec
+              ON run_spec.research_run_spec_id = attempt.research_run_spec_id
+            JOIN systematic_fx.campaigns AS campaign
+              ON campaign.campaign_id = run_spec.campaign_id
+            JOIN systematic_fx.experiment_trials AS trial
+              ON trial.research_run_spec_id = run_spec.research_run_spec_id
+            WHERE campaign.campaign_key = %s
+            """,
+            (profile.campaign_key,),
+        ).fetchone()
+        link_counts = connection.execute(
+            """
+            SELECT count(*) AS links,
+                   count(DISTINCT artifact_identity_sha256)
+                       FILTER (WHERE artifact_role = 'GLOBAL_RESULT')
+                       AS global_identities
+            FROM systematic_fx.bar_state_artifact_links AS link
+            JOIN systematic_fx.campaigns AS campaign
+              ON campaign.campaign_id = link.campaign_id
+            WHERE campaign.campaign_key = %s
+            """,
+            (profile.campaign_key,),
+        ).fetchone()
+    return dict(terminal_counts), dict(link_counts)
+
+
 def test_bar_state_v2_postgresql_release_gate(tmp_path: Path) -> None:
     database_url = _disposable_database_url()
     migrations = discover_migrations(ROOT / "migrations")
-    assert tuple(item.version for item in migrations) == tuple(range(1, 27))
+    assert tuple(item.version for item in migrations) == tuple(range(1, 28))
     migration_by_version = {item.version: item for item in migrations}
     assert migration_by_version[24].checksum == EXPECTED_MIGRATION_0024_SHA256
     assert migration_by_version[25].checksum == EXPECTED_MIGRATION_0025_SHA256
     assert migration_by_version[26].checksum == EXPECTED_MIGRATION_0026_SHA256
+    assert migration_by_version[27].checksum == EXPECTED_MIGRATION_0027_SHA256
 
     first = apply_migrations(
         database_url,
         directory=ROOT / "migrations",
         psql_binary=os.environ.get("SYSTEMATIC_FX_PSQL"),
     )
-    assert first.applied == tuple(range(1, 27))
+    assert first.applied == tuple(range(1, 28))
     assert first.skipped == ()
     repeated = apply_migrations(
         database_url,
@@ -1203,7 +1392,7 @@ def test_bar_state_v2_postgresql_release_gate(tmp_path: Path) -> None:
         psql_binary=os.environ.get("SYSTEMATIC_FX_PSQL"),
     )
     assert repeated.applied == ()
-    assert repeated.skipped == tuple(range(1, 27))
+    assert repeated.skipped == tuple(range(1, 28))
 
     with psycopg.connect(database_url, row_factory=dict_row) as connection:
         latest = connection.execute(
@@ -1235,9 +1424,9 @@ def test_bar_state_v2_postgresql_release_gate(tmp_path: Path) -> None:
             """
         ).fetchone()
     assert latest == {
-        "version": 26,
-        "name": "bar_state_v2a_optimizer_cap_amendment",
-        "checksum": EXPECTED_MIGRATION_0026_SHA256,
+        "version": 27,
+        "name": "bar_state_v2b_parquet_schema_amendment",
+        "checksum": EXPECTED_MIGRATION_0027_SHA256,
     }
     assert trigger_count == 1
     assert canonical_index_guard == {
@@ -2240,20 +2429,20 @@ def test_bar_state_v2_postgresql_release_gate(tmp_path: Path) -> None:
 def test_bar_state_v2a_postgresql_release_gate(tmp_path: Path) -> None:
     database_url = _disposable_v2a_database_url()
     migrations = discover_migrations(ROOT / "migrations")
-    assert tuple(item.version for item in migrations) == tuple(range(1, 27))
+    assert tuple(item.version for item in migrations) == tuple(range(1, 28))
     first = apply_migrations(
         database_url,
         directory=ROOT / "migrations",
         psql_binary=os.environ.get("SYSTEMATIC_FX_PSQL"),
     )
-    assert first.applied == tuple(range(1, 27))
+    assert first.applied == tuple(range(1, 28))
     repeated = apply_migrations(
         database_url,
         directory=ROOT / "migrations",
         psql_binary=os.environ.get("SYSTEMATIC_FX_PSQL"),
     )
     assert repeated.applied == ()
-    assert repeated.skipped == tuple(range(1, 27))
+    assert repeated.skipped == tuple(range(1, 28))
 
     _seed_dataset(
         database_url,
@@ -2687,25 +2876,21 @@ def test_bar_state_v2a_postgresql_release_gate(tmp_path: Path) -> None:
         )
         connection.rollback()
 
-    predecessor_lineage = _shared_lineage(
+    predecessor_artifact_prepared = replace(
         predecessor,
+        project_root=tmp_path,
+        data_root=tmp_path / "data",
+    )
+    cross_profile_artifact = _publish_code_snapshot(
+        predecessor_artifact_prepared,
         predecessor_provenance,
         predecessor_specs,
     )
-    cross_profile_feature = publish_bar_state_parquet(
-        tmp_path,
-        kind="FEATURE",
-        artifact_key_suffix="gate-cross-profile-v2-feature",
-        table=pa.table({"gate_value": pa.array([1], type=pa.int64())}),
-        lineage=predecessor_lineage,
-        logical_identity={"shard_ordinal": 0, "split_key": "discovery"},
-        profile=BAR_STATE_V2_PROFILE,
-    )
-    cross_profile_feature_id = _register_artifact(
-        database_url,
-        tmp_path,
-        cross_profile_feature,
-    )
+    with psycopg.connect(database_url) as connection:
+        cross_profile_artifact_id = connection.execute(
+            "SELECT artifact_id FROM systematic_fx.artifacts WHERE artifact_key = %s",
+            (cross_profile_artifact.descriptor.artifact_key,),
+        ).fetchone()[0]
     with (
         pytest.raises(psycopg.errors.RaiseException, match="bytes or lineage drifted"),
         psycopg.connect(database_url) as connection,
@@ -2714,8 +2899,8 @@ def test_bar_state_v2a_postgresql_release_gate(tmp_path: Path) -> None:
         connection.execute(
             _insert_link_sql(),
             _link_parameters(
-                cross_profile_feature,
-                artifact_id=cross_profile_feature_id,
+                cross_profile_artifact,
+                artifact_id=cross_profile_artifact_id,
                 artifact_role="FEATURE",
                 shard_ordinal=0,
                 attempt_id=first_attempt_id,
@@ -2867,5 +3052,529 @@ def test_bar_state_v2a_postgresql_release_gate(tmp_path: Path) -> None:
     }
     assert link_counts == {"links": 144, "global_identities": 1}
     assert predecessor_snapshot_after == predecessor_snapshot
-    assert latest["version"] == 26
-    assert latest["name"] == "bar_state_v2a_optimizer_cap_amendment"
+    assert latest["version"] == 27
+    assert latest["name"] == "bar_state_v2b_parquet_schema_amendment"
+    assert latest["checksum"] == EXPECTED_MIGRATION_0027_SHA256
+
+
+def test_bar_state_v2b_postgresql_release_gate(tmp_path: Path) -> None:
+    database_url = _disposable_v2b_database_url()
+    migrations = discover_migrations(ROOT / "migrations")
+    assert tuple(item.version for item in migrations) == tuple(range(1, 28))
+    first = apply_migrations(
+        database_url,
+        directory=ROOT / "migrations",
+        psql_binary=os.environ.get("SYSTEMATIC_FX_PSQL"),
+    )
+    assert first.applied == tuple(range(1, 28))
+    repeated = apply_migrations(
+        database_url,
+        directory=ROOT / "migrations",
+        psql_binary=os.environ.get("SYSTEMATIC_FX_PSQL"),
+    )
+    assert repeated.applied == ()
+    assert repeated.skipped == tuple(range(1, 28))
+    _seed_dataset(
+        database_url,
+        tmp_path,
+        manifest_sha256=BAR_STATE_RAW_SOURCE_MANIFEST_SHA256,
+    )
+
+    v2, _v2_provenance, v2_specs, _ = _register_gate_campaign(
+        database_url,
+        tmp_path,
+        profile=BAR_STATE_V2_PROFILE,
+        code_commit=BAR_STATE_V2A_PROFILE.predecessor_code_commit or "",
+    )
+    for candidate_key, spec in zip(v2.candidate_keys, v2_specs, strict=True):
+        reservation = reserve_run_attempt(database_url, run_fingerprint=spec.fingerprint)
+        start_run_attempt(
+            database_url,
+            research_run_attempt_id=reservation.research_run_attempt_id,
+        )
+        abort_bar_state_run_attempt(
+            database_url,
+            research_run_attempt_id=reservation.research_run_attempt_id,
+            candidate_key=candidate_key,
+            run_fingerprint=spec.fingerprint,
+            error_message="frozen V2 optimizer cap exhausted",
+            profile=BAR_STATE_V2_PROFILE,
+        )
+
+    v2a, v2a_provenance, v2a_specs, v2a_registrations = _register_gate_campaign(
+        database_url,
+        tmp_path,
+        profile=BAR_STATE_V2A_PROFILE,
+        code_commit=BAR_STATE_V2B_PROFILE.predecessor_code_commit or "",
+    )
+    for candidate_key, spec in zip(v2a.candidate_keys, v2a_specs, strict=True):
+        reservation = reserve_run_attempt(database_url, run_fingerprint=spec.fingerprint)
+        start_run_attempt(
+            database_url,
+            research_run_attempt_id=reservation.research_run_attempt_id,
+        )
+        abort_bar_state_run_attempt(
+            database_url,
+            research_run_attempt_id=reservation.research_run_attempt_id,
+            candidate_key=candidate_key,
+            run_fingerprint=spec.fingerprint,
+            error_message="V2A FEATURE evidence publication failed, first execution",
+            profile=BAR_STATE_V2A_PROFILE,
+        )
+    with pytest.raises(BarStateRegistryDriftError, match="failed attempts.*drifted"):
+        require_clean_bar_state_predecessor(
+            database_url,
+            successor_profile=BAR_STATE_V2B_PROFILE,
+        )
+    with psycopg.connect(database_url) as connection:
+        assert (
+            connection.execute(
+                "SELECT systematic_fx.bar_state_v2b_predecessor_is_clean()"
+            ).fetchone()[0]
+            is False
+        )
+
+    for candidate_key, spec in zip(v2a.candidate_keys, v2a_specs, strict=True):
+        reservation = reserve_run_attempt(database_url, run_fingerprint=spec.fingerprint)
+        assert reservation.attempt_number == 2
+        start_run_attempt(
+            database_url,
+            research_run_attempt_id=reservation.research_run_attempt_id,
+        )
+        abort_bar_state_run_attempt(
+            database_url,
+            research_run_attempt_id=reservation.research_run_attempt_id,
+            candidate_key=candidate_key,
+            run_fingerprint=spec.fingerprint,
+            error_message="V2A FEATURE evidence publication failed, exact retry",
+            profile=BAR_STATE_V2A_PROFILE,
+        )
+    predecessor_report = require_clean_bar_state_predecessor(
+        database_url,
+        successor_profile=BAR_STATE_V2B_PROFILE,
+    )
+    assert predecessor_report.candidate_count == 12
+    assert predecessor_report.failed_attempt_count == 24
+
+    v2a_artifact_prepared = replace(
+        v2a,
+        project_root=tmp_path,
+        data_root=tmp_path / "data",
+    )
+    v2a_code_artifact = _publish_code_snapshot(
+        v2a_artifact_prepared,
+        v2a_provenance,
+        v2a_specs,
+    )
+    with psycopg.connect(database_url) as connection:
+        connection.execute("SET LOCAL session_replication_role = replica")
+        connection.execute(
+            "UPDATE systematic_fx.campaigns "
+            "SET selected_start_date = DATE '2022-01-04' "
+            "WHERE campaign_key = %s",
+            (BAR_STATE_V2A_PROFILE.campaign_key,),
+        )
+        assert (
+            connection.execute(
+                "SELECT systematic_fx.bar_state_v2b_predecessor_is_clean()"
+            ).fetchone()[0]
+            is False
+        )
+        connection.rollback()
+
+        connection.execute("SET LOCAL session_replication_role = replica")
+        connection.execute(
+            "UPDATE systematic_fx.experiments SET tick_size = 0.00006 WHERE experiment_key = %s",
+            (BAR_STATE_V2A_PROFILE.experiment_key,),
+        )
+        assert (
+            connection.execute(
+                "SELECT systematic_fx.bar_state_v2b_predecessor_is_clean()"
+            ).fetchone()[0]
+            is False
+        )
+        connection.rollback()
+
+    with psycopg.connect(database_url, row_factory=dict_row) as connection:
+        assert (
+            connection.execute(
+                "SELECT systematic_fx.bar_state_v2b_predecessor_is_clean() AS is_clean"
+            ).fetchone()["is_clean"]
+            is True
+        )
+        v2a_code_artifact_id = connection.execute(
+            "SELECT artifact_id FROM systematic_fx.artifacts WHERE artifact_key = %s",
+            (v2a_code_artifact.descriptor.artifact_key,),
+        ).fetchone()["artifact_id"]
+        v2a_snapshot = connection.execute(
+            """
+            SELECT systematic_fx.canonical_jsonb_sha256(jsonb_build_object(
+                'attempts', (
+                    SELECT jsonb_agg(to_jsonb(attempt) ORDER BY attempt.research_run_attempt_id)
+                    FROM systematic_fx.research_run_attempts AS attempt
+                    JOIN systematic_fx.research_run_specs AS run_spec
+                      ON run_spec.research_run_spec_id = attempt.research_run_spec_id
+                    WHERE run_spec.campaign_id = campaign.campaign_id
+                ),
+                'artifacts', (
+                    SELECT jsonb_agg(to_jsonb(artifact) ORDER BY artifact.artifact_id)
+                    FROM systematic_fx.artifacts AS artifact
+                    WHERE artifact.artifact_type = %s
+                ),
+                'specs', (
+                    SELECT jsonb_agg(to_jsonb(run_spec) ORDER BY run_spec.research_run_spec_id)
+                    FROM systematic_fx.research_run_specs AS run_spec
+                    WHERE run_spec.campaign_id = campaign.campaign_id
+                ),
+                'trials', (
+                    SELECT jsonb_agg(to_jsonb(trial) ORDER BY trial.experiment_trial_id)
+                    FROM systematic_fx.experiment_trials AS trial
+                    JOIN systematic_fx.experiments AS experiment
+                      ON experiment.experiment_id = trial.experiment_id
+                    WHERE experiment.campaign_id = campaign.campaign_id
+                )
+            )) AS sha256
+            FROM systematic_fx.campaigns AS campaign
+            WHERE campaign.campaign_key = %s
+            """,
+            (BAR_STATE_V2A_PROFILE.artifact_type, BAR_STATE_V2A_PROFILE.campaign_key),
+        ).fetchone()["sha256"]
+
+    v2b = load_prepared_bar_state_run(ROOT, profile=BAR_STATE_V2B_PROFILE)
+    v2b_provenance = _provenance(database_url, code_commit="4" * 40)
+    v2b_specs = build_bar_state_run_specs(v2b, v2b_provenance)
+    with (
+        pytest.raises(psycopg.errors.RaiseException, match="campaign identity is not exact"),
+        psycopg.connect(database_url) as connection,
+        connection.transaction(),
+    ):
+        connection.execute(
+            """
+            INSERT INTO systematic_fx.campaigns
+                (campaign_key, dataset_id, name, status, selected_start_date,
+                 selected_end_date, roll_cutoff_date, data_manifest_sha256,
+                 feature_version, outcome_version, cost_model_version,
+                 execution_model_version, code_commit, config_sha256,
+                 split_policy, trial_budget, finalist_budget, frozen_at)
+            SELECT %s, dataset_id, 'forged V2B', status, selected_start_date,
+                   selected_end_date, roll_cutoff_date, data_manifest_sha256,
+                   feature_version, outcome_version, cost_model_version,
+                   execution_model_version, %s, %s, split_policy,
+                   trial_budget, finalist_budget, statement_timestamp()
+            FROM systematic_fx.campaigns
+            WHERE campaign_key = %s
+            """,
+            (
+                BAR_STATE_V2B_PROFILE.campaign_key,
+                v2b_provenance.code_commit,
+                BAR_STATE_V2B_PROFILE.campaign_definition_sha256,
+                BAR_STATE_V2A_PROFILE.campaign_key,
+            ),
+        )
+
+    successor_connection = psycopg.connect(database_url)
+    successor_connection.execute(
+        """
+        INSERT INTO systematic_fx.campaigns
+            (campaign_key, dataset_id, name, status, selected_start_date,
+             selected_end_date, roll_cutoff_date, data_manifest_sha256,
+             feature_version, outcome_version, cost_model_version,
+             execution_model_version, code_commit, config_sha256,
+             split_policy, trial_budget, finalist_budget, frozen_at)
+        SELECT %s, dataset_id, %s, status, selected_start_date,
+               selected_end_date, roll_cutoff_date, data_manifest_sha256,
+               feature_version, outcome_version, cost_model_version,
+               execution_model_version, %s, %s, split_policy,
+               trial_budget, finalist_budget, statement_timestamp()
+        FROM systematic_fx.campaigns
+        WHERE campaign_key = %s
+        """,
+        (
+            BAR_STATE_V2B_PROFILE.campaign_key,
+            BAR_STATE_V2B_PROFILE.campaign_name,
+            v2b_provenance.code_commit,
+            BAR_STATE_V2B_PROFILE.campaign_definition_sha256,
+            BAR_STATE_V2A_PROFILE.campaign_key,
+        ),
+    )
+    concurrent_started = threading.Event()
+
+    def insert_late_v2a_attempt() -> None:
+        with psycopg.connect(database_url) as connection:
+            concurrent_started.set()
+            connection.execute(
+                """
+                INSERT INTO systematic_fx.research_run_attempts
+                    (research_run_spec_id, attempt_number, status)
+                VALUES (%s, 3, 'QUEUED')
+                """,
+                (v2a_registrations[v2a.candidate_keys[0]].research_run_spec_id,),
+            )
+
+    try:
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(insert_late_v2a_attempt)
+            assert concurrent_started.wait(timeout=5)
+            with pytest.raises(FutureTimeoutError):
+                future.result(timeout=0.25)
+            successor_connection.commit()
+            with pytest.raises(
+                psycopg.errors.RaiseException,
+                match="V2A predecessor attempt lifecycle is frozen",
+            ):
+                future.result(timeout=5)
+    finally:
+        successor_connection.close()
+
+    prepared, provenance, specs, _ = _register_gate_campaign(
+        database_url,
+        tmp_path,
+        profile=BAR_STATE_V2B_PROFILE,
+        code_commit=v2b_provenance.code_commit,
+    )
+    assert tuple(item.fingerprint for item in specs) == tuple(
+        item.fingerprint for item in v2b_specs
+    )
+    idempotent_code = register_published_bar_artifact(
+        database_url,
+        tmp_path,
+        v2a_code_artifact,
+    )
+    assert idempotent_code.created is False
+
+    with (
+        pytest.raises(psycopg.errors.RaiseException, match="artifacts are frozen"),
+        psycopg.connect(database_url) as connection,
+        connection.transaction(),
+    ):
+        connection.execute(
+            """
+            INSERT INTO systematic_fx.artifacts
+                (artifact_key, artifact_type, uri, sha256, byte_size,
+                 media_type, producer_job_id, metadata)
+            SELECT artifact_key || ':late', artifact_type, uri || ':late', sha256,
+                   byte_size, media_type, producer_job_id, metadata
+            FROM systematic_fx.artifacts
+            WHERE artifact_id = %s
+            """,
+            (v2a_code_artifact_id,),
+        )
+    with (
+        pytest.raises(psycopg.errors.RaiseException, match="one exact frozen experiment"),
+        psycopg.connect(database_url) as connection,
+        connection.transaction(),
+    ):
+        connection.execute(
+            """
+            INSERT INTO systematic_fx.experiments
+                (experiment_key, campaign_id, pattern_id, parent_experiment_id,
+                 primary_family, status, hypothesis, direction, model_family,
+                 tick_size, tick_value, feature_definition_versions,
+                 search_boundary, cost_assumptions, execution_assumptions,
+                 trial_budget, trials_registered, registration_artifact_id,
+                 code_commit, config_sha256, frozen_at)
+            SELECT experiment_key || ':extra', campaign_id, pattern_id,
+                   parent_experiment_id, primary_family, status, hypothesis,
+                   direction, model_family, tick_size, tick_value,
+                   feature_definition_versions, search_boundary,
+                   cost_assumptions, execution_assumptions, trial_budget,
+                   trials_registered, registration_artifact_id, code_commit,
+                   config_sha256, statement_timestamp()
+            FROM systematic_fx.experiments
+            WHERE experiment_key = %s
+            """,
+            (BAR_STATE_V2B_PROFILE.experiment_key,),
+        )
+
+    with psycopg.connect(database_url, row_factory=dict_row) as connection:
+        coexistence = connection.execute(
+            """
+            WITH governed AS (
+                SELECT trial.experiment_trial_id, trial.trial_key,
+                       trial.research_run_spec_id, run_spec.run_fingerprint
+                FROM systematic_fx.experiment_trials AS trial
+                JOIN systematic_fx.experiments AS experiment
+                  ON experiment.experiment_id = trial.experiment_id
+                JOIN systematic_fx.campaigns AS campaign
+                  ON campaign.campaign_id = experiment.campaign_id
+                JOIN systematic_fx.research_run_specs AS run_spec
+                  ON run_spec.research_run_spec_id = trial.research_run_spec_id
+                WHERE campaign.campaign_key IN (%s, %s, %s)
+            )
+            SELECT count(*) AS trial_count,
+                   count(DISTINCT research_run_spec_id) AS spec_count,
+                   count(DISTINCT run_fingerprint) AS fingerprint_count,
+                   count(*) FILTER (
+                       WHERE systematic_fx.bar_state_run_spec_matches_trial(
+                           research_run_spec_id, experiment_trial_id
+                       )
+                   ) AS exact_match_count,
+                   (
+                       SELECT count(*)
+                       FROM (
+                           SELECT trial_key
+                           FROM governed
+                           GROUP BY trial_key
+                           HAVING count(*) = 3
+                       ) AS shared_keys
+                   ) AS shared_candidate_count
+            FROM governed
+            """,
+            (
+                BAR_STATE_V2_PROFILE.campaign_key,
+                BAR_STATE_V2A_PROFILE.campaign_key,
+                BAR_STATE_V2B_PROFILE.campaign_key,
+            ),
+        ).fetchone()
+        trigger_rows = connection.execute(
+            """
+                SELECT trigger.tgname, trigger.tgtype, count(*)
+                FROM pg_catalog.pg_trigger AS trigger
+                JOIN pg_catalog.pg_class AS relation ON relation.oid = trigger.tgrelid
+                JOIN pg_catalog.pg_namespace AS namespace
+                  ON namespace.oid = relation.relnamespace
+                WHERE namespace.nspname = 'systematic_fx'
+                  AND trigger.tgname IN (
+                      'aa_artifacts_freeze_bar_state_predecessor',
+                      'aa_bar_state_artifact_links_freeze_predecessor',
+                      'aa_experiment_trials_freeze_bar_state_predecessor',
+                      'aa_experiments_freeze_bar_state_predecessor',
+                      'aa_research_run_attempts_freeze_bar_state_v2a_predecessor',
+                      'bar_state_artifact_links_enforce_v2b_feature_schema',
+                      'bar_state_artifact_links_publication_refresh',
+                      'campaigns_require_bar_state_v2b_predecessor',
+                      'research_run_specs_freeze_bar_state_v2_predecessor'
+                  )
+                  AND NOT trigger.tgisinternal
+                GROUP BY trigger.tgname, trigger.tgtype
+                """
+        ).fetchall()
+        trigger_contracts = {row["tgname"]: (row["tgtype"], row["count"]) for row in trigger_rows}
+    assert coexistence == {
+        "trial_count": 36,
+        "spec_count": 36,
+        "fingerprint_count": 36,
+        "exact_match_count": 36,
+        "shared_candidate_count": 12,
+    }
+    assert trigger_contracts == {
+        "aa_artifacts_freeze_bar_state_predecessor": (7, 1),
+        "aa_bar_state_artifact_links_freeze_predecessor": (7, 1),
+        "aa_experiment_trials_freeze_bar_state_predecessor": (31, 1),
+        "aa_experiments_freeze_bar_state_predecessor": (23, 1),
+        "aa_research_run_attempts_freeze_bar_state_v2a_predecessor": (31, 1),
+        "bar_state_artifact_links_enforce_v2b_feature_schema": (7, 1),
+        "bar_state_artifact_links_publication_refresh": (28, 1),
+        "campaigns_require_bar_state_v2b_predecessor": (7, 1),
+        "research_run_specs_freeze_bar_state_v2_predecessor": (7, 1),
+    }
+
+    def pre_link_negatives(
+        reservations: Mapping[str, RunAttemptReservation],
+    ) -> None:
+        first_attempt_id = reservations[prepared.candidate_keys[0]].research_run_attempt_id
+        with (
+            pytest.raises(psycopg.errors.RaiseException, match="bytes or lineage drifted"),
+            psycopg.connect(database_url) as connection,
+            connection.transaction(),
+        ):
+            connection.execute(
+                _insert_link_sql(),
+                _link_parameters(
+                    v2a_code_artifact,
+                    artifact_id=v2a_code_artifact_id,
+                    artifact_role="FEATURE",
+                    shard_ordinal=0,
+                    attempt_id=first_attempt_id,
+                ),
+            )
+        wrong_feature = publish_bar_state_parquet(
+            tmp_path,
+            kind="FEATURE",
+            artifact_key_suffix="gate-wrong-v2b-feature-schema",
+            table=pa.table({"gate_value": pa.array([1], type=pa.int64())}),
+            lineage=_shared_lineage(prepared, provenance, specs),
+            logical_identity={"shard_ordinal": 0, "split_key": "discovery"},
+            profile=BAR_STATE_V2B_PROFILE,
+        )
+        wrong_feature_id = _register_artifact(database_url, tmp_path, wrong_feature)
+        with (
+            pytest.raises(
+                psycopg.errors.RaiseException,
+                match="exact round-trip Arrow schema",
+            ),
+            psycopg.connect(database_url) as connection,
+            connection.transaction(),
+        ):
+            connection.execute(
+                _insert_link_sql(),
+                _link_parameters(
+                    wrong_feature,
+                    artifact_id=wrong_feature_id,
+                    artifact_role="FEATURE",
+                    shard_ordinal=0,
+                    attempt_id=first_attempt_id,
+                ),
+            )
+
+    terminal_counts, link_counts = _complete_gate_campaign_lifecycle(
+        database_url,
+        tmp_path,
+        prepared=prepared,
+        provenance=provenance,
+        specs=specs,
+        profile=BAR_STATE_V2B_PROFILE,
+        pre_link_probe=pre_link_negatives,
+    )
+    assert terminal_counts == {
+        "attempts": 12,
+        "finalists": 4,
+        "rejects": 8,
+        "exact_pairs": 12,
+    }
+    assert link_counts == {"links": 144, "global_identities": 1}
+
+    with psycopg.connect(database_url, row_factory=dict_row) as connection:
+        v2a_snapshot_after = connection.execute(
+            """
+            SELECT systematic_fx.canonical_jsonb_sha256(jsonb_build_object(
+                'attempts', (
+                    SELECT jsonb_agg(to_jsonb(attempt) ORDER BY attempt.research_run_attempt_id)
+                    FROM systematic_fx.research_run_attempts AS attempt
+                    JOIN systematic_fx.research_run_specs AS run_spec
+                      ON run_spec.research_run_spec_id = attempt.research_run_spec_id
+                    WHERE run_spec.campaign_id = campaign.campaign_id
+                ),
+                'artifacts', (
+                    SELECT jsonb_agg(to_jsonb(artifact) ORDER BY artifact.artifact_id)
+                    FROM systematic_fx.artifacts AS artifact
+                    WHERE artifact.artifact_type = %s
+                ),
+                'specs', (
+                    SELECT jsonb_agg(to_jsonb(run_spec) ORDER BY run_spec.research_run_spec_id)
+                    FROM systematic_fx.research_run_specs AS run_spec
+                    WHERE run_spec.campaign_id = campaign.campaign_id
+                ),
+                'trials', (
+                    SELECT jsonb_agg(to_jsonb(trial) ORDER BY trial.experiment_trial_id)
+                    FROM systematic_fx.experiment_trials AS trial
+                    JOIN systematic_fx.experiments AS experiment
+                      ON experiment.experiment_id = trial.experiment_id
+                    WHERE experiment.campaign_id = campaign.campaign_id
+                )
+            )) AS sha256
+            FROM systematic_fx.campaigns AS campaign
+            WHERE campaign.campaign_key = %s
+            """,
+            (BAR_STATE_V2A_PROFILE.artifact_type, BAR_STATE_V2A_PROFILE.campaign_key),
+        ).fetchone()["sha256"]
+        latest = connection.execute(
+            "SELECT version, name, checksum FROM systematic_fx.schema_migrations "
+            "ORDER BY version DESC LIMIT 1"
+        ).fetchone()
+    assert v2a_snapshot_after == v2a_snapshot
+    assert latest == {
+        "version": 27,
+        "name": "bar_state_v2b_parquet_schema_amendment",
+        "checksum": EXPECTED_MIGRATION_0027_SHA256,
+    }

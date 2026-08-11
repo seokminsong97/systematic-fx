@@ -179,3 +179,12 @@ namespace, and admits V2A only after proving exactly twelve started-and-failed
 V2 attempts with no linked research evidence. Row locks and append guards
 serialize the amendment against late V2 trials, RunSpecs, and attempts; exact
 profile lineage and terminal/link validation continue through publication.
+
+`0027_bar_state_v2b_parquet_schema_amendment.sql` adds a third immutable State
+profile for the publication-only V2B correction. It keeps V2A's scientific
+catalog and 50,000-iteration model policy unchanged, pins V2B's compliant
+FEATURE list-child schema, and admits V2B only after proving exactly two clean
+FAILED V2A attempts per candidate with no governed evidence. Campaign-row
+locks freeze subsequent V2A experiments, trials, RunSpecs, attempts, and links
+against registration races while retaining fail-clean aborts for active V2B
+attempts if a live prerequisite drifts.

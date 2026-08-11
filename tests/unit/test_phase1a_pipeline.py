@@ -99,21 +99,24 @@ def _repository_migration_rows() -> list[dict[str, object]]:
     ]
 
 
-def test_phase1a_pipeline_supports_exact_bar_state_v2a_migration() -> None:
+def test_phase1a_pipeline_supports_exact_bar_state_v2b_migration() -> None:
     migrations = discover_migrations(_PROJECT_ROOT / "migrations")
     migration_by_version = {item.version: item for item in migrations}
 
     assert tuple(item.version for item in migrations) == (_SUPPORTED_SCHEMA_MIGRATION_VERSIONS)
-    assert _SUPPORTED_SCHEMA_MIGRATION_VERSIONS == tuple(range(1, 27))
+    assert _SUPPORTED_SCHEMA_MIGRATION_VERSIONS == tuple(range(1, 28))
     assert migration_by_version[24].checksum == (
         "4aa845757f1a220c8d5595d4db6053f6374d99d067ab7e20c3e40ea22d610010"
     )
     assert migration_by_version[25].checksum == (
         "e08aa486bf9a65b2875e92866ae5e939fc56dc5d871010dfdb4b9085550749dd"
     )
-    assert migrations[-1].name == "bar_state_v2a_optimizer_cap_amendment"
-    assert migrations[-1].checksum == (
+    assert migration_by_version[26].checksum == (
         "232badda3e76fca79f93fcff059de6f3404fc797eb26a93c9483fd554cfe20bb"
+    )
+    assert migrations[-1].name == "bar_state_v2b_parquet_schema_amendment"
+    assert migrations[-1].checksum == (
+        "f0f69db031dc555b260da1fceef5f1fb4087f25717f1472ae4b006e77182cdb8"
     )
 
 

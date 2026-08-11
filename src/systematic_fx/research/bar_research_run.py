@@ -128,7 +128,7 @@ BAR_SPLIT_VERSION: Final = "bar_pattern_splits_v1"
 BAR_RANDOM_SEED: Final = 0
 BAR_EVIDENCE_MATCH_SHARD_MAX_RECORDS: Final = 4_096
 BAR_EVIDENCE_REPLAY_SHARD_MAX_RECORDS: Final = 256
-SUPPORTED_MIGRATIONS: Final = tuple(range(1, 27))
+SUPPORTED_MIGRATIONS: Final = tuple(range(1, 28))
 
 # These identities describe the one approved dataset handoff.  Config hashes
 # are intentionally not duplicated here: the authoritative loader constants
@@ -327,7 +327,7 @@ def _git_head(project_root: Path) -> str:
 def _postgres_runtime(database_url: str, *, migrations_directory: Path) -> dict[str, object]:
     migrations = discover_migrations(migrations_directory)
     if tuple(item.version for item in migrations) != SUPPORTED_MIGRATIONS:
-        raise BarResearchRunError("bar Discovery requires migrations 0001 through 0026 exactly")
+        raise BarResearchRunError("bar Discovery requires migrations 0001 through 0027 exactly")
     with psycopg.connect(database_url, row_factory=dict_row) as connection:
         version = connection.execute(
             "SELECT current_setting('server_version') AS version, "
