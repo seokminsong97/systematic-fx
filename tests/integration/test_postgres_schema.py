@@ -117,7 +117,7 @@ class PostgreSQLSchemaIntegrationTest(unittest.TestCase):
     def test_migration_is_repeatable_and_expected_tables_exist(self) -> None:
         report = apply_migrations(self.database_url, psql_binary=self.psql)
         self.assertEqual(report.applied, ())
-        self.assertEqual(report.skipped, tuple(range(1, 26)))
+        self.assertEqual(report.skipped, tuple(range(1, 27)))
 
         result = self._run_sql(
             "SELECT tablename FROM pg_catalog.pg_tables "

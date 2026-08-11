@@ -144,7 +144,7 @@ BAR_STATE_DATASET_MANIFEST_RELATIVE_PATH: Final = Path(
 BAR_STATE_EXPECTED_DATASET_HANDOFF_SHA256: Final = (
     "26b1bb96f7323cae13bbe5d670c12f3e85615bbb9aab56932ce6523e67af7b00"
 )
-BAR_STATE_SUPPORTED_MIGRATIONS: Final = tuple(range(1, 26))
+BAR_STATE_SUPPORTED_MIGRATIONS: Final = tuple(range(1, 27))
 BAR_STATE_RANDOM_SEED: Final = 20_260_809
 BAR_STATE_DISCOVERY_ONE_SECOND_ROW_COUNT: Final = 7_573_041
 BAR_STATE_DISCOVERY_OUTCOME_SPAN_COUNT: Final = 10
@@ -452,7 +452,7 @@ def _git_head(project_root: Path) -> str:
 def _postgres_runtime(database_url: str, *, migrations_directory: Path) -> dict[str, object]:
     migrations = discover_migrations(migrations_directory)
     if tuple(item.version for item in migrations) != BAR_STATE_SUPPORTED_MIGRATIONS:
-        raise BarStateRunError("bar-state Discovery requires migrations 0001 through 0025")
+        raise BarStateRunError("bar-state Discovery requires migrations 0001 through 0026")
     with psycopg.connect(database_url, row_factory=dict_row) as connection:
         version = connection.execute(
             "SELECT current_setting('server_version') AS version, "

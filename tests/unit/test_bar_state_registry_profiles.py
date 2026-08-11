@@ -118,6 +118,7 @@ def test_v2a_predecessor_gate_requires_exact_failed_v2_without_research_evidence
         BAR_STATE_V2_PROFILE.campaign_key,
         BAR_STATE_V2_PROFILE.experiment_key,
     )
+    assert "a.started_at IS NOT NULL" in connection.calls[2][0]
     assert connection.calls[-1][1] == (41,)
 
 

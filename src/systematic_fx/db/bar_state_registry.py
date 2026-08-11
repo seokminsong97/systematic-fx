@@ -674,6 +674,7 @@ def _require_clean_bar_state_predecessor_connection(
                      AND a.result_artifact_id IS NULL
                      AND a.trade_ledger_artifact_id IS NULL
                      AND a.reused_attempt_id IS NULL
+                     AND a.started_at IS NOT NULL
                      AND a.finished_at IS NOT NULL
                      AND btrim(COALESCE(a.error_message, '')) <> ''
                )::integer AS exact_failed_count,

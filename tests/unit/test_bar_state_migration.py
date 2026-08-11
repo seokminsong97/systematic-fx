@@ -8,8 +8,11 @@ from systematic_fx.db.migrations import discover_migrations
 from systematic_fx.research.bar_state_config import (
     BAR_STATE_CONFIG_FILE_SHA256,
     BAR_STATE_CONFIG_SEMANTIC_SHA256,
+    BAR_STATE_V2_PROFILE,
+    BAR_STATE_V2A_PROFILE,
     load_bar_state_config,
 )
+from systematic_fx.research.hypotheses import canonical_sha256
 from systematic_fx.validation.bar_state_splits import BAR_STATE_FROZEN_SPLIT_SHA256
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -121,3 +124,62 @@ def test_migration_0025_only_rebinds_the_dataset_row_to_the_raw_manifest() -> No
         ).strip()
     )
     assert "VALUES (25, 'bar_state_raw_dataset_lineage_fix', :'migration_checksum')" in new_sql
+
+
+def test_migration_0026_dispatches_exact_v2_and_v2a_profiles() -> None:
+    migrations = {item.version: item for item in discover_migrations(ROOT / "migrations")}
+    migration = migrations[26]
+    assert migration.name == "bar_state_v2a_optimizer_cap_amendment"
+    assert migration.checksum == (
+        "232badda3e76fca79f93fcff059de6f3404fc797eb26a93c9483fd554cfe20bb"
+    )
+    sql = migration.path.read_text(encoding="utf-8")
+
+    for profile in (BAR_STATE_V2_PROFILE, BAR_STATE_V2A_PROFILE):
+        config = load_bar_state_config(ROOT, profile=profile)
+        for identity in (
+            profile.campaign_key,
+            profile.campaign_name,
+            profile.experiment_key,
+            profile.artifact_type,
+            profile.engine_version,
+            profile.config_file_sha256,
+            profile.config_semantic_sha256,
+            profile.candidate_catalog_sha256,
+            profile.campaign_definition_sha256,
+        ):
+            assert f"'{identity}'" in sql
+        model_policy_sha256s = {
+            canonical_sha256(candidate.as_dict()["model_policy"]) for candidate in config.candidates
+        }
+        assert len(model_policy_sha256s) == 1
+        assert f"'{model_policy_sha256s.pop()}'" in sql
+        assert str(profile.model_max_iter) in sql
+        for candidate in config.candidates:
+            assert f"'{candidate.candidate_key}'" in sql
+            assert f"'{candidate.definition_sha256}'" in sql
+
+    for function_name in (
+        "bar_state_experiment_is_governed",
+        "bar_state_run_spec_matches_trial",
+        "protect_bar_state_campaign_identity",
+        "protect_bar_state_experiment_identity",
+        "enforce_bar_state_trial_lifecycle",
+        "enforce_bar_state_attempt_lifecycle",
+        "enforce_bar_state_artifact_link",
+        "require_bar_state_terminal_pair",
+    ):
+        assert f"CREATE OR REPLACE FUNCTION systematic_fx.{function_name}" in sql
+    assert "FOR UPDATE;" in sql
+    assert "dataset.manifest_sha256 = trial.parameters #>> '{raw_source_manifest_sha256}'" in sql
+    assert "attempt.started_at IS NOT NULL" in sql
+    assert "NOT EXISTS (" in sql
+    assert "'FEATURE', 'LABEL', 'MODEL', 'OOS_TRADE'" in sql
+    assert "profile_version = 'V2A'" in sql
+    assert "research_run_specs_freeze_bar_state_v2_predecessor" in sql
+    assert "campaigns_require_bar_state_v2a_predecessor" in sql
+    assert "bar_state_governance_profile(OLD.campaign_key)" in sql
+    assert "bar_state_governance_profile(NEW.campaign_key)" in sql
+    assert "profile.experiment_key = NEW.experiment_key" in sql
+    assert "VALUES (26, 'bar_state_v2a_optimizer_cap_amendment', :'migration_checksum')" in sql
+    assert "PLACEHOLDER" not in sql

@@ -170,3 +170,12 @@ artifact links change and requests one immediate refresh on installation.
 RunSpec matcher so the control-plane dataset row is bound to the raw MBP-10
 source manifest, while the derived selected-trade-bar manifest remains
 independently bound in the candidate trial and RunSpec parameters.
+
+`0026_bar_state_v2a_optimizer_cap_amendment.sql` adds an immutable dual-profile
+governance dispatch for the failed State V2 campaign and its preregistered V2A
+optimizer-cap amendment. It preserves the V2 identities and artifact schema,
+binds V2A to its distinct configuration, candidate, engine, and artifact
+namespace, and admits V2A only after proving exactly twelve started-and-failed
+V2 attempts with no linked research evidence. Row locks and append guards
+serialize the amendment against late V2 trials, RunSpecs, and attempts; exact
+profile lineage and terminal/link validation continue through publication.
