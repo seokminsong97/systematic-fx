@@ -907,11 +907,17 @@ class _VerifiedOutcomeSpanSource(StatePortfolioPathSource):
             self._active_path_id = None
 
 
-def _feature_arrow_schema() -> pa.Schema:
+def _feature_arrow_schema(
+    *,
+    profile: BarStateCampaignProfile = BAR_STATE_V2_PROFILE,
+) -> pa.Schema:
+    selected = require_bar_state_campaign_profile(profile)
+    list_child_name = "element" if selected.version_id == "V2B" else "item"
+    string_list = pa.list_(pa.field(list_child_name, pa.string()))
     return pa.schema(
         [
             pa.field("feature_set_id", pa.string(), nullable=False),
-            pa.field("feature_names", pa.list_(pa.string()), nullable=False),
+            pa.field("feature_names", string_list, nullable=False),
             pa.field("timeframe_seconds", pa.int32(), nullable=False),
             pa.field("segment_id", pa.uint64(), nullable=False),
             pa.field("contract", pa.string(), nullable=False),
@@ -920,7 +926,7 @@ def _feature_arrow_schema() -> pa.Schema:
             pa.field("decision_ns", pa.int64(), nullable=False),
             pa.field("atr_true_range_sum_ticks", pa.int64(), nullable=False),
             pa.field("volatility_ticks", pa.int32(), nullable=False),
-            pa.field("values_hex", pa.list_(pa.string()), nullable=False),
+            pa.field("values_hex", string_list, nullable=False),
         ],
         metadata={
             b"systematic_fx.artifact_schema": BAR_STATE_ARTIFACT_SCHEMA_BY_KIND["FEATURE"].encode(
@@ -931,7 +937,11 @@ def _feature_arrow_schema() -> pa.Schema:
     )
 
 
-def _feature_table(rows: Sequence[BarStateFeatureRow]) -> pa.Table:
+def _feature_table(
+    rows: Sequence[BarStateFeatureRow],
+    *,
+    profile: BarStateCampaignProfile = BAR_STATE_V2_PROFILE,
+) -> pa.Table:
     records = [
         {
             "atr_true_range_sum_ticks": item.atr_true_range_sum_ticks,
@@ -948,7 +958,7 @@ def _feature_table(rows: Sequence[BarStateFeatureRow]) -> pa.Table:
         }
         for item in rows
     ]
-    return pa.Table.from_pylist(records, schema=_feature_arrow_schema())
+    return pa.Table.from_pylist(records, schema=_feature_arrow_schema(profile=profile))
 
 
 def _label_arrow_schema() -> pa.Schema:
@@ -1227,7 +1237,7 @@ def _build_discovery_features(
                     "row_count": len(rows),
                     "timeframe_seconds": timeframe,
                 },
-                table=_feature_table(rows),
+                table=_feature_table(rows, profile=prepared.profile),
             )
         )
         _notify(

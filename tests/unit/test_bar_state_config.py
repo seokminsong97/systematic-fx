@@ -26,6 +26,13 @@ from systematic_fx.research.bar_state_config import (
     BAR_STATE_V2A_CONFIG_RELATIVE_PATH,
     BAR_STATE_V2A_CONFIG_SEMANTIC_SHA256,
     BAR_STATE_V2A_PROFILE,
+    BAR_STATE_V2B_CAMPAIGN_DEFINITION_SHA256,
+    BAR_STATE_V2B_CAMPAIGN_KEY,
+    BAR_STATE_V2B_CANDIDATE_CATALOG_SHA256,
+    BAR_STATE_V2B_CONFIG_FILE_SHA256,
+    BAR_STATE_V2B_CONFIG_RELATIVE_PATH,
+    BAR_STATE_V2B_CONFIG_SEMANTIC_SHA256,
+    BAR_STATE_V2B_PROFILE,
     MORPHOLOGY_FEATURE_IDS,
     STATE_FEATURE_IDS,
     BarStateCandidate,
@@ -35,6 +42,7 @@ from systematic_fx.research.bar_state_config import (
     frozen_model_policy,
     load_bar_state_config,
     load_bar_state_v2a_config,
+    load_bar_state_v2b_config,
     require_bar_state_campaign_profile,
 )
 from systematic_fx.research.bar_state_features import BarStateFeatureSpec
@@ -110,6 +118,108 @@ def test_v2a_candidate_policy_diff_is_exactly_the_optimizer_cap() -> None:
         assert predecessor_arguments.pop("max_iter") == 5_000
         assert successor_arguments.pop("max_iter") == 50_000
         assert successor_document == predecessor_document
+
+
+def test_v2b_loader_freezes_engineering_identity_without_scientific_drift() -> None:
+    config = load_bar_state_v2b_config(ROOT)
+    v2a = load_bar_state_v2a_config(ROOT)
+
+    assert config.profile is BAR_STATE_V2B_PROFILE
+    assert config.path == ROOT / BAR_STATE_V2B_CONFIG_RELATIVE_PATH
+    assert config.sha256 == BAR_STATE_V2B_CONFIG_FILE_SHA256
+    assert config.semantic_sha256 == BAR_STATE_V2B_CONFIG_SEMANTIC_SHA256
+    assert config.candidate_catalog_sha256 == BAR_STATE_V2B_CANDIDATE_CATALOG_SHA256
+    assert config.definition_sha256 == BAR_STATE_V2B_CAMPAIGN_DEFINITION_SHA256
+    assert config.as_dict()["campaign_key"] == BAR_STATE_V2B_CAMPAIGN_KEY
+    assert config.as_dict()["engineering_amendment"] == {
+        "amendment_scope": "FEATURE_PARQUET_LIST_CHILD_FIELD_NAMES_ONLY",
+        "predecessor_campaign_definition_sha256": (BAR_STATE_V2A_CAMPAIGN_DEFINITION_SHA256),
+        "predecessor_campaign_key": BAR_STATE_V2A_CAMPAIGN_KEY,
+        "predecessor_code_commit": "8688c7efb298f9644ee3821ce575349c446c6998",
+        "predecessor_gate_policy": (
+            "REQUIRE_EXACT_FAILED_PREDECESSOR_ATTEMPTS_1_AND_2_WITH_NO_GOVERNED_EVIDENCE"
+        ),
+    }
+    assert [item.as_dict() for item in config.candidates] == [
+        item.as_dict() for item in v2a.candidates
+    ]
+    assert tuple(item.definition_sha256 for item in config.candidates) == tuple(
+        item.definition_sha256 for item in v2a.candidates
+    )
+    assert config.candidate_catalog_sha256 == v2a.candidate_catalog_sha256
+
+
+def test_v2b_toml_changes_only_administration_paths_and_feature_schema_fix() -> None:
+    v2a = load_toml_document(ROOT / BAR_STATE_V2A_CONFIG_RELATIVE_PATH)
+    v2b = load_toml_document(ROOT / BAR_STATE_V2B_CONFIG_RELATIVE_PATH)
+    shared_scientific_sections = (
+        "source",
+        "market",
+        "candidate_catalog",
+        "feature_sets",
+        "features",
+        "feature_formulas",
+        "model",
+        "labels",
+        "prediction",
+        "entry",
+        "economic_barriers",
+        "costs",
+        "splits",
+        "discovery_support",
+        "discovery_economic_gates",
+        "multiplicity",
+        "promotion",
+    )
+
+    assert {key: v2b[key] for key in shared_scientific_sections} == {
+        key: v2a[key] for key in shared_scientific_sections
+    }
+    assert v2b["model"]["actual_sklearn_kwargs"]["max_iter"] == 50_000
+    inherited = dict(v2b["inherited_v2a_optimizer_cap_qualification"])
+    assert inherited.pop("source_campaign_key") == BAR_STATE_V2A_CAMPAIGN_KEY
+    assert inherited.pop("source_campaign_definition_sha256") == (
+        BAR_STATE_V2A_CAMPAIGN_DEFINITION_SHA256
+    )
+    assert inherited == v2a["optimizer_cap_amendment"]
+    assert v2b["paths"]["bars_input_relative"] == v2a["paths"]["bars_input_relative"]
+    for output_key in (
+        "labels_output_relative",
+        "models_output_relative",
+        "results_output_relative",
+        "checkpoints_output_relative",
+    ):
+        assert v2b["paths"][output_key] == v2a["paths"][output_key].replace(
+            "bar_state_conditional_v2a",
+            "bar_state_conditional_v2b",
+        )
+
+
+def test_v2b_forensic_amendment_is_metadata_only_and_exact() -> None:
+    amendment = load_toml_document(ROOT / BAR_STATE_V2B_CONFIG_RELATIVE_PATH)[
+        "engineering_amendment"
+    ]
+
+    assert amendment["predecessor_attempt_numbers"] == [1, 2]
+    assert amendment["predecessor_attempt_count"] == 24
+    assert amendment["predecessor_governed_artifact_link_count"] == 0
+    assert amendment["first_feature_row_count"] == 98_533
+    assert amendment["first_feature_expected_schema_sha256"] == (
+        "d2aca906686ec49f725f215c3130cc179ca79c25033ed74443fea34b5a61413d"
+    )
+    assert amendment["first_feature_roundtrip_schema_sha256"] == (
+        "da7e500759276e85483f070451595eb083f3c15e76541bc2a2bd86c6483ebef3"
+    )
+    assert amendment["expected_list_child_field_name"] == "item"
+    assert amendment["parquet_roundtrip_list_child_field_name"] == "element"
+    assert amendment["v2b_list_child_field_name"] == "element"
+    assert amendment["engine_result_computed_in_memory"] is True
+    assert amendment["oos_economics_computed_in_memory"] is True
+    assert amendment["oos_economic_values_inspected_for_amendment"] is False
+    assert amendment["sealed_walk_forward_accessed"] is False
+    assert amendment["sealed_holdout_accessed"] is False
+    assert amendment["governed_result_evidence_published"] is False
+    assert amendment["orphan_feature_file_present"] is False
 
 
 def test_v2a_hashes_pin_model_policy_catalog_campaign_and_all_candidates() -> None:
@@ -192,13 +302,22 @@ def test_v2a_config_records_train_only_qualification_and_predecessor_gate() -> N
 
 
 def test_campaign_profile_lookup_and_allowlist_reject_forged_profiles() -> None:
-    assert BAR_STATE_CAMPAIGN_PROFILES == (BAR_STATE_V2_PROFILE, BAR_STATE_V2A_PROFILE)
+    assert BAR_STATE_CAMPAIGN_PROFILES == (
+        BAR_STATE_V2_PROFILE,
+        BAR_STATE_V2A_PROFILE,
+        BAR_STATE_V2B_PROFILE,
+    )
     assert bar_state_campaign_profile() is BAR_STATE_V2_PROFILE
     assert bar_state_campaign_profile("V2A") is BAR_STATE_V2A_PROFILE
+    assert bar_state_campaign_profile("V2B") is BAR_STATE_V2B_PROFILE
     assert require_bar_state_campaign_profile(BAR_STATE_V2A_PROFILE) is BAR_STATE_V2A_PROFILE
     assert BAR_STATE_V2A_PROFILE.artifact_type == BAR_STATE_V2A_CAMPAIGN_KEY
     assert BAR_STATE_V2A_PROFILE.experiment_key == (
         "bar_state_conditional_v2a:experiment:frozen_candidate_catalog:v1"
+    )
+    assert BAR_STATE_V2B_PROFILE.artifact_type == BAR_STATE_V2B_CAMPAIGN_KEY
+    assert BAR_STATE_V2B_PROFILE.experiment_key == (
+        "bar_state_conditional_v2b:experiment:frozen_candidate_catalog:v1"
     )
 
     forged = replace(BAR_STATE_V2A_PROFILE, model_max_iter=50_001)

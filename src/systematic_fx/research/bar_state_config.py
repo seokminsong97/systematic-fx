@@ -1,10 +1,11 @@
-"""Frozen State-Conditional Bar Model V2/V2A configurations and candidate catalogs.
+"""Frozen State-Conditional Bar Model V2/V2A/V2B configurations and catalogs.
 
 The shared catalog is intentionally small: two signal clocks, two preregistered
 feature sets, and three confidence margins produce exactly twelve candidates.
 Each candidate emits one of ``LONG``, ``SHORT``, or ``NO_TRADE``; direction is
-not doubled into separate variants.  V2A is an administrative successor whose
-sole candidate-policy change is a larger optimizer iteration cap.
+not doubled into separate variants. V2A raises only the optimizer iteration
+cap. V2B preserves V2A's scientific catalog and fixes only its FEATURE Parquet
+list-child schema spelling in the execution layer.
 """
 
 from __future__ import annotations
@@ -51,6 +52,21 @@ BAR_STATE_V2A_CANDIDATE_CATALOG_SHA256: Final = (
 BAR_STATE_V2A_CAMPAIGN_DEFINITION_SHA256: Final = (
     "8a332ad6998bb8bf48c3de94bc0ca660905a08acb848580ee5e31d9c42f8033c"
 )
+BAR_STATE_V2B_CONFIG_RELATIVE_PATH: Final = Path("configs/research/bar_state_conditional_v2b.toml")
+BAR_STATE_V2B_CONFIG_FILE_SHA256: Final = (
+    "87127f274ef4cc500deede2d8031919711c042530711051ba7ec598cda4e021e"
+)
+BAR_STATE_V2B_CONFIG_SEMANTIC_SHA256: Final = (
+    "547f30350eb829d5cf82bef6c62e7720ac9a81511759e3a791cdeba24245ad09"
+)
+BAR_STATE_V2B_CONFIG_ID: Final = "bar_state_conditional_v2b"
+BAR_STATE_V2B_CAMPAIGN_KEY: Final = "bar_state_conditional_v2b"
+BAR_STATE_V2B_CANDIDATE_CATALOG_SHA256: Final = (
+    "97bbdacd0d655a1ca4e81085f3f25fb32da0bf31329bbd670ba89778611084d6"
+)
+BAR_STATE_V2B_CAMPAIGN_DEFINITION_SHA256: Final = (
+    "cee6838d9c85498818140bd02ae92483fe17c080d4909190eb0b83f790e5bb60"
+)
 BAR_STATE_SCHEMA_VERSION: Final = 1
 BAR_STATE_CANDIDATE_COUNT: Final = 12
 BAR_STATE_MAXIMUM_FINALISTS: Final = 4
@@ -95,6 +111,8 @@ class BarStateCampaignProfile:
     predecessor_campaign_definition_sha256: str | None = None
     predecessor_code_commit: str | None = None
     predecessor_gate_policy: str | None = None
+    amendment_document_key: str | None = None
+    amendment_scope: str | None = None
 
     def __post_init__(self) -> None:
         for field in (
@@ -142,6 +160,8 @@ class BarStateCampaignProfile:
             self.predecessor_campaign_definition_sha256,
             self.predecessor_code_commit,
             self.predecessor_gate_policy,
+            self.amendment_document_key,
+            self.amendment_scope,
         )
         if any(value is None for value in predecessor_fields) != all(
             value is None for value in predecessor_fields
@@ -171,6 +191,19 @@ class BarStateCampaignProfile:
             or self.predecessor_gate_policy != self.predecessor_gate_policy.strip()
         ):
             raise BarStateConfigError("predecessor gate policy is invalid")
+        if self.amendment_document_key is not None and (
+            not self.amendment_document_key
+            or self.amendment_document_key != self.amendment_document_key.strip()
+            or any(
+                character not in "abcdefghijklmnopqrstuvwxyz0123456789_"
+                for character in self.amendment_document_key
+            )
+        ):
+            raise BarStateConfigError("amendment document key is invalid")
+        if self.amendment_scope is not None and (
+            not self.amendment_scope or self.amendment_scope != self.amendment_scope.strip()
+        ):
+            raise BarStateConfigError("amendment scope is invalid")
 
     @property
     def artifact_type(self) -> str:
@@ -210,10 +243,34 @@ BAR_STATE_V2A_PROFILE: Final = BarStateCampaignProfile(
     predecessor_campaign_definition_sha256=BAR_STATE_CAMPAIGN_DEFINITION_SHA256,
     predecessor_code_commit="2ca2b0b6158c1d1e9d880c2ed65ec7d7582de189",
     predecessor_gate_policy="REQUIRE_EXACT_FAILED_PREDECESSOR_WITH_NO_OOS_EVIDENCE",
+    amendment_document_key="optimizer_cap_amendment",
+    amendment_scope="OPTIMIZER_MAX_ITER_CAP_ONLY",
+)
+BAR_STATE_V2B_PROFILE: Final = BarStateCampaignProfile(
+    version_id="V2B",
+    config_id=BAR_STATE_V2B_CONFIG_ID,
+    campaign_key=BAR_STATE_V2B_CAMPAIGN_KEY,
+    campaign_name="Frozen conditional candle-state Discovery v2b",
+    engine_version="bar_state_conditional_discovery_v2b",
+    config_relative_path=BAR_STATE_V2B_CONFIG_RELATIVE_PATH,
+    config_file_sha256=BAR_STATE_V2B_CONFIG_FILE_SHA256,
+    config_semantic_sha256=BAR_STATE_V2B_CONFIG_SEMANTIC_SHA256,
+    candidate_catalog_sha256=BAR_STATE_V2B_CANDIDATE_CATALOG_SHA256,
+    campaign_definition_sha256=BAR_STATE_V2B_CAMPAIGN_DEFINITION_SHA256,
+    model_max_iter=50_000,
+    amends_campaign_key=BAR_STATE_V2A_CAMPAIGN_KEY,
+    predecessor_campaign_definition_sha256=BAR_STATE_V2A_CAMPAIGN_DEFINITION_SHA256,
+    predecessor_code_commit="8688c7efb298f9644ee3821ce575349c446c6998",
+    predecessor_gate_policy=(
+        "REQUIRE_EXACT_FAILED_PREDECESSOR_ATTEMPTS_1_AND_2_WITH_NO_GOVERNED_EVIDENCE"
+    ),
+    amendment_document_key="engineering_amendment",
+    amendment_scope="FEATURE_PARQUET_LIST_CHILD_FIELD_NAMES_ONLY",
 )
 BAR_STATE_CAMPAIGN_PROFILES: Final = (
     BAR_STATE_V2_PROFILE,
     BAR_STATE_V2A_PROFILE,
+    BAR_STATE_V2B_PROFILE,
 )
 
 
@@ -731,8 +788,10 @@ class BarStateResearchConfig:
             "schema_version": BAR_STATE_SCHEMA_VERSION,
         }
         if self.profile.amends_campaign_key is not None:
-            document["optimizer_cap_amendment"] = {
-                "amendment_scope": "OPTIMIZER_MAX_ITER_CAP_ONLY",
+            assert self.profile.amendment_document_key is not None
+            assert self.profile.amendment_scope is not None
+            document[self.profile.amendment_document_key] = {
+                "amendment_scope": self.profile.amendment_scope,
                 "predecessor_campaign_definition_sha256": (
                     self.profile.predecessor_campaign_definition_sha256
                 ),
@@ -803,4 +862,18 @@ def load_bar_state_v2a_config(
         project_root,
         config_path=config_path,
         profile=BAR_STATE_V2A_PROFILE,
+    )
+
+
+def load_bar_state_v2b_config(
+    project_root: Path,
+    *,
+    config_path: Path | None = None,
+) -> BarStateResearchConfig:
+    """Load the FEATURE-schema engineering successor without changing defaults."""
+
+    return load_bar_state_config(
+        project_root,
+        config_path=config_path,
+        profile=BAR_STATE_V2B_PROFILE,
     )

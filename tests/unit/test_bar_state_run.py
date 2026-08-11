@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pyarrow as pa
+import pyarrow.parquet as pq
 import pytest
 
 from systematic_fx.db.bar_state_registry import (
@@ -19,8 +20,18 @@ from systematic_fx.db.bar_state_registry import (
 )
 from systematic_fx.features.bars import TradeBar
 from systematic_fx.research import bar_state_run
-from systematic_fx.research.bar_state_artifacts import bar_state_price_policy_from_selection
-from systematic_fx.research.bar_state_config import BAR_STATE_V2A_PROFILE
+from systematic_fx.research.bar_artifacts import (
+    BarArtifactDescriptor,
+    BarArtifactError,
+    arrow_schema_sha256,
+    publish_bar_parquet_table,
+    verify_published_bar_artifact,
+)
+from systematic_fx.research.bar_state_artifacts import (
+    BAR_STATE_ARTIFACT_SCHEMA_BY_KIND,
+    bar_state_price_policy_from_selection,
+)
+from systematic_fx.research.bar_state_config import BAR_STATE_V2A_PROFILE, BAR_STATE_V2B_PROFILE
 from systematic_fx.research.bar_state_features import (
     FEATURE_NAMES_BY_SET,
     BarStateFeatureRow,
@@ -42,6 +53,7 @@ from systematic_fx.research.bar_state_run import (
     BarStateResearchRunReport,
     BarStateRunProgress,
     BarStateRunProvenance,
+    _feature_arrow_schema,
     _feature_identity,
     _fit_discovery_finalist_models,
     _fit_models_and_build_signals,
@@ -326,6 +338,24 @@ def test_v2a_plan_uses_disjoint_identity_50k_candidates_and_checkpoint_namespace
     )
 
 
+def test_v2b_plan_preserves_v2a_candidates_under_disjoint_run_identities() -> None:
+    v2a = load_prepared_bar_state_run(ROOT, profile=BAR_STATE_V2A_PROFILE)
+    v2b = load_prepared_bar_state_run(ROOT, profile=BAR_STATE_V2B_PROFILE)
+    v2a_specs = build_bar_state_run_specs(v2a, _provenance())
+    v2b_specs = build_bar_state_run_specs(v2b, _provenance())
+
+    assert [item.as_dict() for item in v2b.config.candidates] == [
+        item.as_dict() for item in v2a.config.candidates
+    ]
+    assert {item.model_max_iter for item in v2b.config.candidates} == {50_000}
+    assert {item.campaign_id for item in v2b_specs} == {BAR_STATE_V2B_PROFILE.campaign_key}
+    assert {item.experiment_id for item in v2b_specs} == {BAR_STATE_V2B_PROFILE.experiment_key}
+    assert {item.engine_version for item in v2b_specs} == {BAR_STATE_V2B_PROFILE.engine_version}
+    assert {item.fingerprint for item in v2a_specs}.isdisjoint(
+        {item.fingerprint for item in v2b_specs}
+    )
+
+
 def test_v2a_predecessor_gate_runs_before_provenance_or_publication() -> None:
     v2a = load_prepared_bar_state_run(ROOT, profile=BAR_STATE_V2A_PROFILE)
     state: list[str] = []
@@ -545,6 +575,55 @@ def test_oos_trade_schema_freezes_decision_entry_and_exit_dates() -> None:
     } <= names
     assert "active_date" not in names
     assert "utc_month" not in names
+
+
+def test_v2b_feature_schema_roundtrips_under_the_strict_parquet_publisher(
+    tmp_path: Path,
+) -> None:
+    v2a_schema = _feature_arrow_schema(profile=BAR_STATE_V2A_PROFILE)
+    v2b_schema = _feature_arrow_schema(profile=BAR_STATE_V2B_PROFILE)
+
+    assert arrow_schema_sha256(v2a_schema) == (
+        "d2aca906686ec49f725f215c3130cc179ca79c25033ed74443fea34b5a61413d"
+    )
+    assert arrow_schema_sha256(v2b_schema) == (
+        "da7e500759276e85483f070451595eb083f3c15e76541bc2a2bd86c6483ebef3"
+    )
+    assert v2a_schema.field("feature_names").type.value_field.name == "item"
+    assert v2a_schema.field("values_hex").type.value_field.name == "item"
+    assert v2b_schema.field("feature_names").type.value_field.name == "element"
+    assert v2b_schema.field("values_hex").type.value_field.name == "element"
+
+    table = pa.Table.from_pylist([], schema=v2b_schema)
+    descriptor = BarArtifactDescriptor(
+        artifact_key="bar_state_conditional_v2b:feature:schema_regression",
+        artifact_type="bar_state_conditional_v2b",
+        artifact_schema=BAR_STATE_ARTIFACT_SCHEMA_BY_KIND["FEATURE"],
+        artifact_version=1,
+        record_count=0,
+        schema_sha256=arrow_schema_sha256(v2b_schema),
+        source_manifest_sha256="a" * 64,
+        logical_identity={"artifact_kind": "FEATURE", "campaign_key": "test_v2b"},
+        media_type="application/vnd.apache.parquet",
+        file_suffix=".parquet",
+    )
+    artifact = publish_bar_parquet_table(tmp_path, descriptor, table)
+
+    verify_published_bar_artifact(tmp_path, artifact)
+    assert artifact.path.is_file()
+    assert arrow_schema_sha256(pq.ParquetFile(artifact.path).schema_arrow) == (
+        descriptor.schema_sha256
+    )
+
+    old_table = pa.Table.from_pylist([], schema=v2a_schema)
+    old_descriptor = replace(
+        descriptor,
+        artifact_key="bar_state_conditional_v2a:feature:schema_regression",
+        artifact_type="bar_state_conditional_v2a",
+        schema_sha256=arrow_schema_sha256(v2a_schema),
+    )
+    with pytest.raises(BarArtifactError, match="staged Parquet differs"):
+        publish_bar_parquet_table(tmp_path, old_descriptor, old_table)
 
 
 def test_engine_final_fit_binding_is_exact_and_nonfinalists_cannot_claim_it(

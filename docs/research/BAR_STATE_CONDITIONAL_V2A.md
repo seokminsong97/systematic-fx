@@ -1,11 +1,11 @@
 # Bar State-Conditional Model V2A
 
-- Status: frozen optimizer-cap amendment; Discovery execution not yet authorized
+- Status: immutable engineering-publication failure; superseded by V2B
 - Campaign key: `bar_state_conditional_v2a`
 - Authorized stage: Discovery only
 - Predecessor: `bar_state_conditional_v2`
 - Amendment scope: optimizer `max_iter` cap only
-- Qualification: train-only; no OOS economics, walk-forward, or holdout access
+- Pre-freeze qualification: train-only; no OOS economics, walk-forward, or holdout access
 
 ## 1. Decision
 
@@ -25,7 +25,49 @@ The original V2 campaign stays closed under its exact configuration, candidate
 definitions, code commit, and artifact namespace. V2A receives new identities
 even though its canonical candidate keys remain `bsv2_*`.
 
-## 2. Exact Amendment Boundary
+## 2. Executed V2A Record
+
+V2A ran twice from exact code commit
+`8688c7efb298f9644ee3821ce575349c446c6998`. The control plane contains
+campaign 138, experiment 7450, twelve frozen trials, and two failed attempts for
+each trial: attempt IDs 1539–1550 for attempt 1 and 1551–1562 for attempt 2.
+Every attempt has null result, trade-ledger, and reuse artifact IDs. All six
+governed evidence roles have zero links.
+
+Both executions completed the in-memory Discovery engine, including signal,
+model, OOS economic replay, bootstrap, and selection computation. They then
+failed before the first governed evidence file was published. No economic
+value, finalist result, GLOBAL document, or TERMINAL document was emitted by
+the CLI or inspected to choose the engineering correction. Walk-forward and
+holdout remained unopened.
+
+The exact failure was the first FEATURE payload:
+
+```text
+artifact suffix           tf0300_fsmorphology_discovery
+split / shard             discovery / 0
+rows                      98,533
+expected Arrow schema SHA d2aca906686ec49f725f215c3130cc179ca79c25033ed74443fea34b5a61413d
+round-trip schema SHA     da7e500759276e85483f070451595eb083f3c15e76541bc2a2bd86c6483ebef3
+exception                 staged Parquet differs from the artifact identity
+```
+
+PyArrow considered the table and reopened Parquet schemas semantically equal,
+but Parquet normalized the nested string-list child names from `item` to
+`element`. Their lossless serialized schema bytes therefore hashed differently.
+The held temporary Parquet had no directory link and was closed by the
+`TemporaryFile` context. The would-be FEATURE identity directory and file do
+not exist; there is no orphan to delete. Only the already-registered
+REGISTRATION and CODE_SNAPSHOT JSON files remain, and their filesystem sizes
+and hashes match the database.
+
+An unchanged third V2A attempt would deterministically fail at the same check.
+Changing the schema construction changes the captured source snapshot, so V2A
+is not patched or rewritten in place. V2B is a new engineering successor with
+the same V2A scientific policies and an explicit `element` child name for only
+its FEATURE list fields.
+
+## 3. Exact Amendment Boundary
 
 | Identity or policy | V2 | V2A |
 |---|---|---|
@@ -46,7 +88,7 @@ provide version separation.
 No fallback is authorized. A warning or `n_iter >= 50000` remains a hard
 candidate failure. The cap may not be raised again inside this campaign.
 
-## 3. Train-Only Qualification Evidence
+## 4. Train-Only Qualification Evidence
 
 The cap was qualified on the exact fit that stopped V2:
 
@@ -90,7 +132,7 @@ Qualification did not inspect an OOS score, trade, PnL, p-value, finalist label,
 walk-forward value, or holdout value. It answered only whether an unchanged
 optimizer reached its existing tolerance before a fixed computational cap.
 
-## 4. Predecessor Gate
+## 5. Predecessor Gate
 
 V2A may start only if the control plane proves this exact predecessor:
 
@@ -107,7 +149,7 @@ successful predecessor attempt or any FEATURE, LABEL, MODEL, OOS_TRADE,
 GLOBAL_RESULT, or TERMINAL_RESULT link blocks V2A. This gate is metadata-only;
 it does not open any result artifact.
 
-## 5. Unchanged Scientific Identities
+## 6. Unchanged Scientific Identities
 
 ```text
 raw source manifest SHA   14db710d8a522a83d495faeac1c05c9a0169f80f088dfbeb7a66b38f14b6e3de
@@ -121,7 +163,7 @@ The Discovery multiplicity family remains 804 tests: 216 predecessor pattern
 variants plus the same 588 state-model barrier cells. The failed V2 optimizer
 did not produce a second economic family because it stopped before OOS evidence.
 
-## 6. Frozen V2A Identities
+## 7. Frozen V2A Identities
 
 ```text
 config file SHA-256       ecc4837c67e1c42ae69bfe0c74744e8aba9ba7cd99584b2dc0c091f6579f0a52
