@@ -35,7 +35,17 @@ from systematic_fx.db.outcome_registry import (
     P1_05_EXPECTED_PLANNED_SOURCE_DATE_COUNT,
     P1_05_EXPECTED_SOURCE_OCCURRENCE_COUNT,
     P1_05_QUERY_ID,
+    P4_01_EXPECTED_DIRECTION_SIGNAL_COUNTS,
+    P4_01_EXPECTED_SOURCE_OCCURRENCE_COUNT,
+    P4_01_QUERY_ID,
+    P4_02_EXPECTED_DIRECTION_SIGNAL_COUNTS,
+    P4_02_EXPECTED_SOURCE_OCCURRENCE_COUNT,
+    P4_02_QUERY_ID,
+    P4_PAIR_CONFIG_SHA256,
+    P4_PAIR_ECONOMIC_CELL_COUNT,
+    P4_PAIR_ID,
     P5_QUERY_ID,
+    PHASE1A_CUMULATIVE_ECONOMIC_CELL_COUNT,
     SCENARIO_COST_TICKS_PER_FILL,
     SCENARIO_IDS,
     OutcomeCellSummary,
@@ -46,11 +56,13 @@ from systematic_fx.db.outcome_registry import (
     OutcomeReplayAuditSubject,
     OutcomeScreeningDecision,
     _open_held_immutable_file,
+    _p4_pair_release_payload,
     _require_held_parent,
     _validate_checkpoint_artifact,
     _validate_equivalence_audit_artifact,
     _validate_source_artifact_document,
     _verify_held_file,
+    complete_phase1a_outcome_replay,
     derive_phase1a_outcome_screening_decisions,
     load_latest_phase1a_outcome_checkpoint,
     outcome_query_profile,
@@ -214,6 +226,93 @@ def test_p1_cell_surface_uses_its_own_frozen_direction_counts() -> None:
     assert len(digest) == 64
     with pytest.raises(OutcomeRegistryError, match="LONG cell signal_count"):
         validate_complete_cell_summaries(p1_cells)
+
+
+@pytest.mark.parametrize(
+    ("query_id", "signal_count", "direction_counts"),
+    (
+        (
+            P4_01_QUERY_ID,
+            P4_01_EXPECTED_SOURCE_OCCURRENCE_COUNT,
+            P4_01_EXPECTED_DIRECTION_SIGNAL_COUNTS,
+        ),
+        (
+            P4_02_QUERY_ID,
+            P4_02_EXPECTED_SOURCE_OCCURRENCE_COUNT,
+            P4_02_EXPECTED_DIRECTION_SIGNAL_COUNTS,
+        ),
+    ),
+)
+def test_p4_profiles_bind_the_exact_pair_and_cumulative_multiplicity(
+    query_id: str,
+    signal_count: int,
+    direction_counts: dict[str, int],
+) -> None:
+    parameters = phase1a_outcome_parameters("a" * 64, query_id=query_id)
+
+    assert parameters["pair_id"] == P4_PAIR_ID
+    assert parameters["pair_config_sha256"] == P4_PAIR_CONFIG_SHA256
+    assert parameters["paired_query_ids"] == [P4_01_QUERY_ID, P4_02_QUERY_ID]
+    assert parameters["source_occurrence_count"] == signal_count
+    assert parameters["expected_direction_signal_counts"] == direction_counts
+    assert parameters["pair_economic_cell_count"] == P4_PAIR_ECONOMIC_CELL_COUNT
+    assert parameters["cumulative_economic_cell_count"] == PHASE1A_CUMULATIVE_ECONOMIC_CELL_COUNT
+
+
+def test_p4_release_payload_is_ordered_and_individual_completion_is_forbidden(
+    tmp_path: Path,
+) -> None:
+    decisions = {
+        P4_01_QUERY_ID: {"LONG": "1" * 64, "SHORT": "2" * 64},
+        P4_02_QUERY_ID: {"LONG": "3" * 64, "SHORT": "4" * 64},
+    }
+    payload = _p4_pair_release_payload(
+        p4_01_outcome_replay_manifest_id=11,
+        p4_01_run_fingerprint="5" * 64,
+        p4_01_result_artifact_sha256="6" * 64,
+        p4_01_cell_summaries_sha256="7" * 64,
+        p4_02_outcome_replay_manifest_id=12,
+        p4_02_run_fingerprint="8" * 64,
+        p4_02_result_artifact_sha256="9" * 64,
+        p4_02_cell_summaries_sha256="a" * 64,
+        decision_sha256s=decisions,
+    )
+
+    assert [member["query_id"] for member in payload["members"]] == [
+        P4_01_QUERY_ID,
+        P4_02_QUERY_ID,
+    ]
+    assert payload["expected_summary_count"] == 5_808
+    assert payload["expected_detail_record_count"] == 978_648
+    assert payload["decision_count"] == 4
+    with pytest.raises(OutcomeRegistryError, match="atomic pair completion"):
+        complete_phase1a_outcome_replay(
+            "postgresql:///not-opened",
+            outcome_replay_manifest_id=1,
+            run_fingerprint="b" * 64,
+            cell_summaries=(),
+            result_artifact_path=tmp_path / "unused.json",
+            data_root=tmp_path,
+            query_id=P4_01_QUERY_ID,
+        )
+
+
+def test_p4_registry_boundary_rejects_signed_negative_zero_without_changing_p5() -> None:
+    p5_cells = list(_complete_cells())
+    p5_cells[0] = replace(p5_cells[0], maximum_drawdown_usd=Decimal("-0"))
+    validate_complete_cell_summaries(tuple(p5_cells), query_id=P5_QUERY_ID)
+
+    p4_cells = [
+        replace(
+            cell,
+            signal_count=P4_01_EXPECTED_DIRECTION_SIGNAL_COUNTS[cell.direction],
+            entry_not_filled_count=(P4_01_EXPECTED_DIRECTION_SIGNAL_COUNTS[cell.direction] - 1),
+        )
+        for cell in _complete_cells()
+    ]
+    p4_cells[0] = replace(p4_cells[0], maximum_drawdown_usd=Decimal("-0"))
+    with pytest.raises(OutcomeRegistryError, match="signed negative zero"):
+        validate_complete_cell_summaries(tuple(p4_cells), query_id=P4_01_QUERY_ID)
 
 
 def test_audit_checkpoint_chain_identity_uses_progress_digest() -> None:
@@ -772,6 +871,29 @@ def test_migration_freezes_append_only_checkpoint_chain_and_complete_surface() -
     assert "IS DISTINCT FROM" in lineage_sql
     assert "<>" not in lineage_sql
     assert "CREATE TRIGGER" not in lineage_sql
+
+
+def test_p4_migration_freezes_atomic_pair_release_and_semantic_hashes() -> None:
+    sql = (ROOT / "migrations/0028_phase1a_p4_paired_outcomes.sql").read_text(encoding="utf-8")
+
+    assert "phase1a_p4_outcome_pair_batches" in sql
+    assert "phase1a_p4_outcome_pair_releases" in sql
+    assert "WHERE status IN ('PREPARED', 'RELEASED')" in sql
+    assert "new Phase 1A P4 pair batches must begin PREPARED" in sql
+    assert "the singleton Phase 1A P4 pair is already released" in sql
+    assert "phase1a_outcome_cell_summary_payload" in sql
+    assert "outcome cell scenario-cost accounting drift" in sql
+    assert "outcome cell decimal metrics must be finite" in sql
+    assert "outcome cell summary SHA-256 drift" in sql
+    assert "screening decision reasons must be unique nonblank strings" in sql
+    assert "screening decision SHA-256 drift" in sql
+    assert "ordered cell-summary aggregate SHA-256 drift" in sql
+    assert "canonical_jsonb_text(expected_payload)" in sql
+    assert "canonical_jsonb_sha256(expected_payload)" in sql
+    assert "DEFERRABLE INITIALLY DEFERRED" in sql
+    assert "P4 cell summaries cannot commit outside atomic pair release" in sql
+    assert "P4 result artifacts cannot commit outside atomic pair release" in sql
+    assert "VALUES (28, 'phase1a_p4_paired_outcomes', :'migration_checksum')" in sql
 
 
 @pytest.mark.parametrize(

@@ -39,6 +39,7 @@ from systematic_fx.db.migrations import discover_migrations
 from systematic_fx.db.outcome_registry import (
     OUTCOME_ENGINE_VERSION,
     OutcomePredecessorGate,
+    OutcomeRegistryStateError,
     OutcomeSourceArtifactSet,
     complete_phase1a_outcome_replay,
     fail_phase1a_outcome_replay,
@@ -61,9 +62,17 @@ from systematic_fx.research.outcome_config import (
     OUTCOME_CONFIG_RELATIVE_PATH,
     P1_OUTCOME_CONFIG_RELATIVE_PATH,
     P1_QUERY_ID,
+    P4_01_OUTCOME_CONFIG_RELATIVE_PATH,
+    P4_01_QUERY_ID,
+    P4_02_OUTCOME_CONFIG_RELATIVE_PATH,
+    P4_02_QUERY_ID,
+    P4_PAIR_CONFIG_RELATIVE_PATH,
+    P4_PAIR_ID,
+    P4_PAIR_QUERY_IDS,
     P5_QUERY_ID,
     OutcomeReplayConfig,
     load_outcome_replay_config,
+    load_p4_pair_outcome_config,
 )
 from systematic_fx.research.outcome_economics import OutcomeEconomicsAccumulator
 from systematic_fx.research.outcome_inputs import (
@@ -96,11 +105,28 @@ from systematic_fx.validation.splits import (
 
 P5_PIPELINE_VERSION: Final = "phase1a_p5_outcome_pipeline_v1"
 P1_PIPELINE_VERSION: Final = "phase1a_p1_05_outcome_pipeline_v1"
+P4_01_PIPELINE_VERSION: Final = "phase1a_p4_01_outcome_pipeline_v1"
+P4_02_PIPELINE_VERSION: Final = "phase1a_p4_02_outcome_pipeline_v1"
 PIPELINE_VERSION: Final = P5_PIPELINE_VERSION
 RANDOM_SEED: Final = 0
 EXPECTED_SUMMARY_COUNT: Final = 3 * 2 * len(BARRIER_TICKS) ** 2
-_SUPPORTED_MIGRATIONS: Final = tuple(range(1, 28))
+_SUPPORTED_MIGRATIONS: Final = tuple(range(1, 29))
 _MODES: Final = frozenset({"PLAN_ONLY", "CACHE_ONLY", "RUN"})
+_P4_RELEASE_NOT_FOUND_MESSAGE: Final = (
+    "exactly one released P4 pair is required for duplicate reuse"
+)
+_PIPELINE_VERSION_BY_QUERY_ID: Final = {
+    P5_QUERY_ID: P5_PIPELINE_VERSION,
+    P1_QUERY_ID: P1_PIPELINE_VERSION,
+    P4_01_QUERY_ID: P4_01_PIPELINE_VERSION,
+    P4_02_QUERY_ID: P4_02_PIPELINE_VERSION,
+}
+_SOURCE_NAMESPACE_BY_QUERY_ID: Final = {
+    P5_QUERY_ID: "phase1a_p5",
+    P1_QUERY_ID: "phase1a_p1_05",
+    P4_01_QUERY_ID: "phase1a_p4_01",
+    P4_02_QUERY_ID: "phase1a_p4_02",
+}
 
 
 class Phase1AOutcomePipelineError(RuntimeError):
@@ -224,6 +250,110 @@ class OutcomePipelineReport:
 
 
 @dataclass(frozen=True, slots=True)
+class P4OutcomePairReport:
+    """Atomic operator-facing view of the two preregistered P4 replays."""
+
+    mode: str
+    first: OutcomePipelineReport
+    second: OutcomePipelineReport
+    pair_id: str = P4_PAIR_ID
+    p4_pair_batch_id: int | None = None
+    p4_pair_release_id: int | None = None
+    pair_release_sha256: str | None = None
+
+    def __post_init__(self) -> None:
+        identity_drift = (
+            self.pair_id != P4_PAIR_ID
+            or self.mode not in _MODES
+            or (self.first.query_id, self.second.query_id) != P4_PAIR_QUERY_IDS
+            or self.first.mode != self.mode
+            or self.second.mode != self.mode
+        )
+        if identity_drift:
+            raise Phase1AOutcomePipelineError("P4 pair report identity/order drift")
+        release_identity = (
+            self.p4_pair_batch_id,
+            self.p4_pair_release_id,
+            self.pair_release_sha256,
+        )
+        if self.mode == "RUN":
+            if (
+                isinstance(self.p4_pair_batch_id, bool)
+                or not isinstance(self.p4_pair_batch_id, int)
+                or self.p4_pair_batch_id <= 0
+                or isinstance(self.p4_pair_release_id, bool)
+                or not isinstance(self.p4_pair_release_id, int)
+                or self.p4_pair_release_id <= 0
+                or not isinstance(self.pair_release_sha256, str)
+                or len(self.pair_release_sha256) != 64
+                or any(
+                    character not in "0123456789abcdef" for character in self.pair_release_sha256
+                )
+                or {self.first.disposition, self.second.disposition}
+                not in ({"SUCCEEDED"}, {"SKIPPED_DUPLICATE"})
+            ):
+                raise Phase1AOutcomePipelineError("P4 pair terminal release proof drift")
+        elif release_identity != (None, None, None):
+            raise Phase1AOutcomePipelineError(
+                "P4 pair release proof is forbidden before RUN completion"
+            )
+
+    @property
+    def disposition(self) -> str:
+        return {
+            "PLAN_ONLY": "PAIR_PLANNED",
+            "CACHE_ONLY": "PAIR_CACHED",
+            "RUN": "PAIR_RELEASED",
+        }[self.mode]
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "disposition": self.disposition,
+            "mode": self.mode,
+            "p4_pair_batch_id": self.p4_pair_batch_id,
+            "p4_pair_release_id": self.p4_pair_release_id,
+            "pair_id": self.pair_id,
+            "pair_release_sha256": self.pair_release_sha256,
+            "query_order": list(P4_PAIR_QUERY_IDS),
+            "reports": {
+                self.first.query_id: self.first.as_dict(),
+                self.second.query_id: self.second.as_dict(),
+            },
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class PreparedOutcomeCompletion:
+    """Fully verified artifacts and economics awaiting a registry transition."""
+
+    result: object
+    final_checkpoint: object
+    completed_source_date_count: int
+    source_event_count: int
+    detail_record_count: int
+    summary_row_count: int
+    cell_summaries: tuple[object, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ReservedOutcomeExecution:
+    """One registered and reserved run whose economic replay has not started."""
+
+    prepared: PreparedOutcomeInputs
+    reports: tuple[DailyCacheReport, ...]
+    terminal_resolution: TerminalResolution
+    cache_manifest: object
+    run_spec: RunSpec
+    reservation: object
+    report: OutcomePipelineReport
+    database_url: str
+    data: Path
+    services: OutcomePipelineServices
+    predecessor_gate: OutcomePredecessorGate | None
+    progress_callback: Callable[[OutcomeProgress], None] | None
+
+
+@dataclass(frozen=True, slots=True)
 class OutcomeArtifactServices:
     """Adapter for immutable cache/detail/checkpoint/result artifact publication."""
 
@@ -269,6 +399,11 @@ class OutcomePipelineServices:
     replay_from_checkpoint: Callable[[Mapping[str, object]], SharedReplay]
     economics_factory: Callable[..., OutcomeEconomicsAccumulator]
     artifacts: OutcomeArtifactServices
+    reserve_pair: Callable[..., Any] | None = None
+    complete_pair: Callable[..., Any] | None = None
+    fail_pair: Callable[..., Any] | None = None
+    load_pair_release: Callable[..., Any] | None = None
+    fail_unpaired: Callable[..., Any] | None = None
 
 
 def _git_head(project_root: Path) -> str:
@@ -293,7 +428,7 @@ def _git_head(project_root: Path) -> str:
 def _postgres_runtime(database_url: str, *, migrations_directory: Path) -> dict[str, object]:
     migrations = discover_migrations(migrations_directory)
     if tuple(item.version for item in migrations) != _SUPPORTED_MIGRATIONS:
-        raise Phase1AOutcomePipelineError("outcome replay requires migrations 0001-0027")
+        raise Phase1AOutcomePipelineError("outcome replay requires migrations 0001-0028")
     with psycopg.connect(database_url, row_factory=dict_row) as connection:
         version = connection.execute(
             "SELECT current_setting('server_version') AS version, "
@@ -360,6 +495,18 @@ def _artifact_services() -> OutcomeArtifactServices:
     )
 
 
+def _invoke_pair_registry(name: str, *args: object, **kwargs: object) -> Any:
+    """Resolve P4 pair-only registry APIs without burdening legacy imports."""
+
+    try:
+        from systematic_fx.db import outcome_registry
+
+        function = getattr(outcome_registry, name)
+    except (ImportError, AttributeError) as error:  # pragma: no cover - integration guard
+        raise Phase1AOutcomePipelineError("P4 pair registry API is unavailable") from error
+    return function(*args, **kwargs)
+
+
 def _default_services() -> OutcomePipelineServices:
     return OutcomePipelineServices(
         load_config=load_outcome_replay_config,
@@ -390,6 +537,21 @@ def _default_services() -> OutcomePipelineServices:
         replay_from_checkpoint=SharedReplay.from_checkpoint,
         economics_factory=OutcomeEconomicsAccumulator,
         artifacts=_artifact_services(),
+        reserve_pair=lambda *args, **kwargs: _invoke_pair_registry(
+            "reserve_phase1a_p4_outcome_pair", *args, **kwargs
+        ),
+        complete_pair=lambda *args, **kwargs: _invoke_pair_registry(
+            "complete_phase1a_p4_outcome_pair", *args, **kwargs
+        ),
+        fail_pair=lambda *args, **kwargs: _invoke_pair_registry(
+            "fail_phase1a_p4_outcome_pair", *args, **kwargs
+        ),
+        load_pair_release=lambda *args, **kwargs: _invoke_pair_registry(
+            "load_phase1a_p4_outcome_pair_release", *args, **kwargs
+        ),
+        fail_unpaired=lambda *args, **kwargs: _invoke_pair_registry(
+            "fail_unpaired_phase1a_p4_outcome_replay", *args, **kwargs
+        ),
     )
 
 
@@ -424,11 +586,10 @@ def _data_layout(data_root: Path, *, create_derived: bool) -> tuple[Path, Path]:
 
 
 def _pipeline_version(query_id: str) -> str:
-    if query_id == P5_QUERY_ID:
-        return P5_PIPELINE_VERSION
-    if query_id == P1_QUERY_ID:
-        return P1_PIPELINE_VERSION
-    raise Phase1AOutcomePipelineError("unsupported governed outcome query")
+    try:
+        return _PIPELINE_VERSION_BY_QUERY_ID[query_id]
+    except KeyError as error:
+        raise Phase1AOutcomePipelineError("unsupported governed outcome query") from error
 
 
 def _artifact_identity(config: OutcomeReplayConfig) -> Any:
@@ -893,6 +1054,7 @@ def _make_run_spec(
     runtime: Mapping[str, object],
     feature_sha256: str,
     predecessor_gate: OutcomePredecessorGate | None = None,
+    p4_pair_config_sha256: str | None = None,
 ) -> RunSpec:
     config = prepared.config
     screening = config.screening_bundle
@@ -916,8 +1078,17 @@ def _make_run_spec(
         "terminal_resolution_sha256": terminal_resolution.sha256,
         "pipeline_version": _pipeline_version(config.query_id),
     }
+    if config.query_id in P4_PAIR_QUERY_IDS:
+        if not isinstance(p4_pair_config_sha256, str) or len(p4_pair_config_sha256) != 64:
+            raise Phase1AOutcomePipelineError("P4 RunSpec requires its paired policy SHA-256")
+        parameters["p4_pair_config_sha256"] = p4_pair_config_sha256
+    elif p4_pair_config_sha256 is not None:
+        raise Phase1AOutcomePipelineError("non-P4 RunSpec cannot bind a P4 pair policy")
     signal, entry, barrier, terminal = _policies(config, terminal_resolution)
-    source_namespace = "phase1a_p5" if config.query_id == P5_QUERY_ID else "phase1a_p1_05"
+    try:
+        source_namespace = _SOURCE_NAMESPACE_BY_QUERY_ID[config.query_id]
+    except KeyError as error:
+        raise Phase1AOutcomePipelineError("unsupported governed outcome query") from error
     source_manifest_hashes = {
         "mbp10_footer_manifest_v1": prepared.plan.footer_manifest_sha256,
         "mbp10_source_sha256_v1": prepared.plan.source_hash_manifest_sha256,
@@ -934,6 +1105,8 @@ def _make_run_spec(
         source_manifest_hashes["phase1a_p5_equivalence_audit_v1"] = (
             predecessor_gate.equivalence_audit_artifact_sha256
         )
+    if p4_pair_config_sha256 is not None:
+        source_manifest_hashes["phase1a_p4_pair_config_v1"] = p4_pair_config_sha256
     return RunSpec(
         campaign_id=CAMPAIGN_ID,
         experiment_id=None,
@@ -1046,7 +1219,16 @@ def _run_replay(
     services: OutcomePipelineServices,
     predecessor_gate: OutcomePredecessorGate | None = None,
     progress_callback: Callable[[OutcomeProgress], None] | None = None,
-) -> tuple[object, object, int, int, int, int]:
+    defer_registry_completion: bool = False,
+) -> tuple[object, object, int, int, int, int] | PreparedOutcomeCompletion:
+    if prepared.config.query_id in P4_PAIR_QUERY_IDS and not defer_registry_completion:
+        raise Phase1AOutcomePipelineError(
+            "P4 members cannot execute through individual registry completion"
+        )
+    if prepared.config.query_id not in P4_PAIR_QUERY_IDS and defer_registry_completion:
+        raise Phase1AOutcomePipelineError(
+            "deferred registry completion is reserved for the governed P4 pair"
+        )
     groups = _date_groups(prepared.plan, reports, terminal_resolution)
     if (
         len(groups) != prepared.config.expected_completed_source_date_count
@@ -1259,26 +1441,37 @@ def _run_replay(
         result, label="published result"
     ):
         raise Phase1AOutcomePipelineError("strict final result reload identity drift")
+    completion = PreparedOutcomeCompletion(
+        result=verified_result,
+        final_checkpoint=final_checkpoint,
+        completed_source_date_count=len(groups),
+        source_event_count=replay.source_event_count,
+        detail_record_count=replay.result_record_count,
+        summary_row_count=len(ordered),
+        cell_summaries=tuple(ordered),
+    )
+    if defer_registry_completion:
+        return completion
     services.complete_replay(
         database_url,
         outcome_replay_manifest_id=manifest_id,
         run_fingerprint=run_spec.fingerprint,
-        cell_summaries=ordered,
-        result_artifact_path=_report_path(verified_result, label="result"),
+        cell_summaries=completion.cell_summaries,
+        result_artifact_path=_report_path(completion.result, label="result"),
         data_root=data,
         query_id=prepared.config.query_id,
     )
     return (
-        verified_result,
-        final_checkpoint,
-        len(groups),
-        replay.source_event_count,
-        replay.result_record_count,
-        len(ordered),
+        completion.result,
+        completion.final_checkpoint,
+        completion.completed_source_date_count,
+        completion.source_event_count,
+        completion.detail_record_count,
+        completion.summary_row_count,
     )
 
 
-def _run_phase1a_outcomes(
+def _prepare_phase1a_outcomes(
     *,
     project_root: Path | str,
     data_root: Path | str,
@@ -1288,8 +1481,9 @@ def _run_phase1a_outcomes(
     max_cache_workers: int | None = None,
     services: OutcomePipelineServices | None = None,
     progress_callback: Callable[[OutcomeProgress], None] | None = None,
-) -> OutcomePipelineReport:
-    """Plan, cache, or execute one complete governed shared replay."""
+    p4_pair_config_sha256: str | None = None,
+) -> OutcomePipelineReport | ReservedOutcomeExecution:
+    """Plan/cache one replay or reserve it without starting economics."""
 
     if mode not in _MODES:
         raise Phase1AOutcomePipelineError("mode must be PLAN_ONLY, CACHE_ONLY, or RUN")
@@ -1460,6 +1654,7 @@ def _run_phase1a_outcomes(
         runtime=runtime,
         feature_sha256=feature_sha256,
         predecessor_gate=predecessor_gate,
+        p4_pair_config_sha256=p4_pair_config_sha256,
     )
     active.register_spec(database_url, run_spec)
     reservation = active.reserve_replay(
@@ -1473,49 +1668,88 @@ def _run_phase1a_outcomes(
         data_root=data,
     )
     manifest_id = int(reservation.outcome_replay_manifest_id)
-    if not reservation.execute:
-        return replace(
+    return ReservedOutcomeExecution(
+        prepared=prepared,
+        reports=reports,
+        terminal_resolution=terminal_resolution,
+        cache_manifest=cache_manifest,
+        run_spec=run_spec,
+        reservation=reservation,
+        report=replace(
             report,
             cache_manifest_sha256=cache_sha,
             run_fingerprint=run_spec.fingerprint,
             outcome_replay_manifest_id=manifest_id,
-            disposition="SKIPPED_DUPLICATE",
+        ),
+        database_url=database_url,
+        data=data,
+        services=active,
+        predecessor_gate=predecessor_gate,
+        progress_callback=progress_callback,
+    )
+
+
+def _execute_reserved_outcome(
+    execution: ReservedOutcomeExecution,
+    *,
+    defer_registry_completion: bool,
+    register_failure: bool,
+) -> OutcomePipelineReport | PreparedOutcomeCompletion:
+    """Execute one reserved replay, optionally leaving completion to its pair."""
+
+    manifest_id = int(execution.reservation.outcome_replay_manifest_id)
+    is_p4_member = execution.prepared.config.query_id in P4_PAIR_QUERY_IDS
+    if is_p4_member != defer_registry_completion:
+        raise Phase1AOutcomePipelineError(
+            "P4 members require deferred pair completion; unpaired members forbid it"
         )
+    if not execution.reservation.execute:
+        if defer_registry_completion:
+            raise Phase1AOutcomePipelineError(
+                "paired replay cannot mix an existing completion with new execution"
+            )
+        return replace(execution.report, disposition="SKIPPED_DUPLICATE")
     try:
-        result, final_checkpoint, completed, events, records, summaries = _run_replay(
-            prepared=prepared,
-            reports=reports,
-            terminal_resolution=terminal_resolution,
-            cache_manifest=cache_manifest,
-            run_spec=run_spec,
-            reservation=reservation,
-            database_url=database_url,
-            data=data,
-            services=active,
-            predecessor_gate=predecessor_gate,
-            progress_callback=progress_callback,
+        replay_result = _run_replay(
+            prepared=execution.prepared,
+            reports=execution.reports,
+            terminal_resolution=execution.terminal_resolution,
+            cache_manifest=execution.cache_manifest,
+            run_spec=execution.run_spec,
+            reservation=execution.reservation,
+            database_url=execution.database_url,
+            data=execution.data,
+            services=execution.services,
+            predecessor_gate=execution.predecessor_gate,
+            progress_callback=execution.progress_callback,
+            defer_registry_completion=defer_registry_completion,
         )
     except Exception as error:
         message = f"{type(error).__name__}: {error}"[:4000]
-        try:
-            active.fail_replay(
-                database_url,
-                outcome_replay_manifest_id=manifest_id,
-                run_fingerprint=run_spec.fingerprint,
-                error_message=message,
-            )
-        except Exception as failure_error:
-            raise Phase1AOutcomePipelineError(
-                f"outcome replay failed and failure registration also failed: {message}"
-            ) from failure_error
+        if register_failure:
+            try:
+                execution.services.fail_replay(
+                    execution.database_url,
+                    outcome_replay_manifest_id=manifest_id,
+                    run_fingerprint=execution.run_spec.fingerprint,
+                    error_message=message,
+                )
+            except Exception as failure_error:
+                raise Phase1AOutcomePipelineError(
+                    f"outcome replay failed and failure registration also failed: {message}"
+                ) from failure_error
         if isinstance(error, Phase1AOutcomePipelineError):
             raise
         raise Phase1AOutcomePipelineError(message) from error
+    if defer_registry_completion:
+        if not isinstance(replay_result, PreparedOutcomeCompletion):
+            raise Phase1AOutcomePipelineError("P4 replay did not defer registry completion")
+        return replay_result
+    if not isinstance(replay_result, tuple) or len(replay_result) != 6:
+        raise Phase1AOutcomePipelineError("outcome replay returned an invalid completion")
+    result, final_checkpoint, completed, events, records, summaries = replay_result
     return replace(
-        report,
-        cache_manifest_sha256=cache_sha,
-        run_fingerprint=run_spec.fingerprint,
-        outcome_replay_manifest_id=manifest_id,
+        execution.report,
         completed_source_date_count=completed,
         source_event_count=events,
         detail_record_count=records,
@@ -1526,6 +1760,771 @@ def _run_phase1a_outcomes(
         final_checkpoint_sha256=_report_sha(final_checkpoint, label="final checkpoint"),
         final_checkpoint_sequence=_checkpoint_sequence(final_checkpoint),
         disposition="SUCCEEDED",
+    )
+
+
+def _run_phase1a_outcomes(
+    *,
+    project_root: Path | str,
+    data_root: Path | str,
+    database_url: str,
+    config_relative_path: Path,
+    mode: Literal["PLAN_ONLY", "CACHE_ONLY", "RUN"] = "RUN",
+    max_cache_workers: int | None = None,
+    services: OutcomePipelineServices | None = None,
+    progress_callback: Callable[[OutcomeProgress], None] | None = None,
+) -> OutcomePipelineReport:
+    """Plan, cache, or execute one unpaired governed shared replay."""
+
+    if config_relative_path in {
+        P4_01_OUTCOME_CONFIG_RELATIVE_PATH,
+        P4_02_OUTCOME_CONFIG_RELATIVE_PATH,
+    }:
+        raise Phase1AOutcomePipelineError("P4 candidates require the atomic pair runner")
+    prepared = _prepare_phase1a_outcomes(
+        project_root=project_root,
+        data_root=data_root,
+        database_url=database_url,
+        config_relative_path=config_relative_path,
+        mode=mode,
+        max_cache_workers=max_cache_workers,
+        services=services,
+        progress_callback=progress_callback,
+    )
+    if isinstance(prepared, OutcomePipelineReport):
+        return prepared
+    result = _execute_reserved_outcome(
+        prepared,
+        defer_registry_completion=False,
+        register_failure=True,
+    )
+    if not isinstance(result, OutcomePipelineReport):  # pragma: no cover - type guard
+        raise Phase1AOutcomePipelineError("unpaired replay completion type drift")
+    return result
+
+
+def _completed_report(
+    execution: ReservedOutcomeExecution,
+    completion: PreparedOutcomeCompletion,
+) -> OutcomePipelineReport:
+    return replace(
+        execution.report,
+        completed_source_date_count=completion.completed_source_date_count,
+        source_event_count=completion.source_event_count,
+        detail_record_count=completion.detail_record_count,
+        summary_row_count=completion.summary_row_count,
+        result_artifact_path=_report_path(completion.result, label="result"),
+        result_artifact_sha256=_report_sha(completion.result, label="result"),
+        final_checkpoint_path=_report_path(completion.final_checkpoint, label="final checkpoint"),
+        final_checkpoint_sha256=_report_sha(completion.final_checkpoint, label="final checkpoint"),
+        final_checkpoint_sequence=_checkpoint_sequence(completion.final_checkpoint),
+        disposition="SUCCEEDED",
+    )
+
+
+def _p4_pair_member(
+    execution: ReservedOutcomeExecution,
+    completion: PreparedOutcomeCompletion,
+) -> object:
+    try:
+        from systematic_fx.db.outcome_registry import P4OutcomePairMember
+    except ImportError as error:  # pragma: no cover - integration guard
+        raise Phase1AOutcomePipelineError("P4 pair member API is unavailable") from error
+    return P4OutcomePairMember(
+        query_id=execution.prepared.config.query_id,
+        outcome_replay_manifest_id=int(execution.reservation.outcome_replay_manifest_id),
+        run_fingerprint=execution.run_spec.fingerprint,
+        cell_summaries=completion.cell_summaries,
+        result_artifact_path=_report_path(completion.result, label="result"),
+    )
+
+
+def _validate_p4_pair_release(
+    release: object,
+    executions: tuple[ReservedOutcomeExecution, ReservedOutcomeExecution],
+    *,
+    pair_config: object,
+) -> tuple[int, int, str]:
+    """Validate the operator-visible identity of one atomic P4 release."""
+
+    first, second = executions
+    expected_ids = (
+        int(first.reservation.outcome_replay_manifest_id),
+        int(second.reservation.outcome_replay_manifest_id),
+    )
+    expected_fingerprints = (
+        first.run_spec.fingerprint,
+        second.run_spec.fingerprint,
+    )
+    try:
+        release_sha256 = release.release_sha256
+        decision_sha256s = release.decision_sha256s
+    except AttributeError as error:
+        raise Phase1AOutcomePipelineError("P4 pair release proof is incomplete") from error
+    decision_count = 0
+    decision_shape_valid = isinstance(decision_sha256s, Mapping) and set(decision_sha256s) == set(
+        P4_PAIR_QUERY_IDS
+    )
+    if decision_shape_valid:
+        for query_id in P4_PAIR_QUERY_IDS:
+            directions = decision_sha256s[query_id]
+            if not isinstance(directions, Mapping) or set(directions) != {"LONG", "SHORT"}:
+                decision_shape_valid = False
+                break
+            if any(
+                not isinstance(value, str)
+                or len(value) != 64
+                or any(character not in "0123456789abcdef" for character in value)
+                for value in directions.values()
+            ):
+                decision_shape_valid = False
+                break
+            decision_count += len(directions)
+    expected_pair_config_sha256 = getattr(pair_config, "sha256", None)
+    expected_pair_cells = getattr(pair_config, "new_pair_cell_count", None)
+    expected_cumulative_cells = getattr(pair_config, "cumulative_observed_cell_count", None)
+    checks = (
+        getattr(release, "pair_id", None) == P4_PAIR_ID,
+        (
+            getattr(release, "p4_01_outcome_replay_manifest_id", None),
+            getattr(release, "p4_02_outcome_replay_manifest_id", None),
+        )
+        == expected_ids,
+        (
+            getattr(release, "p4_01_run_fingerprint", None),
+            getattr(release, "p4_02_run_fingerprint", None),
+        )
+        == expected_fingerprints,
+        getattr(release, "pair_config_sha256", None) == expected_pair_config_sha256,
+        getattr(release, "pair_economic_cell_count", None) == expected_pair_cells,
+        getattr(release, "cumulative_economic_cell_count", None) == expected_cumulative_cells,
+        decision_shape_valid,
+        decision_count == getattr(pair_config, "expected_decision_count", None),
+        isinstance(release_sha256, str)
+        and len(release_sha256) == 64
+        and all(character in "0123456789abcdef" for character in release_sha256),
+    )
+    batch_id = getattr(release, "p4_pair_batch_id", None)
+    release_id = getattr(release, "p4_pair_release_id", None)
+    if (
+        not all(checks)
+        or isinstance(batch_id, bool)
+        or not isinstance(batch_id, int)
+        or batch_id <= 0
+        or isinstance(release_id, bool)
+        or not isinstance(release_id, int)
+        or release_id <= 0
+    ):
+        raise Phase1AOutcomePipelineError("P4 pair release identity/cardinality drift")
+    return batch_id, release_id, release_sha256
+
+
+def _validate_p4_pair_completion_report(
+    completion_report: object,
+    executions: tuple[ReservedOutcomeExecution, ReservedOutcomeExecution],
+    *,
+    pair_config: object,
+) -> tuple[int, int, str]:
+    if not getattr(completion_report, "completed", False):
+        raise Phase1AOutcomePipelineError("P4 pair registry did not complete atomically")
+    release = getattr(completion_report, "release", None)
+    proof = _validate_p4_pair_release(release, executions, pair_config=pair_config)
+    completions = getattr(completion_report, "completions", None)
+    if not isinstance(completions, tuple) or len(completions) != 2:
+        raise Phase1AOutcomePipelineError("P4 pair member completion proof drift")
+    expected_ids = tuple(
+        int(execution.reservation.outcome_replay_manifest_id) for execution in executions
+    )
+    expected_fingerprints = tuple(execution.run_spec.fingerprint for execution in executions)
+    if (
+        tuple(getattr(item, "outcome_replay_manifest_id", None) for item in completions)
+        != expected_ids
+        or tuple(getattr(item, "run_fingerprint", None) for item in completions)
+        != expected_fingerprints
+        or not all(getattr(item, "completed", False) for item in completions)
+        or sum(getattr(item, "summary_row_count", 0) for item in completions)
+        != getattr(pair_config, "expected_summary_count", None)
+        or (
+            getattr(completions[0], "result_artifact_sha256", None),
+            getattr(completions[1], "result_artifact_sha256", None),
+        )
+        != (
+            getattr(release, "p4_01_result_artifact_sha256", None),
+            getattr(release, "p4_02_result_artifact_sha256", None),
+        )
+        or (
+            getattr(completions[0], "cell_summaries_sha256", None),
+            getattr(completions[1], "cell_summaries_sha256", None),
+        )
+        != (
+            getattr(release, "p4_01_cell_summaries_sha256", None),
+            getattr(release, "p4_02_cell_summaries_sha256", None),
+        )
+    ):
+        raise Phase1AOutcomePipelineError("P4 pair completion/release proof drift")
+    return proof
+
+
+def _validate_p4_recovered_release(
+    release: object,
+    executions: tuple[ReservedOutcomeExecution, ReservedOutcomeExecution],
+    completions: Sequence[PreparedOutcomeCompletion],
+    *,
+    pair_config: object,
+) -> tuple[int, int, str]:
+    """Bind an ambiguously committed release to the locally verified results."""
+
+    if len(completions) != 2:
+        raise Phase1AOutcomePipelineError("P4 recovery completion cardinality drift")
+    proof = _validate_p4_pair_release(release, executions, pair_config=pair_config)
+    result_sha256s = tuple(
+        _report_sha(completion.result, label="recovered P4 result") for completion in completions
+    )
+    cell_sha256s = tuple(
+        validate_complete_cell_summaries(
+            completion.cell_summaries,
+            query_id=execution.prepared.config.query_id,
+        )[1]
+        for execution, completion in zip(executions, completions, strict=True)
+    )
+    if result_sha256s != (
+        getattr(release, "p4_01_result_artifact_sha256", None),
+        getattr(release, "p4_02_result_artifact_sha256", None),
+    ) or cell_sha256s != (
+        getattr(release, "p4_01_cell_summaries_sha256", None),
+        getattr(release, "p4_02_cell_summaries_sha256", None),
+    ):
+        raise Phase1AOutcomePipelineError(
+            "P4 recovered release differs from locally verified economics"
+        )
+    return proof
+
+
+def _duplicate_p4_report(
+    execution: ReservedOutcomeExecution,
+    *,
+    result_artifact_sha256: str,
+) -> OutcomePipelineReport:
+    config = execution.prepared.config
+    return replace(
+        execution.report,
+        completed_source_date_count=config.expected_completed_source_date_count,
+        detail_record_count=config.expected_detail_record_count,
+        summary_row_count=config.expected_summary_row_count,
+        result_artifact_sha256=result_artifact_sha256,
+        disposition="SKIPPED_DUPLICATE",
+    )
+
+
+def _released_p4_pair_report(
+    release: object,
+    executions: tuple[ReservedOutcomeExecution, ReservedOutcomeExecution],
+    *,
+    pair_config: object,
+) -> P4OutcomePairReport:
+    """Build one terminal duplicate report from an exact semantic release proof."""
+
+    batch_id, release_id, release_sha256 = _validate_p4_pair_release(
+        release,
+        executions,
+        pair_config=pair_config,
+    )
+    first, second = executions
+    return P4OutcomePairReport(
+        mode="RUN",
+        first=_duplicate_p4_report(
+            first,
+            result_artifact_sha256=release.p4_01_result_artifact_sha256,
+        ),
+        second=_duplicate_p4_report(
+            second,
+            result_artifact_sha256=release.p4_02_result_artifact_sha256,
+        ),
+        p4_pair_batch_id=batch_id,
+        p4_pair_release_id=release_id,
+        pair_release_sha256=release_sha256,
+    )
+
+
+def _try_load_released_p4_pair(
+    executions: tuple[ReservedOutcomeExecution, ReservedOutcomeExecution],
+    *,
+    services: OutcomePipelineServices,
+    database_url: str,
+    pair_config: object,
+    context: str,
+    expected_batch_id: int | None = None,
+) -> tuple[object, P4OutcomePairReport] | None:
+    """Return an exact release, ``None`` only for proven absence, or stop ambiguously."""
+
+    loader = services.load_pair_release
+    if not callable(loader):
+        raise Phase1AOutcomePipelineError("P4 pair release loader is unavailable")
+    first, second = executions
+    try:
+        release = loader(
+            database_url,
+            p4_01_outcome_replay_manifest_id=int(first.reservation.outcome_replay_manifest_id),
+            p4_01_run_fingerprint=first.run_spec.fingerprint,
+            p4_02_outcome_replay_manifest_id=int(second.reservation.outcome_replay_manifest_id),
+            p4_02_run_fingerprint=second.run_spec.fingerprint,
+            data_root=first.data,
+        )
+        report = _released_p4_pair_report(
+            release,
+            executions,
+            pair_config=pair_config,
+        )
+        if expected_batch_id is not None and report.p4_pair_batch_id != expected_batch_id:
+            raise Phase1AOutcomePipelineError("P4 exact release belongs to a different pair batch")
+    except OutcomeRegistryStateError as error:
+        if str(error) == _P4_RELEASE_NOT_FOUND_MESSAGE:
+            return None
+        raise Phase1AOutcomePipelineError(
+            f"P4 {context} remains ambiguous; no failure transition was attempted "
+            "because release verification failed"
+        ) from error
+    except Exception as error:
+        raise Phase1AOutcomePipelineError(
+            f"P4 {context} remains ambiguous; no failure transition was attempted "
+            "because release verification failed"
+        ) from error
+    return release, report
+
+
+def _fail_unpaired_p4_reservations(
+    executions: Sequence[ReservedOutcomeExecution],
+    *,
+    services: OutcomePipelineServices,
+    error_message: str,
+) -> None:
+    """Terminalize every newly queued P4 member that has no pair-batch binding."""
+
+    queued = tuple(execution for execution in executions if execution.reservation.execute)
+    if not queued:
+        return
+    if services.fail_unpaired is None:
+        raise Phase1AOutcomePipelineError("P4 unpaired cleanup service is unavailable")
+    failures: list[str] = []
+    cleanup_error: Exception | None = None
+    for execution in queued:
+        try:
+            state = services.fail_unpaired(
+                execution.database_url,
+                outcome_replay_manifest_id=int(execution.reservation.outcome_replay_manifest_id),
+                run_fingerprint=execution.run_spec.fingerprint,
+                error_message=error_message,
+            )
+            if getattr(state, "status", None) != "FAILED":
+                failures.append(execution.prepared.config.query_id)
+        except Exception as error:  # noqa: BLE001 - attempt cleanup for every queued sibling
+            cleanup_error = error
+            failures.append(execution.prepared.config.query_id)
+    if failures:
+        failure = Phase1AOutcomePipelineError(
+            "P4 queued orphan cleanup failed for: " + ", ".join(failures)
+        )
+        if cleanup_error is not None:
+            raise failure from cleanup_error
+        raise failure
+
+
+def run_phase1a_p4_outcome_pair(
+    *,
+    project_root: Path | str,
+    data_root: Path | str,
+    database_url: str,
+    mode: Literal["PLAN_ONLY", "CACHE_ONLY", "RUN"] = "RUN",
+    max_cache_workers: int | None = None,
+    services: OutcomePipelineServices | None = None,
+    progress_callback: Callable[[OutcomeProgress], None] | None = None,
+) -> P4OutcomePairReport:
+    """Plan both P4 siblings first and publish their economics atomically."""
+
+    project = _strict_root(project_root, label="project_root")
+    pair_config = load_p4_pair_outcome_config(
+        project,
+        config_path=project / P4_PAIR_CONFIG_RELATIVE_PATH,
+    )
+    active = services or _default_services()
+    config_paths = (
+        P4_01_OUTCOME_CONFIG_RELATIVE_PATH,
+        P4_02_OUTCOME_CONFIG_RELATIVE_PATH,
+    )
+
+    # This read-only preflight is deliberately complete for both fixed queries
+    # before cache construction, reservation, or economic execution can begin.
+    preflight: list[OutcomePipelineReport] = []
+    for config_path in config_paths:
+        planned = _prepare_phase1a_outcomes(
+            project_root=project,
+            data_root=data_root,
+            database_url=database_url,
+            config_relative_path=config_path,
+            mode="PLAN_ONLY",
+            max_cache_workers=max_cache_workers,
+            services=active,
+            progress_callback=None,
+        )
+        if not isinstance(planned, OutcomePipelineReport):  # pragma: no cover - guard
+            raise Phase1AOutcomePipelineError("P4 pair preflight returned a reservation")
+        preflight.append(planned)
+    if tuple(report.query_id for report in preflight) != pair_config.ordered_query_ids:
+        raise Phase1AOutcomePipelineError("P4 pair preflight identity/order drift")
+    if mode == "PLAN_ONLY":
+        return P4OutcomePairReport(
+            mode=mode,
+            first=preflight[0],
+            second=preflight[1],
+        )
+
+    if mode == "RUN":
+        required_pair_services = (
+            "reserve_pair",
+            "complete_pair",
+            "fail_pair",
+            "load_pair_release",
+            "fail_unpaired",
+        )
+        missing = tuple(
+            name for name in required_pair_services if not callable(getattr(active, name, None))
+        )
+        if missing:
+            raise Phase1AOutcomePipelineError(
+                "P4 pair registry service preflight failed: " + ", ".join(missing)
+            )
+
+    prepared_members: list[OutcomePipelineReport | ReservedOutcomeExecution] = []
+    try:
+        for config_path in config_paths:
+            prepared_members.append(
+                _prepare_phase1a_outcomes(
+                    project_root=project,
+                    data_root=data_root,
+                    database_url=database_url,
+                    config_relative_path=config_path,
+                    mode=mode,
+                    max_cache_workers=max_cache_workers,
+                    services=active,
+                    progress_callback=progress_callback,
+                    p4_pair_config_sha256=pair_config.sha256,
+                )
+            )
+    except Exception as error:
+        message = f"{type(error).__name__}: {error}"[:4000]
+        reserved = tuple(
+            item for item in prepared_members if isinstance(item, ReservedOutcomeExecution)
+        )
+        try:
+            _fail_unpaired_p4_reservations(
+                reserved,
+                services=active,
+                error_message=message,
+            )
+        except Exception as cleanup_error:
+            raise Phase1AOutcomePipelineError(
+                f"P4 pair preparation failed and queued cleanup also failed: {message}"
+            ) from cleanup_error
+        if isinstance(error, Phase1AOutcomePipelineError):
+            raise
+        raise Phase1AOutcomePipelineError(message) from error
+    if mode == "CACHE_ONLY":
+        if not all(isinstance(item, OutcomePipelineReport) for item in prepared_members):
+            raise Phase1AOutcomePipelineError("P4 cache-only pair returned a reservation")
+        cache_reports = tuple(prepared_members)
+        first_cache = cache_reports[0]
+        second_cache = cache_reports[1]
+        if not isinstance(first_cache, OutcomePipelineReport) or not isinstance(
+            second_cache, OutcomePipelineReport
+        ):  # pragma: no cover - narrowed above
+            raise Phase1AOutcomePipelineError("P4 cache-only report type drift")
+        return P4OutcomePairReport(
+            mode=mode,
+            first=first_cache,
+            second=second_cache,
+        )
+
+    if not all(isinstance(item, ReservedOutcomeExecution) for item in prepared_members):
+        message = "P4 run pair did not reserve both candidates"
+        _fail_unpaired_p4_reservations(
+            tuple(item for item in prepared_members if isinstance(item, ReservedOutcomeExecution)),
+            services=active,
+            error_message=message,
+        )
+        raise Phase1AOutcomePipelineError(message)
+    first_execution = prepared_members[0]
+    second_execution = prepared_members[1]
+    if not isinstance(first_execution, ReservedOutcomeExecution) or not isinstance(
+        second_execution, ReservedOutcomeExecution
+    ):  # pragma: no cover - narrowed above
+        raise Phase1AOutcomePipelineError("P4 reserved execution type drift")
+    executions = (first_execution, second_execution)
+    if tuple(item.prepared.config.query_id for item in executions) != P4_PAIR_QUERY_IDS:
+        message = "P4 reservation identity/order drift"
+        _fail_unpaired_p4_reservations(
+            executions,
+            services=active,
+            error_message=message,
+        )
+        raise Phase1AOutcomePipelineError(message)
+    execute_flags = tuple(bool(item.reservation.execute) for item in executions)
+    if execute_flags == (False, False):
+        released = _try_load_released_p4_pair(
+            executions,
+            services=active,
+            database_url=database_url,
+            pair_config=pair_config,
+            context="duplicate reservation",
+        )
+        if released is None:
+            raise Phase1AOutcomePipelineError(
+                "P4 duplicate reservations require an exact released pair"
+            )
+        return released[1]
+    if execute_flags != (True, True):
+        message = "P4 pair cannot mix a completed duplicate with an executable member"
+        released = _try_load_released_p4_pair(
+            executions,
+            services=active,
+            database_url=database_url,
+            pair_config=pair_config,
+            context="mixed reservation",
+        )
+        if released is not None:
+            return released[1]
+        try:
+            _fail_unpaired_p4_reservations(
+                executions,
+                services=active,
+                error_message=message,
+            )
+        except Exception as cleanup_error:
+            released = _try_load_released_p4_pair(
+                executions,
+                services=active,
+                database_url=database_url,
+                pair_config=pair_config,
+                context="mixed-reservation cleanup",
+            )
+            if released is not None:
+                return released[1]
+            raise Phase1AOutcomePipelineError(
+                f"{message}; queued cleanup also failed"
+            ) from cleanup_error
+        raise Phase1AOutcomePipelineError(message)
+    pair_reservation: object | None = None
+    try:
+        pair_reservation = active.reserve_pair(
+            database_url,
+            p4_01_outcome_replay_manifest_id=int(
+                first_execution.reservation.outcome_replay_manifest_id
+            ),
+            p4_01_run_fingerprint=first_execution.run_spec.fingerprint,
+            p4_02_outcome_replay_manifest_id=int(
+                second_execution.reservation.outcome_replay_manifest_id
+            ),
+            p4_02_run_fingerprint=second_execution.run_spec.fingerprint,
+        )
+        if (
+            getattr(pair_reservation, "pair_id", None) != P4_PAIR_ID
+            or getattr(pair_reservation, "status", None) not in {"PREPARED", "RELEASED"}
+            or int(getattr(pair_reservation, "p4_01_outcome_replay_manifest_id", -1))
+            != int(first_execution.reservation.outcome_replay_manifest_id)
+            or int(getattr(pair_reservation, "p4_02_outcome_replay_manifest_id", -1))
+            != int(second_execution.reservation.outcome_replay_manifest_id)
+        ):
+            raise Phase1AOutcomePipelineError("P4 pair reservation identity/state drift")
+        if pair_reservation.status == "RELEASED":
+            batch_id = getattr(pair_reservation, "p4_pair_batch_id", None)
+            if isinstance(batch_id, bool) or not isinstance(batch_id, int) or batch_id <= 0:
+                raise Phase1AOutcomePipelineError("P4 released pair reservation identity drift")
+            released = _try_load_released_p4_pair(
+                executions,
+                services=active,
+                database_url=database_url,
+                pair_config=pair_config,
+                context="released pair reservation",
+                expected_batch_id=batch_id,
+            )
+            if released is None:
+                raise Phase1AOutcomePipelineError(
+                    "P4 pair reservation reported RELEASED without an exact release proof; "
+                    "no failure transition was attempted"
+                )
+            return released[1]
+    except Exception as error:
+        message = f"{type(error).__name__}: {error}"[:4000]
+        batch_id = getattr(pair_reservation, "p4_pair_batch_id", None)
+        expected_batch_id = (
+            batch_id
+            if isinstance(batch_id, int) and not isinstance(batch_id, bool) and batch_id > 0
+            else None
+        )
+        released = _try_load_released_p4_pair(
+            executions,
+            services=active,
+            database_url=database_url,
+            pair_config=pair_config,
+            context="pair reservation failure",
+            expected_batch_id=expected_batch_id,
+        )
+        if released is not None:
+            return released[1]
+        if getattr(pair_reservation, "status", None) == "RELEASED":
+            if isinstance(error, Phase1AOutcomePipelineError):
+                raise
+            raise Phase1AOutcomePipelineError(message) from error
+        try:
+            if expected_batch_id is not None:
+                failed = active.fail_pair(
+                    database_url,
+                    p4_pair_batch_id=expected_batch_id,
+                    p4_01_run_fingerprint=first_execution.run_spec.fingerprint,
+                    p4_02_run_fingerprint=second_execution.run_spec.fingerprint,
+                    error_message=message,
+                )
+                if getattr(failed, "status", None) != "FAILED":
+                    raise Phase1AOutcomePipelineError(
+                        "P4 malformed pair reservation did not terminalize"
+                    )
+            else:
+                _fail_unpaired_p4_reservations(
+                    executions,
+                    services=active,
+                    error_message=message,
+                )
+        except Exception as cleanup_error:
+            released = _try_load_released_p4_pair(
+                executions,
+                services=active,
+                database_url=database_url,
+                pair_config=pair_config,
+                context="pair-reservation cleanup",
+                expected_batch_id=expected_batch_id,
+            )
+            if released is not None:
+                return released[1]
+            raise Phase1AOutcomePipelineError(
+                f"P4 pair reservation failed and cleanup also failed: {message}"
+            ) from cleanup_error
+        if isinstance(error, Phase1AOutcomePipelineError):
+            raise
+        raise Phase1AOutcomePipelineError(message) from error
+    if pair_reservation is None:  # pragma: no cover - success sets it
+        raise Phase1AOutcomePipelineError("P4 pair reservation returned no identity")
+
+    prepared_completions: list[PreparedOutcomeCompletion] = []
+    complete_pair_invoked = False
+    try:
+        for execution in executions:
+            completion = _execute_reserved_outcome(
+                execution,
+                defer_registry_completion=True,
+                register_failure=False,
+            )
+            if not isinstance(completion, PreparedOutcomeCompletion):  # pragma: no cover
+                raise Phase1AOutcomePipelineError("P4 replay completion type drift")
+            prepared_completions.append(completion)
+        if (
+            len(prepared_completions) != pair_config.expected_candidate_count
+            or sum(item.summary_row_count for item in prepared_completions)
+            != pair_config.expected_summary_count
+            or sum(item.detail_record_count for item in prepared_completions)
+            != pair_config.expected_detail_record_count
+            or sum(item.report.signal_count for item in executions)
+            != pair_config.expected_signal_count
+        ):
+            raise Phase1AOutcomePipelineError("P4 paired completion cardinality drift")
+        members = tuple(
+            _p4_pair_member(execution, completion)
+            for execution, completion in zip(executions, prepared_completions, strict=True)
+        )
+        complete_pair_invoked = True
+        completion_report = active.complete_pair(
+            database_url,
+            p4_pair_batch_id=int(pair_reservation.p4_pair_batch_id),
+            members=members,
+            data_root=first_execution.data,
+        )
+        batch_id, release_id, release_sha256 = _validate_p4_pair_completion_report(
+            completion_report,
+            executions,
+            pair_config=pair_config,
+        )
+        if batch_id != int(pair_reservation.p4_pair_batch_id):
+            raise Phase1AOutcomePipelineError("P4 completion returned a different pair batch")
+    except Exception as error:
+        message = f"{type(error).__name__}: {error}"[:4000]
+        pair_batch_id = int(pair_reservation.p4_pair_batch_id)
+
+        def recover_execution_release() -> tuple[int, int, str] | P4OutcomePairReport | None:
+            released = _try_load_released_p4_pair(
+                executions,
+                services=active,
+                database_url=database_url,
+                pair_config=pair_config,
+                context="completion",
+                expected_batch_id=pair_batch_id,
+            )
+            if released is None:
+                return None
+            recovered_release, duplicate_report = released
+            if not complete_pair_invoked:
+                return duplicate_report
+            proof = _validate_p4_recovered_release(
+                recovered_release,
+                executions,
+                prepared_completions,
+                pair_config=pair_config,
+            )
+            if proof[0] != pair_batch_id:
+                raise Phase1AOutcomePipelineError(
+                    "P4 recovered release belongs to a different pair batch"
+                )
+            return proof
+
+        recovered = recover_execution_release()
+        if isinstance(recovered, P4OutcomePairReport):
+            return recovered
+        if recovered is not None:
+            batch_id, release_id, release_sha256 = recovered
+        else:
+            release_recovered_after_failure = False
+            try:
+                failed = active.fail_pair(
+                    database_url,
+                    p4_pair_batch_id=pair_batch_id,
+                    p4_01_run_fingerprint=first_execution.run_spec.fingerprint,
+                    p4_02_run_fingerprint=second_execution.run_spec.fingerprint,
+                    error_message=message,
+                )
+                if getattr(failed, "status", None) != "FAILED":
+                    raise Phase1AOutcomePipelineError(
+                        "P4 pair failure registration returned a non-terminal state"
+                    )
+            except Exception as failure_error:
+                recovered = recover_execution_release()
+                if isinstance(recovered, P4OutcomePairReport):
+                    return recovered
+                if recovered is not None:
+                    batch_id, release_id, release_sha256 = recovered
+                    release_recovered_after_failure = True
+                else:
+                    raise Phase1AOutcomePipelineError(
+                        f"P4 pair failed and atomic failure registration also failed: {message}"
+                    ) from failure_error
+            if not release_recovered_after_failure:
+                if isinstance(error, Phase1AOutcomePipelineError):
+                    raise
+                raise Phase1AOutcomePipelineError(message) from error
+
+    return P4OutcomePairReport(
+        mode=mode,
+        first=_completed_report(first_execution, prepared_completions[0]),
+        second=_completed_report(second_execution, prepared_completions[1]),
+        p4_pair_batch_id=batch_id,
+        p4_pair_release_id=release_id,
+        pair_release_sha256=release_sha256,
     )
 
 
@@ -1596,9 +2595,12 @@ __all__ = [
     "OutcomePipelineReport",
     "OutcomePipelineServices",
     "OutcomeProgress",
+    "P4OutcomePairReport",
     "Phase1AOutcomePipelineError",
+    "PreparedOutcomeCompletion",
     "PreparedOutcomeInputs",
     "merge_daily_shared_events",
     "run_phase1a_p1_05_outcomes",
+    "run_phase1a_p4_outcome_pair",
     "run_phase1a_p5_outcomes",
 ]

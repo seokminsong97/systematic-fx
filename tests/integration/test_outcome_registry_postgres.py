@@ -33,6 +33,8 @@ from systematic_fx.db.outcome_registry import (
     OUTCOME_CONFIG_ID,
     OUTCOME_ENGINE_VERSION,
     P1_05_QUERY_ID,
+    P4_01_QUERY_ID,
+    P4_02_QUERY_ID,
     P5_QUERY_ID,
     SCENARIO_COST_TICKS_PER_FILL,
     SCENARIO_IDS,
@@ -44,6 +46,7 @@ from systematic_fx.db.outcome_registry import (
     find_phase1a_p5_equivalence_audit_for_subject,
     load_latest_phase1a_outcome_checkpoint,
     load_phase1a_p1_predecessor_gate,
+    load_phase1a_p4_outcome_pair_release,
     load_phase1a_p5_audit_subject,
     load_phase1a_p5_equivalence_audit_for_attempt,
     outcome_query_profile,
@@ -1143,6 +1146,23 @@ class OutcomeRegistryPostgreSQLIntegrationTest(unittest.TestCase):
                 (reservation.outcome_replay_manifest_id,),
             ).fetchone()
         self.assertEqual(states, ("RUNNING", "RUNNING"))
+
+    def test_missing_p4_pair_release_loader_remains_strictly_read_only(self) -> None:
+        """Regression: a read-only loader must not issue SELECT ... FOR SHARE."""
+
+        nonce = uuid.uuid4().hex
+        with self.assertRaisesRegex(
+            OutcomeRegistryError,
+            "exactly one released P4 pair",
+        ):
+            load_phase1a_p4_outcome_pair_release(
+                self.database_url,
+                p4_01_outcome_replay_manifest_id=2**62 - 1,
+                p4_01_run_fingerprint=_digest(f"{P4_01_QUERY_ID}:{nonce}"),
+                p4_02_outcome_replay_manifest_id=2**62 - 2,
+                p4_02_run_fingerprint=_digest(f"{P4_02_QUERY_ID}:{nonce}"),
+                data_root=self.data_root,
+            )
 
 
 if __name__ == "__main__":

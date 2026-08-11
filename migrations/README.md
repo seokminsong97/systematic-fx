@@ -188,3 +188,12 @@ FAILED V2A attempts per candidate with no governed evidence. Campaign-row
 locks freeze subsequent V2A experiments, trials, RunSpecs, attempts, and links
 against registration races while retaining fail-clean aborts for active V2B
 attempts if a live prerequisite drifts.
+
+`0028_phase1a_p4_paired_outcomes.sql` adds the governed Phase 1A P4 pair batch
+and simultaneous-release registries. It binds both preregistered liquidity-
+transition candidates, their frozen configs and signal/input manifests, and
+the previously observed outcome lineage before either replay may start. The
+pair can publish its two economic surfaces and four screening decisions only
+as one atomic release; partial completion is forbidden, while paired failure
+and narrowly scoped unpaired-queue cleanup keep retry state terminal and
+auditable.

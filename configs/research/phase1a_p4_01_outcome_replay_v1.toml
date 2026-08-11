@@ -1,0 +1,104 @@
+[outcome_replay]
+id = "phase1a_p4_01_outcome_replay_v1"
+schema_version = 1
+engine_version = "phase1a_shared_outcome_replay_v1"
+campaign_key = "phase1a_conservative_screening_v1"
+query_id = "p4_01_opposite_depth_depletion_continuation"
+screening_only = true
+maximum_authority = "SCREENING_SURVIVOR"
+
+[discovery_inputs]
+artifact_schema = "systematic_fx.phase1a_discovery_slice.v1"
+discovery_config_path = "configs/research/phase1a_discovery_slice_v1.toml"
+first_slice_index = 0
+last_slice_index = 98
+expected_slice_count = 99
+source_dates_per_slice = 5
+expected_signal_count = 334
+expected_long_signal_count = 175
+expected_short_signal_count = 159
+expected_signal_source_date_count = 143
+expected_contract_count = 7
+expected_artifact_manifest_sha256 = "23037db1dd12784e379b76effa4f3056cec18d9ae2db7fe7e54e11f2f5424d33"
+expected_signal_manifest_sha256 = "ef89f2dcc1a42176e4570a2b63c5d554c9e0d6fa1da77256dae3907a62a3bb59"
+require_canonical_success_attempt = true
+require_visible_to_ai = true
+require_research_eligible_false = true
+require_all_occurrence_variables = true
+require_artifact_sha256_verification = true
+
+[frozen_policy_inputs]
+campaign_path = "configs/campaigns/phase1a_conservative_screening_v1.toml"
+cost_path = "configs/costs/phase1a_conservative_cost_v1.toml"
+execution_path = "configs/execution/phase1a_conservative_execution_v1.toml"
+barrier_grid_path = "configs/research/phase1a_barrier_grid_v1.toml"
+source_footer_manifest = "data/derived/manifests/mbp10_footer_manifest_v1.jsonl"
+source_sha256_manifest = "data/derived/manifests/mbp10_source_sha256_v1.jsonl"
+eligible_calendar_artifact = "data/derived/manifests/phase1a_screening_source_date_calendar_v1.json"
+split_artifact = "data/derived/manifests/phase1a_performance_free_split_v1.json"
+
+[cache]
+schema = "systematic_fx.phase1a_daily_executable_cache.v1"
+request_index_schema = "systematic_fx.phase1a_daily_executable_cache_index.v1"
+version = "phase1a_daily_executable_cache_v1"
+partition_key = ["source_date", "raw_symbol"]
+maximum_parallel_workers = 4
+maximum_in_flight_partitions = 4
+worker_unit = "ONE_CACHE_KEY"
+expected_partition_count = 472
+expected_plan_sha256 = "7014967ae8aa63842ea17d0a12ff005b2656f540974af6ead8ec763f7ff73ba6"
+raw_partition_build_count = "ONCE_PER_CONTENT_IDENTITY"
+semantic_request_index_required = true
+retain_invalid_observations = true
+retain_source_row_lineage = true
+output_directory = "data/derived/backtest_event_cache/phase1a_daily_executable_cache_v1"
+
+[replay]
+logical_passes = 1
+expected_completed_source_date_count = 472
+expected_last_completed_source_date = "2023-08-31"
+global_event_order = ["ts_recv_ns", "sequence", "event_index", "contract_key"]
+signal_time_field = "bucket_end_ns"
+contract_field = "variables.contract"
+first_touch_observation_active_sessions = 20
+first_touch_unresolved_status = "CENSORED"
+portfolio_position_continues_after_censor = true
+occupied_signal_behavior = "LOG_AND_SKIP"
+occupancy_key = ["scenario_id", "direction", "contract_key", "grid_cell_id"]
+same_timestamp_tie_break = "STOP_FIRST"
+terminal_exit = "LAST_VALID_EXECUTABLE_QUOTE_BEFORE_EXPIRY_MONTH_START"
+terminal_partition_resolution = "REVERSE_SCAN_LAST_VALID_EXECUTABLE_QUOTE_PARTITION_V1"
+terminal_exit_failure = "HARD_FAILURE"
+
+[checkpoint]
+boundary = "SOURCE_DATE_COMPLETE"
+source_dates_per_checkpoint = 1
+resume_requires_exact_run_fingerprint = true
+resume_requires_exact_cache_manifest = true
+resume_requires_preceding_checkpoint_sha256 = true
+output_directory = "data/derived/outcomes/checkpoints/phase1a_p4_01_outcome_replay_v1"
+
+[results]
+artifact_schema = "systematic_fx.phase1a_p4_01_outcome_replay.v1"
+output_directory = "data/derived/outcomes/phase1a_p4_01_outcome_replay_v1"
+append_only_postgresql_registry = true
+required_scenarios = ["BASELINE", "MODERATE_COMBINED", "SEVERE_DIAGNOSTIC"]
+required_directions = ["LONG", "SHORT"]
+expected_grid_cell_count = 484
+expected_scenario_direction_cell_count = 2904
+record_every_signal = true
+record_every_grid_cell = true
+record_entry_not_filled = true
+record_skipped_occupied = true
+record_censored = true
+record_terminal_exit = true
+record_all_execution_variables = true
+
+[campaign_sequence]
+pair_id = "phase1a_p4_liquidity_transition_pair_v1"
+first_query_id = "p4_01_opposite_depth_depletion_continuation"
+second_query_id = "p4_02_depth_resistance_reversal"
+both_queries_must_be_planned_before_either_runs = true
+second_query_may_start_after = "BOTH_P4_PLANS_FROZEN"
+economic_results_may_be_interpreted_after = "BOTH_P4_REPLAYS_COMPLETE"
+selection_may_depend_on_sibling_economics = false

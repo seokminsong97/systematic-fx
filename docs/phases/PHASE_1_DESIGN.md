@@ -444,6 +444,17 @@ positive cell. Therefore the implementation produces no Production
 Buying/Sell/Loss triplet. This is screening evidence only; it does not satisfy
 the walk-forward, sealed-holdout, or `PASS_BACKTEST` requirements.
 
+The next bounded economic screen is the already-registered P4 liquidity pair,
+not a threshold revision of either rejected candidate. Its immutable protocol
+is recorded in
+[`PHASE1A_P4_PAIR_OUTCOME.md`](../research/PHASE1A_P4_PAIR_OUTCOME.md).
+P4-01 and P4-02 remain independent candidate portfolios but form one atomic
+release unit: both plans and attempts are bound before replay, neither member
+can publish a terminal result alone, and four query-direction decisions are
+released together. The prior 1,936 P5/P1 economic cells remain in the exposure
+ledger; the P4 pair adds another 1,936. The selector still has no p-value, so a
+positive result can be called only a Discovery `SCREENING_SURVIVOR`.
+
 Safe parallelism is limited to:
 
 - Bounded independent date/contract cache construction, including that

@@ -26,7 +26,10 @@ from systematic_fx.backtest.event_cache import (
 )
 from systematic_fx.backtest.shared_replay import SharedReplay, SignalSeed
 from systematic_fx.db.migrations import discover_migrations
-from systematic_fx.db.outcome_registry import phase1a_p5_outcome_parameters
+from systematic_fx.db.outcome_registry import (
+    OutcomeRegistryStateError,
+    phase1a_p5_outcome_parameters,
+)
 from systematic_fx.research.outcome_artifacts import (
     load_final_result_manifest,
     load_outcome_checkpoint,
@@ -45,21 +48,28 @@ from systematic_fx.research.outcome_inputs import (
 )
 from systematic_fx.research.phase1a_outcome_pipeline import (
     _SUPPORTED_MIGRATIONS,
+    OutcomePipelineReport,
     OutcomeProgress,
+    P4OutcomePairReport,
     Phase1AOutcomePipelineError,
+    PreparedOutcomeCompletion,
+    ReservedOutcomeExecution,
     _input_lineage,
     _make_run_spec,
     _run_replay,
     merge_daily_shared_events,
+    run_phase1a_p4_outcome_pair,
 )
 
+EXPECTED_MIGRATION_0028_SHA256 = "fb5683dca1b054516b6ee94b721aeeb1ac9662993ac7495d41961fb66e5e172e"
 
-def test_outcome_pipeline_supports_exact_bar_state_v2b_migration() -> None:
+
+def test_outcome_pipeline_supports_exact_p4_paired_outcome_migration() -> None:
     migrations = discover_migrations(Path(__file__).resolve().parents[2] / "migrations")
     migration_by_version = {item.version: item for item in migrations}
 
     assert tuple(item.version for item in migrations) == _SUPPORTED_MIGRATIONS
-    assert _SUPPORTED_MIGRATIONS == tuple(range(1, 28))
+    assert _SUPPORTED_MIGRATIONS == tuple(range(1, 29))
     assert migration_by_version[24].checksum == (
         "4aa845757f1a220c8d5595d4db6053f6374d99d067ab7e20c3e40ea22d610010"
     )
@@ -69,10 +79,11 @@ def test_outcome_pipeline_supports_exact_bar_state_v2b_migration() -> None:
     assert migration_by_version[26].checksum == (
         "232badda3e76fca79f93fcff059de6f3404fc797eb26a93c9483fd554cfe20bb"
     )
-    assert migrations[-1].name == "bar_state_v2b_parquet_schema_amendment"
-    assert migrations[-1].checksum == (
+    assert migration_by_version[27].checksum == (
         "f0f69db031dc555b260da1fceef5f1fb4087f25717f1472ae4b006e77182cdb8"
     )
+    assert migrations[-1].name == "phase1a_p4_paired_outcomes"
+    assert migrations[-1].checksum == EXPECTED_MIGRATION_0028_SHA256
 
 
 class _Phase1ACompleteTestEconomics(OutcomeEconomicsAccumulator):
@@ -478,6 +489,1097 @@ def test_phase1a_p1_outcome_cli_selects_second_runner(
     assert arguments.handler(arguments) == 0
     assert captured["mode"] == "PLAN_ONLY"
     assert json.loads(capsys.readouterr().out) == {"query_id": "p1_05_unconfirmed_move_reversal"}
+
+
+def _p4_operator_report(query_id: str, *, mode: str) -> OutcomePipelineReport:
+    return OutcomePipelineReport(
+        pipeline_version=f"{query_id}.pipeline",
+        mode=mode,
+        query_id=query_id,
+        signal_count=(334 if query_id.startswith("p4_01") else 340),
+        long_signal_count=(175 if query_id.startswith("p4_01") else 159),
+        short_signal_count=(159 if query_id.startswith("p4_01") else 181),
+        signal_source_date_count=(143 if query_id.startswith("p4_01") else 155),
+        contract_count=7,
+        cache_partition_count=(472 if query_id.startswith("p4_01") else 455),
+        portable_artifact_manifest_sha256="1" * 64,
+        rich_source_artifact_manifest_sha256="2" * 64,
+        signal_manifest_sha256="3" * 64,
+        input_plan_sha256="4" * 64,
+        calendar_sha256="5" * 64,
+        split_sha256="6" * 64,
+    )
+
+
+_P4_TEST_QUERY_IDS = (
+    "p4_01_opposite_depth_depletion_continuation",
+    "p4_02_depth_resistance_reversal",
+)
+
+
+def _p4_test_release(*, batch_id: int, release_id: int | None = None) -> object:
+    return SimpleNamespace(
+        release_sha256="e" * 64,
+        p4_pair_batch_id=batch_id,
+        p4_pair_release_id=batch_id + 1 if release_id is None else release_id,
+        pair_id="phase1a_p4_liquidity_transition_pair_v1",
+        p4_01_outcome_replay_manifest_id=1,
+        p4_02_outcome_replay_manifest_id=2,
+        p4_01_run_fingerprint="1" * 64,
+        p4_02_run_fingerprint="2" * 64,
+        p4_01_result_artifact_sha256="a" * 64,
+        p4_02_result_artifact_sha256="b" * 64,
+        p4_01_cell_summaries_sha256="f" * 64,
+        p4_02_cell_summaries_sha256="0" * 64,
+        decision_sha256s={
+            _P4_TEST_QUERY_IDS[0]: {"LONG": "1" * 64, "SHORT": "2" * 64},
+            _P4_TEST_QUERY_IDS[1]: {"LONG": "3" * 64, "SHORT": "4" * 64},
+        },
+        pair_config_sha256=("d83f28fae463643fc8969f8944b41c8b87254362fe709344afb7cfd240b8ea5f"),
+        pair_economic_cell_count=1_936,
+        cumulative_economic_cell_count=3_872,
+    )
+
+
+def _p4_test_executions(
+    tmp_path: Path,
+    services: object,
+    *,
+    execute_flags: tuple[bool, bool],
+) -> tuple[ReservedOutcomeExecution, ReservedOutcomeExecution]:
+    configs = tuple(
+        load_outcome_replay_config(
+            Path.cwd(),
+            config_path=Path(
+                "configs/research/phase1a_p4_01_outcome_replay_v1.toml"
+                if index == 1
+                else "configs/research/phase1a_p4_02_outcome_replay_v1.toml"
+            ),
+        )
+        for index in (1, 2)
+    )
+    return tuple(
+        ReservedOutcomeExecution(
+            prepared=SimpleNamespace(config=config),
+            reports=(),
+            terminal_resolution=SimpleNamespace(),
+            cache_manifest=SimpleNamespace(),
+            run_spec=SimpleNamespace(fingerprint=str(index) * 64),
+            reservation=SimpleNamespace(
+                outcome_replay_manifest_id=index,
+                execute=execute_flags[index - 1],
+            ),
+            report=_p4_operator_report(config.query_id, mode="RUN"),
+            database_url="postgresql://test",
+            data=tmp_path,
+            services=services,
+            predecessor_gate=None,
+            progress_callback=None,
+        )
+        for index, config in enumerate(configs, start=1)
+    )
+
+
+def _patch_p4_test_preparation(
+    monkeypatch: pytest.MonkeyPatch,
+    executions: tuple[ReservedOutcomeExecution, ReservedOutcomeExecution],
+) -> None:
+    def fake_prepare(**kwargs: object) -> OutcomePipelineReport | ReservedOutcomeExecution:
+        path = Path(kwargs["config_relative_path"])
+        index = 0 if "p4_01" in path.name else 1
+        if kwargs["mode"] == "PLAN_ONLY":
+            return _p4_operator_report(_P4_TEST_QUERY_IDS[index], mode="PLAN_ONLY")
+        return executions[index]
+
+    monkeypatch.setattr(
+        "systematic_fx.research.phase1a_outcome_pipeline._prepare_phase1a_outcomes",
+        fake_prepare,
+    )
+
+
+def test_p4_pair_plan_preflights_both_in_fixed_order(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, str]] = []
+
+    def fake_prepare(**kwargs: object) -> OutcomePipelineReport:
+        path = Path(kwargs["config_relative_path"])
+        query_id = (
+            "p4_01_opposite_depth_depletion_continuation"
+            if "p4_01" in path.name
+            else "p4_02_depth_resistance_reversal"
+        )
+        calls.append((query_id, str(kwargs["mode"])))
+        return _p4_operator_report(query_id, mode=str(kwargs["mode"]))
+
+    monkeypatch.setattr(
+        "systematic_fx.research.phase1a_outcome_pipeline._prepare_phase1a_outcomes",
+        fake_prepare,
+    )
+
+    report = run_phase1a_p4_outcome_pair(
+        project_root=Path.cwd(),
+        data_root=Path.cwd() / "data",
+        database_url="postgresql://test",
+        mode="PLAN_ONLY",
+    )
+
+    assert isinstance(report, P4OutcomePairReport)
+    assert report.disposition == "PAIR_PLANNED"
+    assert calls == [
+        ("p4_01_opposite_depth_depletion_continuation", "PLAN_ONLY"),
+        ("p4_02_depth_resistance_reversal", "PLAN_ONLY"),
+    ]
+    assert list(report.as_dict()["reports"]) == [
+        "p4_01_opposite_depth_depletion_continuation",
+        "p4_02_depth_resistance_reversal",
+    ]
+
+
+def test_p4_pair_registry_capabilities_fail_before_first_mutation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+
+    def fake_prepare(**kwargs: object) -> OutcomePipelineReport:
+        mode = str(kwargs["mode"])
+        calls.append(mode)
+        path = Path(kwargs["config_relative_path"])
+        query_id = (
+            "p4_01_opposite_depth_depletion_continuation"
+            if "p4_01" in path.name
+            else "p4_02_depth_resistance_reversal"
+        )
+        return _p4_operator_report(query_id, mode=mode)
+
+    monkeypatch.setattr(
+        "systematic_fx.research.phase1a_outcome_pipeline._prepare_phase1a_outcomes",
+        fake_prepare,
+    )
+
+    with pytest.raises(Phase1AOutcomePipelineError, match="service preflight failed"):
+        run_phase1a_p4_outcome_pair(
+            project_root=Path.cwd(),
+            data_root=Path.cwd() / "data",
+            database_url="postgresql://test",
+            services=SimpleNamespace(),
+        )
+
+    assert calls == ["PLAN_ONLY", "PLAN_ONLY"]
+
+
+def test_p4_pair_reserves_both_before_economics_and_completes_once(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    first_query = "p4_01_opposite_depth_depletion_continuation"
+    second_query = "p4_02_depth_resistance_reversal"
+    events: list[str] = []
+    result_objects = {
+        first_query: SimpleNamespace(path=tmp_path / "first.json", sha256="a" * 64),
+        second_query: SimpleNamespace(path=tmp_path / "second.json", sha256="b" * 64),
+    }
+    checkpoint_objects = {
+        first_query: SimpleNamespace(
+            path=tmp_path / "first-checkpoint.json",
+            sha256="c" * 64,
+            checkpoint_sequence=472,
+        ),
+        second_query: SimpleNamespace(
+            path=tmp_path / "second-checkpoint.json",
+            sha256="d" * 64,
+            checkpoint_sequence=455,
+        ),
+    }
+
+    services = SimpleNamespace()
+    executions: dict[str, ReservedOutcomeExecution] = {}
+    for index, query_id in enumerate((first_query, second_query), start=1):
+        executions[query_id] = ReservedOutcomeExecution(
+            prepared=SimpleNamespace(config=SimpleNamespace(query_id=query_id)),
+            reports=(),
+            terminal_resolution=SimpleNamespace(),
+            cache_manifest=SimpleNamespace(),
+            run_spec=SimpleNamespace(fingerprint=str(index) * 64),
+            reservation=SimpleNamespace(outcome_replay_manifest_id=index, execute=True),
+            report=_p4_operator_report(query_id, mode="RUN"),
+            database_url="postgresql://test",
+            data=tmp_path,
+            services=services,
+            predecessor_gate=None,
+            progress_callback=None,
+        )
+
+    def fake_prepare(**kwargs: object) -> OutcomePipelineReport | ReservedOutcomeExecution:
+        path = Path(kwargs["config_relative_path"])
+        query_id = first_query if "p4_01" in path.name else second_query
+        mode = str(kwargs["mode"])
+        events.append(f"prepare:{query_id}:{mode}")
+        if mode == "PLAN_ONLY":
+            return _p4_operator_report(query_id, mode=mode)
+        assert kwargs["p4_pair_config_sha256"] == (
+            "d83f28fae463643fc8969f8944b41c8b87254362fe709344afb7cfd240b8ea5f"
+        )
+        return executions[query_id]
+
+    def reserve_pair(*_args: object, **_kwargs: object) -> object:
+        events.append("reserve_pair")
+        return SimpleNamespace(
+            p4_pair_batch_id=9,
+            pair_id="phase1a_p4_liquidity_transition_pair_v1",
+            status="PREPARED",
+            p4_01_outcome_replay_manifest_id=1,
+            p4_02_outcome_replay_manifest_id=2,
+        )
+
+    def fake_execute(
+        execution: ReservedOutcomeExecution, **kwargs: object
+    ) -> PreparedOutcomeCompletion:
+        query_id = execution.prepared.config.query_id
+        events.append(f"execute:{query_id}")
+        assert kwargs == {"defer_registry_completion": True, "register_failure": False}
+        first = query_id == first_query
+        return PreparedOutcomeCompletion(
+            result=result_objects[query_id],
+            final_checkpoint=checkpoint_objects[query_id],
+            completed_source_date_count=472 if first else 455,
+            source_event_count=100 if first else 200,
+            detail_record_count=484_968 if first else 493_680,
+            summary_row_count=2_904,
+            cell_summaries=(None,) * 2_904,
+        )
+
+    def complete_pair(*_args: object, **kwargs: object) -> object:
+        events.append("complete_pair")
+        assert kwargs["p4_pair_batch_id"] == 9
+        assert [member.query_id for member in kwargs["members"]] == [first_query, second_query]
+        release = SimpleNamespace(
+            release_sha256="e" * 64,
+            p4_pair_batch_id=9,
+            p4_pair_release_id=10,
+            pair_id="phase1a_p4_liquidity_transition_pair_v1",
+            p4_01_outcome_replay_manifest_id=1,
+            p4_02_outcome_replay_manifest_id=2,
+            p4_01_run_fingerprint="1" * 64,
+            p4_02_run_fingerprint="2" * 64,
+            p4_01_result_artifact_sha256="a" * 64,
+            p4_02_result_artifact_sha256="b" * 64,
+            p4_01_cell_summaries_sha256="f" * 64,
+            p4_02_cell_summaries_sha256="0" * 64,
+            decision_sha256s={
+                first_query: {"LONG": "1" * 64, "SHORT": "2" * 64},
+                second_query: {"LONG": "3" * 64, "SHORT": "4" * 64},
+            },
+            pair_config_sha256=("d83f28fae463643fc8969f8944b41c8b87254362fe709344afb7cfd240b8ea5f"),
+            pair_economic_cell_count=1_936,
+            cumulative_economic_cell_count=3_872,
+        )
+        completions = (
+            SimpleNamespace(
+                outcome_replay_manifest_id=1,
+                run_fingerprint="1" * 64,
+                completed=True,
+                summary_row_count=2_904,
+                result_artifact_sha256="a" * 64,
+                cell_summaries_sha256="f" * 64,
+            ),
+            SimpleNamespace(
+                outcome_replay_manifest_id=2,
+                run_fingerprint="2" * 64,
+                completed=True,
+                summary_row_count=2_904,
+                result_artifact_sha256="b" * 64,
+                cell_summaries_sha256="0" * 64,
+            ),
+        )
+        return SimpleNamespace(completed=True, release=release, completions=completions)
+
+    services.reserve_pair = reserve_pair
+    services.complete_pair = complete_pair
+    services.fail_pair = lambda *_args, **_kwargs: pytest.fail("unexpected pair failure")
+    services.load_pair_release = lambda *_args, **_kwargs: pytest.fail(
+        "unexpected duplicate release load"
+    )
+    services.fail_unpaired = lambda *_args, **_kwargs: pytest.fail("unexpected unpaired cleanup")
+    monkeypatch.setattr(
+        "systematic_fx.research.phase1a_outcome_pipeline._prepare_phase1a_outcomes",
+        fake_prepare,
+    )
+    monkeypatch.setattr(
+        "systematic_fx.research.phase1a_outcome_pipeline._execute_reserved_outcome",
+        fake_execute,
+    )
+
+    report = run_phase1a_p4_outcome_pair(
+        project_root=Path.cwd(),
+        data_root=tmp_path,
+        database_url="postgresql://test",
+        services=services,
+    )
+
+    assert report.disposition == "PAIR_RELEASED"
+    assert report.p4_pair_batch_id == 9
+    assert report.p4_pair_release_id == 10
+    assert report.pair_release_sha256 == "e" * 64
+    assert events == [
+        f"prepare:{first_query}:PLAN_ONLY",
+        f"prepare:{second_query}:PLAN_ONLY",
+        f"prepare:{first_query}:RUN",
+        f"prepare:{second_query}:RUN",
+        "reserve_pair",
+        f"execute:{first_query}",
+        f"execute:{second_query}",
+        "complete_pair",
+    ]
+
+
+def test_p4_pair_recovers_success_when_complete_commits_then_raises(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    query_ids = (
+        "p4_01_opposite_depth_depletion_continuation",
+        "p4_02_depth_resistance_reversal",
+    )
+    services = SimpleNamespace()
+    executions = _p4_test_executions(
+        tmp_path,
+        services,
+        execute_flags=(True, True),
+    )
+    completions = tuple(
+        PreparedOutcomeCompletion(
+            result=SimpleNamespace(
+                path=tmp_path / f"result-{index}.json",
+                sha256=("a" if index == 1 else "b") * 64,
+            ),
+            final_checkpoint=SimpleNamespace(
+                path=tmp_path / f"checkpoint-{index}.json",
+                sha256=("c" if index == 1 else "d") * 64,
+                checkpoint_sequence=472 if index == 1 else 455,
+            ),
+            completed_source_date_count=472 if index == 1 else 455,
+            source_event_count=index,
+            detail_record_count=484_968 if index == 1 else 493_680,
+            summary_row_count=2_904,
+            cell_summaries=(None,) * 2_904,
+        )
+        for index in (1, 2)
+    )
+
+    def fake_prepare(**kwargs: object) -> OutcomePipelineReport | ReservedOutcomeExecution:
+        path = Path(kwargs["config_relative_path"])
+        index = 0 if "p4_01" in path.name else 1
+        if kwargs["mode"] == "PLAN_ONLY":
+            return _p4_operator_report(query_ids[index], mode="PLAN_ONLY")
+        return executions[index]
+
+    services.reserve_pair = lambda *_args, **_kwargs: SimpleNamespace(
+        p4_pair_batch_id=31,
+        pair_id="phase1a_p4_liquidity_transition_pair_v1",
+        status="PREPARED",
+        p4_01_outcome_replay_manifest_id=1,
+        p4_02_outcome_replay_manifest_id=2,
+    )
+    visible_release: list[object] = []
+
+    def commit_then_raise(*_args: object, **_kwargs: object) -> object:
+        visible_release.append(_p4_test_release(batch_id=31, release_id=32))
+        raise ConnectionError("connection lost after commit")
+
+    loaded: list[dict[str, object]] = []
+
+    def load_release(*_args: object, **kwargs: object) -> object:
+        assert visible_release
+        loaded.append(kwargs)
+        return visible_release[0]
+
+    services.complete_pair = commit_then_raise
+    services.load_pair_release = load_release
+    services.fail_pair = lambda *_args, **_kwargs: pytest.fail(
+        "a verified committed release must not be failed"
+    )
+    services.fail_unpaired = lambda *_args, **_kwargs: pytest.fail("unexpected unpaired cleanup")
+    execution_index = 0
+
+    def fake_execute(*_args: object, **_kwargs: object) -> PreparedOutcomeCompletion:
+        nonlocal execution_index
+        completion = completions[execution_index]
+        execution_index += 1
+        return completion
+
+    recovered: list[object] = []
+
+    def validate_recovery(
+        release: object,
+        _executions: object,
+        observed_completions: object,
+        **_kwargs: object,
+    ) -> tuple[int, int, str]:
+        recovered.append(release)
+        assert tuple(observed_completions) == completions
+        return (31, 32, "e" * 64)
+
+    monkeypatch.setattr(
+        "systematic_fx.research.phase1a_outcome_pipeline._prepare_phase1a_outcomes",
+        fake_prepare,
+    )
+    monkeypatch.setattr(
+        "systematic_fx.research.phase1a_outcome_pipeline._execute_reserved_outcome",
+        fake_execute,
+    )
+    monkeypatch.setattr(
+        "systematic_fx.research.phase1a_outcome_pipeline._validate_p4_recovered_release",
+        validate_recovery,
+    )
+
+    report = run_phase1a_p4_outcome_pair(
+        project_root=Path.cwd(),
+        data_root=tmp_path,
+        database_url="postgresql://test",
+        services=services,
+    )
+
+    assert report.disposition == "PAIR_RELEASED"
+    assert (report.p4_pair_batch_id, report.p4_pair_release_id) == (31, 32)
+    assert report.pair_release_sha256 == "e" * 64
+    assert len(loaded) == 1
+    assert loaded[0]["p4_01_outcome_replay_manifest_id"] == 1
+    assert loaded[0]["p4_02_outcome_replay_manifest_id"] == 2
+    assert recovered == visible_release
+
+    execution_index = 0
+
+    def unavailable_release_loader(*_args: object, **_kwargs: object) -> object:
+        raise RuntimeError("release verification database unavailable")
+
+    services.load_pair_release = unavailable_release_loader
+    with pytest.raises(
+        Phase1AOutcomePipelineError,
+        match="completion remains ambiguous; no failure transition was attempted",
+    ):
+        run_phase1a_p4_outcome_pair(
+            project_root=Path.cwd(),
+            data_root=tmp_path,
+            database_url="postgresql://test",
+            services=services,
+        )
+
+    execution_index = 0
+
+    def absent_release_loader(*_args: object, **_kwargs: object) -> object:
+        raise OutcomeRegistryStateError(
+            "exactly one released P4 pair is required for duplicate reuse"
+        )
+
+    failed_batches: list[int] = []
+    services.load_pair_release = absent_release_loader
+    services.fail_pair = lambda *_args, **kwargs: (
+        failed_batches.append(int(kwargs["p4_pair_batch_id"])) or SimpleNamespace(status="FAILED")
+    )
+    with pytest.raises(Phase1AOutcomePipelineError, match="connection lost after commit"):
+        run_phase1a_p4_outcome_pair(
+            project_root=Path.cwd(),
+            data_root=tmp_path,
+            database_url="postgresql://test",
+            services=services,
+        )
+    assert failed_batches == [31]
+
+
+def test_p4_pair_failure_marks_both_members_atomically(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    query_ids = (
+        "p4_01_opposite_depth_depletion_continuation",
+        "p4_02_depth_resistance_reversal",
+    )
+    services = SimpleNamespace()
+    executions = tuple(
+        ReservedOutcomeExecution(
+            prepared=SimpleNamespace(config=SimpleNamespace(query_id=query_id)),
+            reports=(),
+            terminal_resolution=SimpleNamespace(),
+            cache_manifest=SimpleNamespace(),
+            run_spec=SimpleNamespace(fingerprint=str(index) * 64),
+            reservation=SimpleNamespace(outcome_replay_manifest_id=index, execute=True),
+            report=_p4_operator_report(query_id, mode="RUN"),
+            database_url="postgresql://test",
+            data=tmp_path,
+            services=services,
+            predecessor_gate=None,
+            progress_callback=None,
+        )
+        for index, query_id in enumerate(query_ids, start=1)
+    )
+    prepared_calls = 0
+
+    def fake_prepare(**kwargs: object) -> OutcomePipelineReport | ReservedOutcomeExecution:
+        nonlocal prepared_calls
+        path = Path(kwargs["config_relative_path"])
+        index = 0 if "p4_01" in path.name else 1
+        if kwargs["mode"] == "PLAN_ONLY":
+            return _p4_operator_report(query_ids[index], mode="PLAN_ONLY")
+        prepared_calls += 1
+        return executions[index]
+
+    services.reserve_pair = lambda *_args, **_kwargs: SimpleNamespace(
+        p4_pair_batch_id=11,
+        pair_id="phase1a_p4_liquidity_transition_pair_v1",
+        status="PREPARED",
+        p4_01_outcome_replay_manifest_id=1,
+        p4_02_outcome_replay_manifest_id=2,
+    )
+    failed: list[dict[str, object]] = []
+    services.fail_pair = lambda *_args, **kwargs: (
+        failed.append(kwargs) or SimpleNamespace(status="FAILED")
+    )
+    services.complete_pair = lambda *_args, **_kwargs: pytest.fail("unexpected completion")
+    services.load_pair_release = lambda *_args, **_kwargs: (_ for _ in ()).throw(
+        OutcomeRegistryStateError("exactly one released P4 pair is required for duplicate reuse")
+    )
+    services.fail_unpaired = lambda *_args, **_kwargs: pytest.fail("unexpected unpaired cleanup")
+
+    def fake_execute(execution: ReservedOutcomeExecution, **_kwargs: object) -> object:
+        if execution.prepared.config.query_id == query_ids[1]:
+            raise RuntimeError("deliberate second-member failure")
+        return PreparedOutcomeCompletion(
+            result=SimpleNamespace(),
+            final_checkpoint=SimpleNamespace(),
+            completed_source_date_count=472,
+            source_event_count=1,
+            detail_record_count=484_968,
+            summary_row_count=2_904,
+            cell_summaries=(),
+        )
+
+    monkeypatch.setattr(
+        "systematic_fx.research.phase1a_outcome_pipeline._prepare_phase1a_outcomes",
+        fake_prepare,
+    )
+    monkeypatch.setattr(
+        "systematic_fx.research.phase1a_outcome_pipeline._execute_reserved_outcome",
+        fake_execute,
+    )
+
+    with pytest.raises(Phase1AOutcomePipelineError, match="deliberate second-member failure"):
+        run_phase1a_p4_outcome_pair(
+            project_root=Path.cwd(),
+            data_root=tmp_path,
+            database_url="postgresql://test",
+            services=services,
+        )
+
+    assert prepared_calls == 2
+    assert failed == [
+        {
+            "p4_pair_batch_id": 11,
+            "p4_01_run_fingerprint": "1" * 64,
+            "p4_02_run_fingerprint": "2" * 64,
+            "error_message": "RuntimeError: deliberate second-member failure",
+        }
+    ]
+
+
+def test_p4_second_preparation_failure_cleans_first_queued_member(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    first_query = "p4_01_opposite_depth_depletion_continuation"
+    second_query = "p4_02_depth_resistance_reversal"
+    services = SimpleNamespace()
+    first_execution = ReservedOutcomeExecution(
+        prepared=SimpleNamespace(config=SimpleNamespace(query_id=first_query)),
+        reports=(),
+        terminal_resolution=SimpleNamespace(),
+        cache_manifest=SimpleNamespace(),
+        run_spec=SimpleNamespace(fingerprint="1" * 64),
+        reservation=SimpleNamespace(outcome_replay_manifest_id=1, execute=True),
+        report=_p4_operator_report(first_query, mode="RUN"),
+        database_url="postgresql://test",
+        data=tmp_path,
+        services=services,
+        predecessor_gate=None,
+        progress_callback=None,
+    )
+    actual_prepares = 0
+
+    def fake_prepare(**kwargs: object) -> OutcomePipelineReport | ReservedOutcomeExecution:
+        nonlocal actual_prepares
+        path = Path(kwargs["config_relative_path"])
+        query_id = first_query if "p4_01" in path.name else second_query
+        if kwargs["mode"] == "PLAN_ONLY":
+            return _p4_operator_report(query_id, mode="PLAN_ONLY")
+        actual_prepares += 1
+        if query_id == first_query:
+            return first_execution
+        raise RuntimeError("deliberate second preparation failure")
+
+    cleaned: list[dict[str, object]] = []
+    services.fail_unpaired = lambda *_args, **kwargs: (
+        cleaned.append(kwargs) or SimpleNamespace(status="FAILED")
+    )
+    services.reserve_pair = lambda *_args, **_kwargs: pytest.fail("unexpected pair reserve")
+    services.complete_pair = lambda *_args, **_kwargs: pytest.fail("unexpected completion")
+    services.fail_pair = lambda *_args, **_kwargs: pytest.fail("unexpected pair failure")
+    services.load_pair_release = lambda *_args, **_kwargs: (_ for _ in ()).throw(
+        OutcomeRegistryStateError("exactly one released P4 pair is required for duplicate reuse")
+    )
+    monkeypatch.setattr(
+        "systematic_fx.research.phase1a_outcome_pipeline._prepare_phase1a_outcomes",
+        fake_prepare,
+    )
+
+    with pytest.raises(Phase1AOutcomePipelineError, match="second preparation failure"):
+        run_phase1a_p4_outcome_pair(
+            project_root=Path.cwd(),
+            data_root=tmp_path,
+            database_url="postgresql://test",
+            services=services,
+        )
+
+    assert actual_prepares == 2
+    assert cleaned == [
+        {
+            "outcome_replay_manifest_id": 1,
+            "run_fingerprint": "1" * 64,
+            "error_message": "RuntimeError: deliberate second preparation failure",
+        }
+    ]
+
+
+def test_p4_mixed_duplicate_and_new_reservation_cleans_new_member(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    query_ids = (
+        "p4_01_opposite_depth_depletion_continuation",
+        "p4_02_depth_resistance_reversal",
+    )
+    services = SimpleNamespace()
+    executions = tuple(
+        ReservedOutcomeExecution(
+            prepared=SimpleNamespace(config=SimpleNamespace(query_id=query_id)),
+            reports=(),
+            terminal_resolution=SimpleNamespace(),
+            cache_manifest=SimpleNamespace(),
+            run_spec=SimpleNamespace(fingerprint=str(index) * 64),
+            reservation=SimpleNamespace(
+                outcome_replay_manifest_id=index,
+                execute=index == 2,
+            ),
+            report=_p4_operator_report(query_id, mode="RUN"),
+            database_url="postgresql://test",
+            data=tmp_path,
+            services=services,
+            predecessor_gate=None,
+            progress_callback=None,
+        )
+        for index, query_id in enumerate(query_ids, start=1)
+    )
+
+    def fake_prepare(**kwargs: object) -> OutcomePipelineReport | ReservedOutcomeExecution:
+        path = Path(kwargs["config_relative_path"])
+        index = 0 if "p4_01" in path.name else 1
+        if kwargs["mode"] == "PLAN_ONLY":
+            return _p4_operator_report(query_ids[index], mode="PLAN_ONLY")
+        return executions[index]
+
+    cleaned: list[int] = []
+    services.fail_unpaired = lambda *_args, **kwargs: (
+        cleaned.append(int(kwargs["outcome_replay_manifest_id"]))
+        or SimpleNamespace(status="FAILED")
+    )
+    services.reserve_pair = lambda *_args, **_kwargs: pytest.fail("unexpected pair reserve")
+    services.complete_pair = lambda *_args, **_kwargs: pytest.fail("unexpected completion")
+    services.fail_pair = lambda *_args, **_kwargs: pytest.fail("unexpected pair failure")
+    services.load_pair_release = lambda *_args, **_kwargs: (_ for _ in ()).throw(
+        OutcomeRegistryStateError("exactly one released P4 pair is required for duplicate reuse")
+    )
+    monkeypatch.setattr(
+        "systematic_fx.research.phase1a_outcome_pipeline._prepare_phase1a_outcomes",
+        fake_prepare,
+    )
+
+    with pytest.raises(Phase1AOutcomePipelineError, match="cannot mix"):
+        run_phase1a_p4_outcome_pair(
+            project_root=Path.cwd(),
+            data_root=tmp_path,
+            database_url="postgresql://test",
+            services=services,
+        )
+
+    assert cleaned == [2]
+
+
+@pytest.mark.parametrize("execute_flags", [(True, False), (False, True)])
+def test_p4_mixed_reservation_hydrates_concurrently_released_pair(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    execute_flags: tuple[bool, bool],
+) -> None:
+    services = SimpleNamespace()
+    executions = _p4_test_executions(
+        tmp_path,
+        services,
+        execute_flags=execute_flags,
+    )
+    _patch_p4_test_preparation(monkeypatch, executions)
+    loaded: list[dict[str, object]] = []
+    services.load_pair_release = lambda *_args, **kwargs: (
+        loaded.append(kwargs) or _p4_test_release(batch_id=41)
+    )
+    services.reserve_pair = lambda *_args, **_kwargs: pytest.fail("unexpected pair reserve")
+    services.complete_pair = lambda *_args, **_kwargs: pytest.fail("unexpected completion")
+    services.fail_pair = lambda *_args, **_kwargs: pytest.fail("unexpected pair failure")
+    services.fail_unpaired = lambda *_args, **_kwargs: pytest.fail(
+        "a released pair must not be cleaned as unpaired"
+    )
+
+    report = run_phase1a_p4_outcome_pair(
+        project_root=Path.cwd(),
+        data_root=tmp_path,
+        database_url="postgresql://test",
+        services=services,
+    )
+
+    assert (report.p4_pair_batch_id, report.p4_pair_release_id) == (41, 42)
+    assert (report.first.disposition, report.second.disposition) == (
+        "SKIPPED_DUPLICATE",
+        "SKIPPED_DUPLICATE",
+    )
+    assert len(loaded) == 1
+
+
+def test_p4_released_pair_reservation_hydrates_without_economics_or_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    services = SimpleNamespace()
+    executions = _p4_test_executions(
+        tmp_path,
+        services,
+        execute_flags=(True, True),
+    )
+    _patch_p4_test_preparation(monkeypatch, executions)
+    services.reserve_pair = lambda *_args, **_kwargs: SimpleNamespace(
+        p4_pair_batch_id=51,
+        pair_id="phase1a_p4_liquidity_transition_pair_v1",
+        status="RELEASED",
+        p4_01_outcome_replay_manifest_id=1,
+        p4_02_outcome_replay_manifest_id=2,
+    )
+    loaded: list[dict[str, object]] = []
+    services.load_pair_release = lambda *_args, **kwargs: (
+        loaded.append(kwargs) or _p4_test_release(batch_id=51)
+    )
+    services.complete_pair = lambda *_args, **_kwargs: pytest.fail("unexpected completion")
+    services.fail_pair = lambda *_args, **_kwargs: pytest.fail(
+        "a RELEASED reservation must not be failed"
+    )
+    services.fail_unpaired = lambda *_args, **_kwargs: pytest.fail("unexpected cleanup")
+    monkeypatch.setattr(
+        "systematic_fx.research.phase1a_outcome_pipeline._execute_reserved_outcome",
+        lambda *_args, **_kwargs: pytest.fail("released pair must not execute economics"),
+    )
+
+    report = run_phase1a_p4_outcome_pair(
+        project_root=Path.cwd(),
+        data_root=tmp_path,
+        database_url="postgresql://test",
+        services=services,
+    )
+
+    assert report.p4_pair_batch_id == 51
+    assert (report.first.disposition, report.second.disposition) == (
+        "SKIPPED_DUPLICATE",
+        "SKIPPED_DUPLICATE",
+    )
+    assert len(loaded) == 1
+
+
+def test_p4_prepared_then_start_error_hydrates_peer_release(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    services = SimpleNamespace()
+    executions = _p4_test_executions(
+        tmp_path,
+        services,
+        execute_flags=(True, True),
+    )
+    _patch_p4_test_preparation(monkeypatch, executions)
+    services.reserve_pair = lambda *_args, **_kwargs: SimpleNamespace(
+        p4_pair_batch_id=61,
+        pair_id="phase1a_p4_liquidity_transition_pair_v1",
+        status="PREPARED",
+        p4_01_outcome_replay_manifest_id=1,
+        p4_02_outcome_replay_manifest_id=2,
+    )
+    peer_released: list[bool] = []
+
+    def start_after_peer_release(*_args: object, **_kwargs: object) -> object:
+        peer_released.append(True)
+        raise OutcomeRegistryStateError("P4 pair is already RELEASED")
+
+    def load_release(*_args: object, **_kwargs: object) -> object:
+        assert peer_released
+        return _p4_test_release(batch_id=61)
+
+    monkeypatch.setattr(
+        "systematic_fx.research.phase1a_outcome_pipeline._execute_reserved_outcome",
+        start_after_peer_release,
+    )
+    services.load_pair_release = load_release
+    services.complete_pair = lambda *_args, **_kwargs: pytest.fail("unexpected completion")
+    services.fail_pair = lambda *_args, **_kwargs: pytest.fail(
+        "a peer-released pair must not be failed"
+    )
+    services.fail_unpaired = lambda *_args, **_kwargs: pytest.fail("unexpected cleanup")
+
+    report = run_phase1a_p4_outcome_pair(
+        project_root=Path.cwd(),
+        data_root=tmp_path,
+        database_url="postgresql://test",
+        services=services,
+    )
+
+    assert report.p4_pair_batch_id == 61
+    assert (report.first.disposition, report.second.disposition) == (
+        "SKIPPED_DUPLICATE",
+        "SKIPPED_DUPLICATE",
+    )
+
+
+def test_p4_failure_rechecks_release_after_atomic_fail_rejects_race(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    services = SimpleNamespace()
+    executions = _p4_test_executions(
+        tmp_path,
+        services,
+        execute_flags=(True, True),
+    )
+    _patch_p4_test_preparation(monkeypatch, executions)
+    services.reserve_pair = lambda *_args, **_kwargs: SimpleNamespace(
+        p4_pair_batch_id=71,
+        pair_id="phase1a_p4_liquidity_transition_pair_v1",
+        status="PREPARED",
+        p4_01_outcome_replay_manifest_id=1,
+        p4_02_outcome_replay_manifest_id=2,
+    )
+    monkeypatch.setattr(
+        "systematic_fx.research.phase1a_outcome_pipeline._execute_reserved_outcome",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("start race")),
+    )
+    load_count = 0
+
+    def load_release(*_args: object, **_kwargs: object) -> object:
+        nonlocal load_count
+        load_count += 1
+        if load_count == 1:
+            raise OutcomeRegistryStateError(
+                "exactly one released P4 pair is required for duplicate reuse"
+            )
+        return _p4_test_release(batch_id=71)
+
+    fail_calls: list[int] = []
+
+    def fail_after_peer_release(*_args: object, **kwargs: object) -> object:
+        fail_calls.append(int(kwargs["p4_pair_batch_id"]))
+        raise OutcomeRegistryStateError("P4 pair is already RELEASED")
+
+    services.load_pair_release = load_release
+    services.fail_pair = fail_after_peer_release
+    services.complete_pair = lambda *_args, **_kwargs: pytest.fail("unexpected completion")
+    services.fail_unpaired = lambda *_args, **_kwargs: pytest.fail("unexpected cleanup")
+
+    report = run_phase1a_p4_outcome_pair(
+        project_root=Path.cwd(),
+        data_root=tmp_path,
+        database_url="postgresql://test",
+        services=services,
+    )
+
+    assert report.p4_pair_batch_id == 71
+    assert fail_calls == [71]
+    assert load_count == 2
+    assert (report.first.disposition, report.second.disposition) == (
+        "SKIPPED_DUPLICATE",
+        "SKIPPED_DUPLICATE",
+    )
+
+
+def test_p4_mixed_cleanup_rechecks_release_after_unpaired_rejection(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    services = SimpleNamespace()
+    executions = _p4_test_executions(
+        tmp_path,
+        services,
+        execute_flags=(False, True),
+    )
+    _patch_p4_test_preparation(monkeypatch, executions)
+    load_count = 0
+
+    def load_release(*_args: object, **_kwargs: object) -> object:
+        nonlocal load_count
+        load_count += 1
+        if load_count == 1:
+            raise OutcomeRegistryStateError(
+                "exactly one released P4 pair is required for duplicate reuse"
+            )
+        return _p4_test_release(batch_id=81)
+
+    cleanup_calls: list[int] = []
+
+    def reject_unpaired_cleanup(*_args: object, **kwargs: object) -> object:
+        cleanup_calls.append(int(kwargs["outcome_replay_manifest_id"]))
+        raise OutcomeRegistryStateError("P4 member is now bound to a RELEASED pair")
+
+    services.load_pair_release = load_release
+    services.fail_unpaired = reject_unpaired_cleanup
+    services.reserve_pair = lambda *_args, **_kwargs: pytest.fail("unexpected pair reserve")
+    services.complete_pair = lambda *_args, **_kwargs: pytest.fail("unexpected completion")
+    services.fail_pair = lambda *_args, **_kwargs: pytest.fail("unexpected pair failure")
+
+    report = run_phase1a_p4_outcome_pair(
+        project_root=Path.cwd(),
+        data_root=tmp_path,
+        database_url="postgresql://test",
+        services=services,
+    )
+
+    assert report.p4_pair_batch_id == 81
+    assert cleanup_calls == [2]
+    assert load_count == 2
+    assert (report.first.disposition, report.second.disposition) == (
+        "SKIPPED_DUPLICATE",
+        "SKIPPED_DUPLICATE",
+    )
+
+
+def test_p4_pair_duplicate_requires_exact_existing_release(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    query_ids = (
+        "p4_01_opposite_depth_depletion_continuation",
+        "p4_02_depth_resistance_reversal",
+    )
+    services = SimpleNamespace()
+    executions = tuple(
+        ReservedOutcomeExecution(
+            prepared=SimpleNamespace(
+                config=replace(
+                    load_outcome_replay_config(
+                        Path.cwd(),
+                        config_path=Path(
+                            "configs/research/phase1a_p4_01_outcome_replay_v1.toml"
+                            if index == 1
+                            else "configs/research/phase1a_p4_02_outcome_replay_v1.toml"
+                        ),
+                    )
+                )
+            ),
+            reports=(),
+            terminal_resolution=SimpleNamespace(),
+            cache_manifest=SimpleNamespace(),
+            run_spec=SimpleNamespace(fingerprint=str(index) * 64),
+            reservation=SimpleNamespace(outcome_replay_manifest_id=index, execute=False),
+            report=_p4_operator_report(query_id, mode="RUN"),
+            database_url="postgresql://test",
+            data=tmp_path,
+            services=services,
+            predecessor_gate=None,
+            progress_callback=None,
+        )
+        for index, query_id in enumerate(query_ids, start=1)
+    )
+
+    def fake_prepare(**kwargs: object) -> OutcomePipelineReport | ReservedOutcomeExecution:
+        path = Path(kwargs["config_relative_path"])
+        index = 0 if "p4_01" in path.name else 1
+        if kwargs["mode"] == "PLAN_ONLY":
+            return _p4_operator_report(query_ids[index], mode="PLAN_ONLY")
+        return executions[index]
+
+    release = SimpleNamespace(
+        release_sha256="e" * 64,
+        p4_pair_batch_id=21,
+        p4_pair_release_id=22,
+        pair_id="phase1a_p4_liquidity_transition_pair_v1",
+        p4_01_outcome_replay_manifest_id=1,
+        p4_02_outcome_replay_manifest_id=2,
+        p4_01_run_fingerprint="1" * 64,
+        p4_02_run_fingerprint="2" * 64,
+        p4_01_result_artifact_sha256="a" * 64,
+        p4_02_result_artifact_sha256="b" * 64,
+        decision_sha256s={
+            query_ids[0]: {"LONG": "1" * 64, "SHORT": "2" * 64},
+            query_ids[1]: {"LONG": "3" * 64, "SHORT": "4" * 64},
+        },
+        pair_config_sha256=("d83f28fae463643fc8969f8944b41c8b87254362fe709344afb7cfd240b8ea5f"),
+        pair_economic_cell_count=1_936,
+        cumulative_economic_cell_count=3_872,
+    )
+    loaded: list[dict[str, object]] = []
+    services.load_pair_release = lambda *_args, **kwargs: loaded.append(kwargs) or release
+    services.reserve_pair = lambda *_args, **_kwargs: pytest.fail("unexpected pair reserve")
+    services.complete_pair = lambda *_args, **_kwargs: pytest.fail("unexpected completion")
+    services.fail_pair = lambda *_args, **_kwargs: pytest.fail("unexpected pair failure")
+    services.fail_unpaired = lambda *_args, **_kwargs: pytest.fail("unexpected unpaired cleanup")
+    monkeypatch.setattr(
+        "systematic_fx.research.phase1a_outcome_pipeline._prepare_phase1a_outcomes",
+        fake_prepare,
+    )
+
+    report = run_phase1a_p4_outcome_pair(
+        project_root=Path.cwd(),
+        data_root=tmp_path,
+        database_url="postgresql://test",
+        services=services,
+    )
+
+    assert report.disposition == "PAIR_RELEASED"
+    assert report.p4_pair_batch_id == 21
+    assert report.p4_pair_release_id == 22
+    assert report.pair_release_sha256 == "e" * 64
+    assert (report.first.disposition, report.second.disposition) == (
+        "SKIPPED_DUPLICATE",
+        "SKIPPED_DUPLICATE",
+    )
+    assert sum(item.summary_row_count for item in (report.first, report.second)) == 5_808
+    assert len(loaded) == 1
+    assert loaded[0]["data_root"] == tmp_path
+
+
+def test_phase1a_p4_pair_cli_exposes_no_individual_candidate_command(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: Any,
+) -> None:
+    parser = cli.build_parser()
+    arguments = parser.parse_args(["research", "phase1a-p4-pair-outcomes", "--plan-only", "--json"])
+
+    monkeypatch.setattr(
+        "systematic_fx.research.phase1a_outcome_pipeline.run_phase1a_p4_outcome_pair",
+        lambda **kwargs: SimpleNamespace(as_dict=lambda: {"mode": kwargs["mode"]}),
+    )
+    monkeypatch.setattr(
+        cli.Settings,
+        "from_env",
+        lambda: SimpleNamespace(data_root=Path("data"), database_url="postgresql://test"),
+    )
+
+    assert arguments.handler(arguments) == 0
+    assert json.loads(capsys.readouterr().out) == {"mode": "PLAN_ONLY"}
+    with pytest.raises(SystemExit):
+        parser.parse_args(["research", "phase1a-p4-01-outcomes"])
+    with pytest.raises(SystemExit):
+        parser.parse_args(["research", "phase1a-p4-02-outcomes"])
 
 
 def test_outcome_run_spec_records_rich_portable_plan_and_cache_lineage() -> None:

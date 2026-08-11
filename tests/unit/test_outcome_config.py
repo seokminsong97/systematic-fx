@@ -11,8 +11,15 @@ from systematic_fx.research.outcome_config import (
     P1_OUTCOME_ARTIFACT_SCHEMA,
     P1_OUTCOME_CONFIG_RELATIVE_PATH,
     P1_QUERY_ID,
+    P4_01_OUTCOME_CONFIG_RELATIVE_PATH,
+    P4_01_QUERY_ID,
+    P4_02_OUTCOME_CONFIG_RELATIVE_PATH,
+    P4_02_QUERY_ID,
+    P4_PAIR_CONFIG_SHA256,
+    P4_PAIR_ID,
     P5_QUERY_ID,
     load_outcome_replay_config,
+    load_p4_pair_outcome_config,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -137,6 +144,65 @@ class OutcomeReplayConfigTests(unittest.TestCase):
         )
         self.assertNotIn("expected_first_completed_source_date", config.canonical_parameters())
         self.assertNotIn("outcome_artifact_schema", config.canonical_parameters())
+
+    def test_p4_configs_freeze_distinct_pair_members_and_input_identities(self) -> None:
+        first = load_outcome_replay_config(
+            ROOT,
+            config_path=P4_01_OUTCOME_CONFIG_RELATIVE_PATH,
+        )
+        second = load_outcome_replay_config(
+            ROOT,
+            config_path=P4_02_OUTCOME_CONFIG_RELATIVE_PATH,
+        )
+
+        self.assertEqual((first.query_id, second.query_id), (P4_01_QUERY_ID, P4_02_QUERY_ID))
+        self.assertEqual((first.expected_signal_count, second.expected_signal_count), (334, 340))
+        self.assertEqual(
+            (dict(first.expected_direction_counts), dict(second.expected_direction_counts)),
+            ({"LONG": 175, "SHORT": 159}, {"LONG": 159, "SHORT": 181}),
+        )
+        self.assertEqual(
+            (first.expected_signal_source_date_count, second.expected_signal_source_date_count),
+            (143, 155),
+        )
+        self.assertEqual(
+            (first.expected_cache_partition_count, second.expected_cache_partition_count),
+            (472, 455),
+        )
+        self.assertEqual(
+            (
+                first.expected_first_completed_source_date,
+                second.expected_first_completed_source_date,
+            ),
+            (date(2022, 1, 3), date(2022, 1, 18)),
+        )
+        self.assertEqual(
+            (first.sha256, second.sha256),
+            (
+                "a98f0c7bcaaca70bbcfe4da7f80414a96bd664c36e025176f0163a9c2a455d25",
+                "e9b49a0f45f4988403163085d3e4cc2e960c91cf630ea6d2cc24b7ce95a64220",
+            ),
+        )
+        self.assertEqual(
+            first.canonical_parameters()["campaign_sequence"],
+            second.canonical_parameters()["campaign_sequence"],
+        )
+
+    def test_p4_pair_config_freezes_atomic_release_and_cumulative_ledger(self) -> None:
+        pair = load_p4_pair_outcome_config(ROOT)
+
+        self.assertEqual(pair.pair_id, P4_PAIR_ID)
+        self.assertEqual(pair.sha256, P4_PAIR_CONFIG_SHA256)
+        self.assertEqual(pair.ordered_query_ids, (P4_01_QUERY_ID, P4_02_QUERY_ID))
+        self.assertEqual(pair.expected_candidate_count, 2)
+        self.assertEqual(pair.expected_summary_count, 5_808)
+        self.assertEqual(pair.expected_decision_count, 4)
+        self.assertEqual(pair.expected_signal_count, 674)
+        self.assertEqual(pair.expected_detail_record_count, 978_648)
+        self.assertEqual(pair.new_pair_cell_count, 1_936)
+        self.assertEqual(pair.observed_prior_cell_count, 1_936)
+        self.assertEqual(pair.cumulative_observed_cell_count, 3_872)
+        self.assertEqual(pair.fixed_query_potential_ledger_count, 10_648)
 
 
 if __name__ == "__main__":

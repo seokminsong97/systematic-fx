@@ -50,6 +50,8 @@ from systematic_fx.research.outcome_config import (
     EXPECTED_SIGNAL_COUNT,
     EXPECTED_SLICE_INDICES,
     P1_QUERY_ID,
+    P4_01_QUERY_ID,
+    P4_02_QUERY_ID,
     P5_QUERY_ID,
     TERMINAL_EXIT_POLICY,
     TERMINAL_PARTITION_RESOLUTION_POLICY,
@@ -79,6 +81,31 @@ _TARGET_DEFINITIONS: Final = {
         "direction_rule": "OPPOSITE_SIGN_BAR_MOVE",
         "id": P1_QUERY_ID,
         "parent_hypothesis_ids": [P1_QUERY_ID],
+    },
+    P4_01_QUERY_ID: {
+        "conditions": [
+            "abs(bar_move_x2_ticks)>=8",
+            "opposite_l5_depth_depleted",
+            "supporting_l5_depth_not_depleted",
+            "last_spread_ticks<=2",
+        ],
+        "direction_rule": "SIGN_BAR_MOVE",
+        "id": P4_01_QUERY_ID,
+        "parent_hypothesis_ids": [
+            "p4_01_ask_depletion_upward_continuation",
+            "p4_02_bid_depletion_downward_continuation",
+        ],
+    },
+    P4_02_QUERY_ID: {
+        "conditions": [
+            "abs(bar_move_x2_ticks)>=8",
+            "opposite_l5_depth_replenished",
+            "supporting_l5_depth_depleted",
+            "last_spread_ticks<=2",
+        ],
+        "direction_rule": "OPPOSITE_SIGN_BAR_MOVE",
+        "id": P4_02_QUERY_ID,
+        "parent_hypothesis_ids": ["p4_03_depletion_replenishment_reversal"],
     },
 }
 _ARTIFACT_FIELDS: Final = {

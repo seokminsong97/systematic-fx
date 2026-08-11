@@ -25,11 +25,27 @@ OUTCOME_CONFIG_RELATIVE_PATH: Final = Path("configs/research/phase1a_p5_outcome_
 P1_OUTCOME_CONFIG_RELATIVE_PATH: Final = Path(
     "configs/research/phase1a_p1_05_outcome_replay_v1.toml"
 )
+P4_01_OUTCOME_CONFIG_RELATIVE_PATH: Final = Path(
+    "configs/research/phase1a_p4_01_outcome_replay_v1.toml"
+)
+P4_02_OUTCOME_CONFIG_RELATIVE_PATH: Final = Path(
+    "configs/research/phase1a_p4_02_outcome_replay_v1.toml"
+)
+P4_PAIR_CONFIG_RELATIVE_PATH: Final = Path(
+    "configs/research/phase1a_p4_pair_outcome_replay_v1.toml"
+)
 OUTCOME_ARTIFACT_SCHEMA: Final = "systematic_fx.phase1a_p5_outcome_replay.v1"
 P1_OUTCOME_ARTIFACT_SCHEMA: Final = "systematic_fx.phase1a_p1_05_outcome_replay.v1"
+P4_01_OUTCOME_ARTIFACT_SCHEMA: Final = "systematic_fx.phase1a_p4_01_outcome_replay.v1"
+P4_02_OUTCOME_ARTIFACT_SCHEMA: Final = "systematic_fx.phase1a_p4_02_outcome_replay.v1"
 OUTCOME_REPLAY_ENGINE_VERSION: Final = "phase1a_shared_outcome_replay_v1"
 P5_QUERY_ID: Final = "p5_01_range_expansion_flow_continuation"
 P1_QUERY_ID: Final = "p1_05_unconfirmed_move_reversal"
+P4_01_QUERY_ID: Final = "p4_01_opposite_depth_depletion_continuation"
+P4_02_QUERY_ID: Final = "p4_02_depth_resistance_reversal"
+P4_PAIR_ID: Final = "phase1a_p4_liquidity_transition_pair_v1"
+P4_PAIR_QUERY_IDS: Final = (P4_01_QUERY_ID, P4_02_QUERY_ID)
+P4_PAIR_CONFIG_SHA256: Final = "d83f28fae463643fc8969f8944b41c8b87254362fe709344afb7cfd240b8ea5f"
 TERMINAL_EXIT_POLICY: Final = "LAST_VALID_EXECUTABLE_QUOTE_BEFORE_EXPIRY_MONTH_START"
 TERMINAL_PARTITION_RESOLUTION_POLICY: Final = (
     "REVERSE_SCAN_LAST_VALID_EXECUTABLE_QUOTE_PARTITION_V1"
@@ -58,6 +74,45 @@ EXPECTED_SCENARIO_IDS: Final = (
     "MODERATE_COMBINED",
     "SEVERE_DIAGNOSTIC",
 )
+_LEGACY_CAMPAIGN_SEQUENCE: Final = (
+    ("first_query_id", P5_QUERY_ID),
+    ("second_query_id", P1_QUERY_ID),
+    ("second_query_may_start_after", "P5_COMPLETE_AND_LINEAGE_RESUME_AUDIT_PASSED"),
+)
+P4_CAMPAIGN_SEQUENCE: Final = (
+    ("pair_id", P4_PAIR_ID),
+    ("first_query_id", P4_01_QUERY_ID),
+    ("second_query_id", P4_02_QUERY_ID),
+    ("both_queries_must_be_planned_before_either_runs", True),
+    ("second_query_may_start_after", "BOTH_P4_PLANS_FROZEN"),
+    ("economic_results_may_be_interpreted_after", "BOTH_P4_REPLAYS_COMPLETE"),
+    ("selection_may_depend_on_sibling_economics", False),
+)
+_EXPECTED_P4_PAIR_POLICY: Final = {
+    "id": P4_PAIR_ID,
+    "schema_version": 1,
+    "ordered_query_ids": list(P4_PAIR_QUERY_IDS),
+    "ordered_config_ids": [
+        "phase1a_p4_01_outcome_replay_v1",
+        "phase1a_p4_02_outcome_replay_v1",
+    ],
+    "release_unit": "PAIR",
+    "partial_result_release": "FORBIDDEN",
+    "economic_gate_between_candidates": False,
+    "expected_candidate_count": 2,
+    "expected_summary_count": 5_808,
+    "expected_decision_count": 4,
+    "expected_signal_count": 674,
+    "expected_detail_record_count": 978_648,
+    "new_pair_cell_count": 1_936,
+    "observed_prior_cell_count": 1_936,
+    "cumulative_observed_cell_count": 3_872,
+    "fixed_query_potential_ledger_count": 10_648,
+    "fixed_query_potential_ledger_usage": "DIAGNOSTIC_ONLY",
+    "p_values_allowed": False,
+    "significance_claims_allowed": False,
+    "maximum_authority": "SCREENING_SURVIVOR",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,6 +136,7 @@ class FrozenOutcomeProfile:
     expected_artifact_manifest_sha256: str
     expected_signal_manifest_sha256: str
     expected_input_plan_sha256: str
+    campaign_sequence: tuple[tuple[str, object], ...]
 
 
 P5_OUTCOME_PROFILE: Final = FrozenOutcomeProfile(
@@ -101,6 +157,7 @@ P5_OUTCOME_PROFILE: Final = FrozenOutcomeProfile(
     expected_artifact_manifest_sha256=EXPECTED_ARTIFACT_MANIFEST_SHA256,
     expected_signal_manifest_sha256=EXPECTED_SIGNAL_MANIFEST_SHA256,
     expected_input_plan_sha256=EXPECTED_INPUT_PLAN_SHA256,
+    campaign_sequence=_LEGACY_CAMPAIGN_SEQUENCE,
 )
 P1_OUTCOME_PROFILE: Final = FrozenOutcomeProfile(
     config_relative_path=P1_OUTCOME_CONFIG_RELATIVE_PATH,
@@ -124,10 +181,57 @@ P1_OUTCOME_PROFILE: Final = FrozenOutcomeProfile(
         "733728670870dd438e79dfadd9df80043a0f2baf9553733cf89382132fefba25"
     ),
     expected_input_plan_sha256=("3ad39a9bff36e0eae1c87687bf38108b663394624582167bdbf5d848fe5b0252"),
+    campaign_sequence=_LEGACY_CAMPAIGN_SEQUENCE,
+)
+P4_01_OUTCOME_PROFILE: Final = FrozenOutcomeProfile(
+    config_relative_path=P4_01_OUTCOME_CONFIG_RELATIVE_PATH,
+    config_id="phase1a_p4_01_outcome_replay_v1",
+    query_id=P4_01_QUERY_ID,
+    outcome_artifact_schema=P4_01_OUTCOME_ARTIFACT_SCHEMA,
+    slice_indices=EXPECTED_SLICE_INDICES,
+    expected_signal_count=334,
+    expected_long_signal_count=175,
+    expected_short_signal_count=159,
+    expected_signal_source_date_count=143,
+    expected_contract_count=7,
+    expected_cache_partition_count=472,
+    expected_completed_source_date_count=472,
+    expected_first_completed_source_date=date(2022, 1, 3),
+    expected_last_completed_source_date=date(2023, 8, 31),
+    expected_artifact_manifest_sha256=EXPECTED_ARTIFACT_MANIFEST_SHA256,
+    expected_signal_manifest_sha256=(
+        "ef89f2dcc1a42176e4570a2b63c5d554c9e0d6fa1da77256dae3907a62a3bb59"
+    ),
+    expected_input_plan_sha256=("7014967ae8aa63842ea17d0a12ff005b2656f540974af6ead8ec763f7ff73ba6"),
+    campaign_sequence=P4_CAMPAIGN_SEQUENCE,
+)
+P4_02_OUTCOME_PROFILE: Final = FrozenOutcomeProfile(
+    config_relative_path=P4_02_OUTCOME_CONFIG_RELATIVE_PATH,
+    config_id="phase1a_p4_02_outcome_replay_v1",
+    query_id=P4_02_QUERY_ID,
+    outcome_artifact_schema=P4_02_OUTCOME_ARTIFACT_SCHEMA,
+    slice_indices=EXPECTED_SLICE_INDICES,
+    expected_signal_count=340,
+    expected_long_signal_count=159,
+    expected_short_signal_count=181,
+    expected_signal_source_date_count=155,
+    expected_contract_count=7,
+    expected_cache_partition_count=455,
+    expected_completed_source_date_count=455,
+    expected_first_completed_source_date=date(2022, 1, 18),
+    expected_last_completed_source_date=date(2023, 8, 31),
+    expected_artifact_manifest_sha256=EXPECTED_ARTIFACT_MANIFEST_SHA256,
+    expected_signal_manifest_sha256=(
+        "c4babe44c322d391fabd305ca28b0a3274136ff611c98e2fe962b44d3d5043f4"
+    ),
+    expected_input_plan_sha256=("9b764e5dae1670f365046a21b0c1c5de563462fd69b2f2c91b3d7cbd547afe9c"),
+    campaign_sequence=P4_CAMPAIGN_SEQUENCE,
 )
 OUTCOME_PROFILES_BY_QUERY_ID: Final = {
     P5_QUERY_ID: P5_OUTCOME_PROFILE,
     P1_QUERY_ID: P1_OUTCOME_PROFILE,
+    P4_01_QUERY_ID: P4_01_OUTCOME_PROFILE,
+    P4_02_QUERY_ID: P4_02_OUTCOME_PROFILE,
 }
 
 
@@ -173,6 +277,7 @@ class OutcomeReplayConfig:
     outcome_artifact_schema: str
     campaign_key: str
     query_id: str
+    campaign_sequence: tuple[tuple[str, object], ...]
     slice_indices: tuple[int, ...]
     source_dates_per_slice: int
     expected_signal_count: int
@@ -234,7 +339,7 @@ class OutcomeReplayConfig:
     def canonical_parameters(self) -> dict[str, object]:
         """Return the complete non-secret replay variables for RunSpec/DB lineage."""
 
-        return {
+        parameters: dict[str, object] = {
             "barrier_ticks": list(self.barrier_ticks),
             "cache": {
                 "key": ["source_date", "raw_symbol"],
@@ -284,6 +389,32 @@ class OutcomeReplayConfig:
             "terminal_exit": TERMINAL_EXIT_POLICY,
             "terminal_partition_resolution": TERMINAL_PARTITION_RESOLUTION_POLICY,
         }
+        # P5/P1 RunSpecs predate paired-family governance, so their canonical
+        # parameter bytes stay unchanged.  New P4 RunSpecs bind the full pair
+        # policy so neither sibling can be selected conditionally.
+        if self.query_id in P4_PAIR_QUERY_IDS:
+            parameters["campaign_sequence"] = dict(self.campaign_sequence)
+        return parameters
+
+
+@dataclass(frozen=True, slots=True)
+class P4PairOutcomeConfig:
+    """Strict simultaneous-release and multiplicity policy for the P4 family."""
+
+    path: Path
+    sha256: str
+    pair_id: str
+    ordered_query_ids: tuple[str, str]
+    ordered_config_ids: tuple[str, str]
+    expected_candidate_count: int
+    expected_summary_count: int
+    expected_decision_count: int
+    expected_signal_count: int
+    expected_detail_record_count: int
+    new_pair_cell_count: int
+    observed_prior_cell_count: int
+    cumulative_observed_cell_count: int
+    fixed_query_potential_ledger_count: int
 
 
 def _table(document: dict[str, Any], name: str) -> dict[str, Any]:
@@ -609,12 +740,7 @@ def load_outcome_replay_config(
     ):
         _boolean(results, name, expected=True)
 
-    if (
-        _string(sequence, "first_query_id") != P5_QUERY_ID
-        or _string(sequence, "second_query_id") != P1_QUERY_ID
-        or _string(sequence, "second_query_may_start_after")
-        != "P5_COMPLETE_AND_LINEAGE_RESUME_AUDIT_PASSED"
-    ):
+    if sequence != dict(profile.campaign_sequence):
         raise OutcomeConfigError("campaign query sequence drift")
 
     checkpoint_output = _relative_path(
@@ -637,6 +763,7 @@ def load_outcome_replay_config(
         outcome_artifact_schema=profile.outcome_artifact_schema,
         campaign_key=_string(replay_id, "campaign_key"),
         query_id=query_id,
+        campaign_sequence=profile.campaign_sequence,
         slice_indices=slices,
         source_dates_per_slice=_integer(discovery, "source_dates_per_slice", minimum=1),
         expected_signal_count=expected_signal_count,
@@ -679,5 +806,57 @@ def load_outcome_replay_config(
         ),
         split_relative=_relative_path(
             policy["split_artifact"], label="split_artifact", derived=True
+        ),
+    )
+
+
+def load_p4_pair_outcome_config(
+    project_root: Path,
+    *,
+    config_path: Path | None = None,
+) -> P4PairOutcomeConfig:
+    """Load the exact P4 paired-release document and reject any policy drift."""
+
+    root = project_root.expanduser().resolve(strict=True)
+    requested = config_path or root / P4_PAIR_CONFIG_RELATIVE_PATH
+    if not requested.is_absolute():
+        requested = root / requested
+    path = requested.expanduser().resolve(strict=True)
+    try:
+        relative_path = path.relative_to(root)
+    except ValueError as error:
+        raise OutcomeConfigError("P4 pair config must remain inside the project") from error
+    if relative_path != P4_PAIR_CONFIG_RELATIVE_PATH:
+        raise OutcomeConfigError("P4 pair config path drift")
+    document = load_toml_document(path)
+    expected_document = {"p4_pair_outcome_replay": _EXPECTED_P4_PAIR_POLICY}
+    if document != expected_document:
+        raise OutcomeConfigError("P4 paired-release or multiplicity policy drift")
+    document_sha256 = canonical_sha256(document)
+    if document_sha256 != P4_PAIR_CONFIG_SHA256:
+        raise OutcomeConfigError("P4 pair config SHA-256 drift")
+    policy = _table(document, "p4_pair_outcome_replay")
+    query_ids = tuple(policy["ordered_query_ids"])
+    config_ids = tuple(policy["ordered_config_ids"])
+    if query_ids != P4_PAIR_QUERY_IDS or len(config_ids) != 2:
+        raise OutcomeConfigError("P4 pair identity/order drift")
+    return P4PairOutcomeConfig(
+        path=path,
+        sha256=document_sha256,
+        pair_id=_string(policy, "id"),
+        ordered_query_ids=(query_ids[0], query_ids[1]),
+        ordered_config_ids=(config_ids[0], config_ids[1]),
+        expected_candidate_count=_integer(policy, "expected_candidate_count", minimum=1),
+        expected_summary_count=_integer(policy, "expected_summary_count", minimum=1),
+        expected_decision_count=_integer(policy, "expected_decision_count", minimum=1),
+        expected_signal_count=_integer(policy, "expected_signal_count", minimum=1),
+        expected_detail_record_count=_integer(policy, "expected_detail_record_count", minimum=1),
+        new_pair_cell_count=_integer(policy, "new_pair_cell_count", minimum=1),
+        observed_prior_cell_count=_integer(policy, "observed_prior_cell_count", minimum=1),
+        cumulative_observed_cell_count=_integer(
+            policy, "cumulative_observed_cell_count", minimum=1
+        ),
+        fixed_query_potential_ledger_count=_integer(
+            policy, "fixed_query_potential_ledger_count", minimum=1
         ),
     )

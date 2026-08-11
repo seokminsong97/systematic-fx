@@ -660,6 +660,10 @@ def _phase1a_p1_05_outcomes_command(args: argparse.Namespace) -> int:
     return _phase1a_outcomes_command(args, runner_name="run_phase1a_p1_05_outcomes")
 
 
+def _phase1a_p4_pair_outcomes_command(args: argparse.Namespace) -> int:
+    return _phase1a_outcomes_command(args, runner_name="run_phase1a_p4_outcome_pair")
+
+
 def _phase1a_p5_equivalence_audit_command(args: argparse.Namespace) -> int:
     from systematic_fx.research.outcome_equivalence_audit import (
         OutcomeEquivalenceAuditError,
@@ -1268,6 +1272,33 @@ def build_parser() -> argparse.ArgumentParser:
     phase1a_p1_outcome_parser.add_argument("--database-url")
     phase1a_p1_outcome_parser.add_argument("--json", action="store_true", help="emit JSON")
     phase1a_p1_outcome_parser.set_defaults(handler=_phase1a_p1_05_outcomes_command)
+
+    phase1a_p4_pair_parser = research_commands.add_parser(
+        "phase1a-p4-pair-outcomes",
+        help="plan, cache, or atomically run both governed P4 shared outcome replays",
+    )
+    phase1a_p4_pair_mode = phase1a_p4_pair_parser.add_mutually_exclusive_group()
+    phase1a_p4_pair_mode.add_argument(
+        "--plan-only",
+        action="store_true",
+        help="verify both fixed 99-slice/674-signal plans without building caches",
+    )
+    phase1a_p4_pair_mode.add_argument(
+        "--cache-only",
+        action="store_true",
+        help="build and verify both immutable cache plans without economic replay",
+    )
+    phase1a_p4_pair_parser.add_argument(
+        "--max-cache-workers",
+        type=_positive_int,
+        choices=range(1, 5),
+        help="parallel raw-cache builders per candidate (1-4; governed default otherwise)",
+    )
+    phase1a_p4_pair_parser.add_argument("--database-url")
+    phase1a_p4_pair_parser.add_argument(
+        "--json", action="store_true", help="emit both terminal reports as one JSON object"
+    )
+    phase1a_p4_pair_parser.set_defaults(handler=_phase1a_p4_pair_outcomes_command)
 
     exposure_parser = research_commands.add_parser(
         "exposure",

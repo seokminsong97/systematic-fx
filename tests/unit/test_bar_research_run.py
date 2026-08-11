@@ -59,12 +59,12 @@ MIGRATION_SHA256 = "e" * 64
 CODE_COMMIT = "1" * 40
 
 
-def test_bar_research_run_supports_exact_bar_state_v2b_migration() -> None:
+def test_bar_research_run_supports_exact_p4_paired_migration_chain() -> None:
     migrations = discover_migrations(ROOT / "migrations")
     migration_by_version = {item.version: item for item in migrations}
 
     assert tuple(item.version for item in migrations) == SUPPORTED_MIGRATIONS
-    assert SUPPORTED_MIGRATIONS == tuple(range(1, 28))
+    assert SUPPORTED_MIGRATIONS == tuple(range(1, 29))
     assert migration_by_version[24].checksum == (
         "4aa845757f1a220c8d5595d4db6053f6374d99d067ab7e20c3e40ea22d610010"
     )
@@ -74,10 +74,12 @@ def test_bar_research_run_supports_exact_bar_state_v2b_migration() -> None:
     assert migration_by_version[26].checksum == (
         "232badda3e76fca79f93fcff059de6f3404fc797eb26a93c9483fd554cfe20bb"
     )
-    assert migrations[-1].name == "bar_state_v2b_parquet_schema_amendment"
-    assert migrations[-1].checksum == (
+    assert migration_by_version[27].name == "bar_state_v2b_parquet_schema_amendment"
+    assert migration_by_version[27].checksum == (
         "f0f69db031dc555b260da1fceef5f1fb4087f25717f1472ae4b006e77182cdb8"
     )
+    assert migrations[-1].name == "phase1a_p4_paired_outcomes"
+    assert len(migrations[-1].checksum) == 64
 
 
 def _loaded_dataset(dates: tuple[date, ...]) -> LoadedBarDatasetManifest:

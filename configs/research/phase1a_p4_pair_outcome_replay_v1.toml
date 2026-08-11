@@ -1,0 +1,21 @@
+[p4_pair_outcome_replay]
+id = "phase1a_p4_liquidity_transition_pair_v1"
+schema_version = 1
+ordered_query_ids = ["p4_01_opposite_depth_depletion_continuation", "p4_02_depth_resistance_reversal"]
+ordered_config_ids = ["phase1a_p4_01_outcome_replay_v1", "phase1a_p4_02_outcome_replay_v1"]
+release_unit = "PAIR"
+partial_result_release = "FORBIDDEN"
+economic_gate_between_candidates = false
+expected_candidate_count = 2
+expected_summary_count = 5808
+expected_decision_count = 4
+expected_signal_count = 674
+expected_detail_record_count = 978648
+new_pair_cell_count = 1936
+observed_prior_cell_count = 1936
+cumulative_observed_cell_count = 3872
+fixed_query_potential_ledger_count = 10648
+fixed_query_potential_ledger_usage = "DIAGNOSTIC_ONLY"
+p_values_allowed = false
+significance_claims_allowed = false
+maximum_authority = "SCREENING_SURVIVOR"

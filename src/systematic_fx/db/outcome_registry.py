@@ -43,12 +43,19 @@ from systematic_fx.research.run_spec import RUN_SPEC_SCHEMA, RUN_SPEC_SCHEMA_VER
 CAMPAIGN_KEY: Final = "phase1a_conservative_screening_v1"
 P5_QUERY_ID: Final = "p5_01_range_expansion_flow_continuation"
 P1_05_QUERY_ID: Final = "p1_05_unconfirmed_move_reversal"
+P4_01_QUERY_ID: Final = "p4_01_opposite_depth_depletion_continuation"
+P4_02_QUERY_ID: Final = "p4_02_depth_resistance_reversal"
+P4_PAIR_ID: Final = "phase1a_p4_liquidity_transition_pair_v1"
 PATTERN_KEY: Final = P5_QUERY_ID
 OUTCOME_ENGINE_VERSION: Final = "phase1a_shared_outcome_replay_v1"
 OUTCOME_CONFIG_ID: Final = "phase1a_p5_outcome_replay_v1"
 OUTCOME_ARTIFACT_SCHEMA: Final = "systematic_fx.phase1a_p5_outcome_replay.v1"
 P1_05_OUTCOME_CONFIG_ID: Final = "phase1a_p1_05_outcome_replay_v1"
 P1_05_OUTCOME_ARTIFACT_SCHEMA: Final = "systematic_fx.phase1a_p1_05_outcome_replay.v1"
+P4_01_OUTCOME_CONFIG_ID: Final = "phase1a_p4_01_outcome_replay_v1"
+P4_01_OUTCOME_ARTIFACT_SCHEMA: Final = "systematic_fx.phase1a_p4_01_outcome_replay.v1"
+P4_02_OUTCOME_CONFIG_ID: Final = "phase1a_p4_02_outcome_replay_v1"
+P4_02_OUTCOME_ARTIFACT_SCHEMA: Final = "systematic_fx.phase1a_p4_02_outcome_replay.v1"
 CHECKPOINT_ARTIFACT_SCHEMA: Final = "systematic_fx.phase1a_outcome_checkpoint.v1"
 DISCOVERY_ARTIFACT_SCHEMA: Final = "systematic_fx.phase1a_discovery_slice.v1"
 OUTCOME_ARTIFACT_TYPE: Final = "PHASE1A_OUTCOME_REPLAY_RESULT"
@@ -78,6 +85,103 @@ P1_05_EXPECTED_CACHE_PARTITION_COUNT: Final = 478
 P1_05_EXPECTED_PLANNED_SOURCE_DATE_COUNT: Final = 478
 P1_05_EXPECTED_DETAIL_RECORD_COUNT: Final = (
     P1_05_EXPECTED_SOURCE_OCCURRENCE_COUNT * len(SCENARIO_IDS) * EXPECTED_CELL_COUNT
+)
+P4_01_EXPECTED_SOURCE_OCCURRENCE_COUNT: Final = 334
+P4_01_EXPECTED_DIRECTION_SIGNAL_COUNTS: Final = {"LONG": 175, "SHORT": 159}
+P4_01_EXPECTED_CACHE_PARTITION_COUNT: Final = 472
+P4_01_EXPECTED_PLANNED_SOURCE_DATE_COUNT: Final = 472
+P4_02_EXPECTED_SOURCE_OCCURRENCE_COUNT: Final = 340
+P4_02_EXPECTED_DIRECTION_SIGNAL_COUNTS: Final = {"LONG": 159, "SHORT": 181}
+P4_02_EXPECTED_CACHE_PARTITION_COUNT: Final = 455
+P4_02_EXPECTED_PLANNED_SOURCE_DATE_COUNT: Final = 455
+P4_PAIR_CONFIG_SHA256: Final = "d83f28fae463643fc8969f8944b41c8b87254362fe709344afb7cfd240b8ea5f"
+P4_01_OUTCOME_CONFIG_SHA256: Final = (
+    "a98f0c7bcaaca70bbcfe4da7f80414a96bd664c36e025176f0163a9c2a455d25"
+)
+P4_02_OUTCOME_CONFIG_SHA256: Final = (
+    "e9b49a0f45f4988403163085d3e4cc2e960c91cf630ea6d2cc24b7ce95a64220"
+)
+P4_01_QUERY_DEFINITION_SHA256: Final = (
+    "39df10c27e6fa4c5070d16cb30b4c8085fe7774a36833c141d159284f7f3dc3e"
+)
+P4_02_QUERY_DEFINITION_SHA256: Final = (
+    "825b46856dde86f7dc75393457a71d920e1eeda896f35dcd4fd47eb5fab10207"
+)
+P4_01_SIGNAL_MANIFEST_SHA256: Final = (
+    "ef89f2dcc1a42176e4570a2b63c5d554c9e0d6fa1da77256dae3907a62a3bb59"
+)
+P4_02_SIGNAL_MANIFEST_SHA256: Final = (
+    "c4babe44c322d391fabd305ca28b0a3274136ff611c98e2fe962b44d3d5043f4"
+)
+P4_01_INPUT_PLAN_SHA256: Final = "7014967ae8aa63842ea17d0a12ff005b2656f540974af6ead8ec763f7ff73ba6"
+P4_02_INPUT_PLAN_SHA256: Final = "9b764e5dae1670f365046a21b0c1c5de563462fd69b2f2c91b3d7cbd547afe9c"
+P4_PAIR_ECONOMIC_CELL_COUNT: Final = 2 * len(DIRECTION_IDS) * EXPECTED_CELL_COUNT
+PHASE1A_CUMULATIVE_ECONOMIC_CELL_COUNT: Final = 2 * P4_PAIR_ECONOMIC_CELL_COUNT
+P4_PAIR_PRIOR_LINEAGE: Final = {
+    "p5": {
+        "cell_summaries_sha256": (
+            "43d8d00d1e6b32b7658df50d1f310da7dd77225bb2585aee893d9ba6be318c0e"
+        ),
+        "decision_sha256s": {
+            "LONG": "1d070437dc62115349fcc5b5e2b53f1240d6e92f681487bd4d29903f6e0ad36d",
+            "SHORT": "af1d58b4348ffa5c928027e461f58298928b899bbfb11e6e9c855876e70862e4",
+        },
+        "detail_shard_manifest_sha256": (
+            "79833d95c5d5ba9596e193f78d90f32a3bb13fb7b4480c752abe0a1834900af7"
+        ),
+        "final_checkpoint_sha256": (
+            "1693c5e2309608f4c73505975d84d6c3117530280b12ba44e5bcaac1225a5ab7"
+        ),
+        "input_lineage_sha256": (
+            "5ccd46db1cd5abc07ba2c94fca7283c5d16edc712ef64804e43eba5724433e45"
+        ),
+        "outcome_replay_manifest_id": 1,
+        "research_run_attempt_id": 1300,
+        "research_run_spec_id": 1300,
+        "result_artifact_sha256": (
+            "ca9f4496c7e7e0102cf40631be060c723c16e16cccf0ef6c78986db35572fd79"
+        ),
+        "run_fingerprint": ("2dafdf8abfbdbcaf669f43f61443746104cb31524377a74a09964bb74768d64f"),
+    },
+    "p5_equivalence_audit": {
+        "audit_artifact_sha256": (
+            "b878bdfcd65a481f0710a5be5af5e4c77392260392c164ccd86db1cde6f1d309"
+        ),
+        "outcome_equivalence_audit_id": 1,
+        "validation_research_run_attempt_id": 1302,
+        "validation_research_run_spec_id": 1303,
+        "validation_run_fingerprint": (
+            "b6a227c2f9c768e3b2a32c8bd7a5e2d210e7b3b053d4213b2d01055f6414ab69"
+        ),
+    },
+    "p1_05": {
+        "cell_summaries_sha256": (
+            "b781d6111bc098fcd846edde3e0a4378ccbefb4edbb34c5e9dae0d5be2dc65be"
+        ),
+        "decision_sha256s": {
+            "LONG": "6f2690b619cb038a174b395e830317c3a30c93d01d4f359931f8a7e9abeb1cfe",
+            "SHORT": "08215d7dd1d902a45dac82eb44de19f2caaa69b17c96f2e7e64a9d4ae99e50e8",
+        },
+        "detail_shard_manifest_sha256": (
+            "aca496bacc9606def65c79350a8ca3dbc76f2700d274cdc2badba097fb1fb386"
+        ),
+        "final_checkpoint_sha256": (
+            "ede238cf6c45287294cc1dce2927f63dd7d2d8a78dda76f5ff59ec1c102a96de"
+        ),
+        "input_lineage_sha256": (
+            "de733b7025eb0c7903fc24679f4adbd8cd859217bf1c68505e1032de75287a00"
+        ),
+        "outcome_replay_manifest_id": 4,
+        "research_run_attempt_id": 1305,
+        "research_run_spec_id": 1306,
+        "result_artifact_sha256": (
+            "0bd8f465bb3bb47a7f9f72662f905a19a416802a5d8ebff23cdeefd66fcc10ce"
+        ),
+        "run_fingerprint": ("40730e618651c613be15d303054898757a14f1a9671be6bde7567cc921c7e97e"),
+    },
+}
+P4_PAIR_PRIOR_LINEAGE_SHA256: Final = (
+    "f56298bd8f649bfdf7b5b5432beac34968cf0f1b15f007b54803cb5d227ad6d0"
 )
 SCENARIO_COST_TICKS_PER_FILL: Final = {
     "BASELINE": (4, 4),
@@ -119,6 +223,13 @@ class OutcomeQueryProfile:
     cache_partition_count: int
     planned_source_date_count: int
     final_source_date: date
+    pair_id: str | None = None
+    paired_query_ids: tuple[str, ...] = ()
+    pair_config_sha256: str | None = None
+    outcome_config_sha256: str | None = None
+    query_definition_sha256: str | None = None
+    signal_manifest_sha256: str | None = None
+    input_plan_sha256: str | None = None
 
     @property
     def detail_record_count(self) -> int:
@@ -155,8 +266,50 @@ P1_05_OUTCOME_QUERY_PROFILE: Final = OutcomeQueryProfile(
     planned_source_date_count=P1_05_EXPECTED_PLANNED_SOURCE_DATE_COUNT,
     final_source_date=EXPECTED_FINAL_SOURCE_DATE,
 )
+P4_01_OUTCOME_QUERY_PROFILE: Final = OutcomeQueryProfile(
+    query_id=P4_01_QUERY_ID,
+    outcome_config_id=P4_01_OUTCOME_CONFIG_ID,
+    outcome_artifact_schema=P4_01_OUTCOME_ARTIFACT_SCHEMA,
+    source_slice_count=EXPECTED_SOURCE_SLICE_COUNT,
+    source_occurrence_count=P4_01_EXPECTED_SOURCE_OCCURRENCE_COUNT,
+    direction_signal_counts=P4_01_EXPECTED_DIRECTION_SIGNAL_COUNTS,
+    cache_partition_count=P4_01_EXPECTED_CACHE_PARTITION_COUNT,
+    planned_source_date_count=P4_01_EXPECTED_PLANNED_SOURCE_DATE_COUNT,
+    final_source_date=EXPECTED_FINAL_SOURCE_DATE,
+    pair_id=P4_PAIR_ID,
+    paired_query_ids=(P4_01_QUERY_ID, P4_02_QUERY_ID),
+    pair_config_sha256=P4_PAIR_CONFIG_SHA256,
+    outcome_config_sha256=P4_01_OUTCOME_CONFIG_SHA256,
+    query_definition_sha256=P4_01_QUERY_DEFINITION_SHA256,
+    signal_manifest_sha256=P4_01_SIGNAL_MANIFEST_SHA256,
+    input_plan_sha256=P4_01_INPUT_PLAN_SHA256,
+)
+P4_02_OUTCOME_QUERY_PROFILE: Final = OutcomeQueryProfile(
+    query_id=P4_02_QUERY_ID,
+    outcome_config_id=P4_02_OUTCOME_CONFIG_ID,
+    outcome_artifact_schema=P4_02_OUTCOME_ARTIFACT_SCHEMA,
+    source_slice_count=EXPECTED_SOURCE_SLICE_COUNT,
+    source_occurrence_count=P4_02_EXPECTED_SOURCE_OCCURRENCE_COUNT,
+    direction_signal_counts=P4_02_EXPECTED_DIRECTION_SIGNAL_COUNTS,
+    cache_partition_count=P4_02_EXPECTED_CACHE_PARTITION_COUNT,
+    planned_source_date_count=P4_02_EXPECTED_PLANNED_SOURCE_DATE_COUNT,
+    final_source_date=EXPECTED_FINAL_SOURCE_DATE,
+    pair_id=P4_PAIR_ID,
+    paired_query_ids=(P4_01_QUERY_ID, P4_02_QUERY_ID),
+    pair_config_sha256=P4_PAIR_CONFIG_SHA256,
+    outcome_config_sha256=P4_02_OUTCOME_CONFIG_SHA256,
+    query_definition_sha256=P4_02_QUERY_DEFINITION_SHA256,
+    signal_manifest_sha256=P4_02_SIGNAL_MANIFEST_SHA256,
+    input_plan_sha256=P4_02_INPUT_PLAN_SHA256,
+)
 _OUTCOME_QUERY_PROFILES: Final = {
-    profile.query_id: profile for profile in (P5_OUTCOME_QUERY_PROFILE, P1_05_OUTCOME_QUERY_PROFILE)
+    profile.query_id: profile
+    for profile in (
+        P5_OUTCOME_QUERY_PROFILE,
+        P1_05_OUTCOME_QUERY_PROFILE,
+        P4_01_OUTCOME_QUERY_PROFILE,
+        P4_02_OUTCOME_QUERY_PROFILE,
+    )
 }
 
 _CACHE_MANIFEST_REFERENCE_FIELDS: Final = {
@@ -645,6 +798,17 @@ def validate_complete_cell_summaries(
     for value in summaries:
         if not isinstance(value, OutcomeCellSummary):
             raise OutcomeRegistryError("cell_summaries must contain OutcomeCellSummary values")
+        if profile.pair_id is not None and any(
+            decimal_value is not None and decimal_value.is_zero() and decimal_value.is_signed()
+            for decimal_value in (
+                value.fully_loaded_net_ev_ticks,
+                value.fully_loaded_net_pnl_usd,
+                value.calendar_month_net_pnl_usd,
+                value.profit_factor,
+                value.maximum_drawdown_usd,
+            )
+        ):
+            raise OutcomeRegistryError("P4 cell decimal metrics must not use signed negative zero")
         if value.identity in by_identity:
             raise OutcomeRegistryError(f"duplicate cell summary identity: {value.identity}")
         expected_signal_count = profile.direction_signal_counts[value.direction]
@@ -750,7 +914,24 @@ def phase1a_outcome_parameters(
             )
         parameters.update(predecessor_gate.parameters)
     elif predecessor_gate is not None:
-        raise OutcomeRegistryError("p5 outcome parameters cannot bind a predecessor gate")
+        raise OutcomeRegistryError(
+            f"{profile.query_id} outcome parameters cannot bind a predecessor gate"
+        )
+    if profile.pair_id is not None:
+        parameters.update(
+            {
+                "cumulative_economic_cell_count": (PHASE1A_CUMULATIVE_ECONOMIC_CELL_COUNT),
+                "pair_economic_cell_count": P4_PAIR_ECONOMIC_CELL_COUNT,
+                "pair_id": profile.pair_id,
+                "pair_config_sha256": profile.pair_config_sha256,
+                "outcome_config_sha256": profile.outcome_config_sha256,
+                "paired_query_ids": list(profile.paired_query_ids),
+                "prior_outcome_lineage_sha256": P4_PAIR_PRIOR_LINEAGE_SHA256,
+                "query_definition_sha256": profile.query_definition_sha256,
+                "signal_manifest_sha256": profile.signal_manifest_sha256,
+                "input_plan_sha256": profile.input_plan_sha256,
+            }
+        )
     return parameters
 
 
@@ -889,6 +1070,95 @@ class OutcomeCompletionReport:
     summary_row_count: int
     created_artifact: bool
     completed: bool
+
+
+@dataclass(frozen=True, slots=True)
+class P4OutcomePairMember:
+    """One staged P4 replay result awaiting atomic paired publication."""
+
+    query_id: str
+    outcome_replay_manifest_id: int
+    run_fingerprint: str
+    cell_summaries: Sequence[OutcomeCellSummary]
+    result_artifact_path: Path
+
+
+@dataclass(frozen=True, slots=True)
+class P4OutcomePairReservation:
+    """The immutable PREPARED binding between both P4 replay attempts."""
+
+    p4_pair_batch_id: int
+    pair_id: str
+    p4_01_outcome_replay_manifest_id: int
+    p4_02_outcome_replay_manifest_id: int
+    p4_01_run_fingerprint: str
+    p4_02_run_fingerprint: str
+    pair_config_sha256: str
+    prior_outcome_lineage_sha256: str
+    status: str
+    created: bool
+
+
+@dataclass(frozen=True, slots=True)
+class P4OutcomePairRelease:
+    """One append-only simultaneous release of both P4 economic surfaces."""
+
+    p4_pair_release_id: int
+    p4_pair_batch_id: int
+    pair_id: str
+    p4_01_outcome_replay_manifest_id: int
+    p4_02_outcome_replay_manifest_id: int
+    p4_01_run_fingerprint: str
+    p4_02_run_fingerprint: str
+    p4_01_result_artifact_sha256: str
+    p4_02_result_artifact_sha256: str
+    p4_01_cell_summaries_sha256: str
+    p4_02_cell_summaries_sha256: str
+    decision_sha256s: dict[str, dict[str, str]]
+    pair_config_sha256: str
+    prior_outcome_lineage_sha256: str
+    pair_economic_cell_count: int
+    cumulative_economic_cell_count: int
+    pair_release_sha256: str
+    released_at: datetime
+
+    @property
+    def release_sha256(self) -> str:
+        observed = _canonical_sha256(
+            _p4_pair_release_payload(
+                p4_01_outcome_replay_manifest_id=(self.p4_01_outcome_replay_manifest_id),
+                p4_01_run_fingerprint=self.p4_01_run_fingerprint,
+                p4_01_result_artifact_sha256=self.p4_01_result_artifact_sha256,
+                p4_01_cell_summaries_sha256=self.p4_01_cell_summaries_sha256,
+                p4_02_outcome_replay_manifest_id=(self.p4_02_outcome_replay_manifest_id),
+                p4_02_run_fingerprint=self.p4_02_run_fingerprint,
+                p4_02_result_artifact_sha256=self.p4_02_result_artifact_sha256,
+                p4_02_cell_summaries_sha256=self.p4_02_cell_summaries_sha256,
+                decision_sha256s=self.decision_sha256s,
+            )
+        )
+        if observed != self.pair_release_sha256:
+            raise OutcomeRegistryDriftError("P4 pair release digest drift")
+        return observed
+
+
+@dataclass(frozen=True, slots=True)
+class P4OutcomePairCompletionReport:
+    """The two member completions and their one atomic release identity."""
+
+    release: P4OutcomePairRelease
+    completions: tuple[OutcomeCompletionReport, OutcomeCompletionReport]
+    completed: bool
+
+
+@dataclass(frozen=True, slots=True)
+class P4OutcomePairFailureReport:
+    """The atomic terminal failure of both members of one prepared P4 batch."""
+
+    p4_pair_batch_id: int
+    pair_id: str
+    states: tuple[OutcomeReplayState, OutcomeReplayState]
+    status: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -2146,6 +2416,51 @@ def _load_manifest_for_update(
     return row
 
 
+def _load_manifest_snapshot(
+    connection: psycopg.Connection[dict[str, Any]],
+    *,
+    outcome_replay_manifest_id: int,
+) -> dict[str, Any]:
+    """Load one complete manifest/attempt/RunSpec identity without row locks."""
+
+    row = connection.execute(
+        """
+        SELECT manifest.*, attempt.attempt_number,
+               attempt.status AS attempt_status,
+               attempt.result_artifact_id AS attempt_result_artifact_id,
+               attempt.started_at AS attempt_started_at,
+               attempt.finished_at AS attempt_finished_at,
+               attempt.error_message AS attempt_error_message,
+               campaign.campaign_key,
+               run_spec.canonicalization_schema,
+               run_spec.canonicalization_version,
+               run_spec.experiment_id,
+               run_spec.run_kind,
+               run_spec.engine_version,
+               run_spec.direction,
+               run_spec.canonical_spec,
+               run_spec.canonical_spec AS run_spec_canonical_spec
+        FROM systematic_fx.phase1a_outcome_replay_manifests AS manifest
+        JOIN systematic_fx.research_run_attempts AS attempt
+          ON attempt.research_run_attempt_id = manifest.research_run_attempt_id
+         AND attempt.research_run_spec_id = manifest.research_run_spec_id
+        JOIN systematic_fx.research_run_specs AS run_spec
+          ON run_spec.research_run_spec_id = manifest.research_run_spec_id
+         AND run_spec.campaign_id = manifest.campaign_id
+         AND run_spec.run_fingerprint = manifest.run_fingerprint
+        JOIN systematic_fx.campaigns AS campaign
+          ON campaign.campaign_id = manifest.campaign_id
+        WHERE manifest.outcome_replay_manifest_id = %s
+        """,
+        (outcome_replay_manifest_id,),
+    ).fetchone()
+    if row is None:
+        raise OutcomeRegistryError(
+            f"outcome replay manifest {outcome_replay_manifest_id} does not exist"
+        )
+    return row
+
+
 def _assert_live_manifest(
     row: Mapping[str, Any],
     *,
@@ -2164,6 +2479,299 @@ def _assert_live_manifest(
     )
     if row.get("attempt_status") != row.get("status"):
         raise OutcomeRegistryDriftError("outcome replay and attempt status drift")
+
+
+def _p4_pair_reservation(row: Mapping[str, Any], *, created: bool) -> P4OutcomePairReservation:
+    return P4OutcomePairReservation(
+        p4_pair_batch_id=_positive_identifier(
+            row.get("p4_pair_batch_id"), label="p4_pair_batch_id"
+        ),
+        pair_id=_nonempty(row.get("pair_id"), label="pair_id"),
+        p4_01_outcome_replay_manifest_id=_positive_identifier(
+            row.get("p4_01_outcome_replay_manifest_id"),
+            label="p4_01_outcome_replay_manifest_id",
+        ),
+        p4_02_outcome_replay_manifest_id=_positive_identifier(
+            row.get("p4_02_outcome_replay_manifest_id"),
+            label="p4_02_outcome_replay_manifest_id",
+        ),
+        p4_01_run_fingerprint=_sha256(
+            row.get("p4_01_run_fingerprint"), label="p4_01_run_fingerprint"
+        ),
+        p4_02_run_fingerprint=_sha256(
+            row.get("p4_02_run_fingerprint"), label="p4_02_run_fingerprint"
+        ),
+        pair_config_sha256=_sha256(row.get("pair_config_sha256"), label="pair_config_sha256"),
+        prior_outcome_lineage_sha256=_sha256(
+            row.get("prior_outcome_lineage_sha256"),
+            label="prior_outcome_lineage_sha256",
+        ),
+        status=_nonempty(row.get("status"), label="pair batch status"),
+        created=created,
+    )
+
+
+def _validate_p4_prior_outcome_lineage(
+    connection: psycopg.Connection[dict[str, Any]],
+) -> dict[str, object]:
+    """Reconstruct and freeze the already observed P5/P1 family lineage."""
+
+    observed: dict[str, object] = {}
+    for label, query_id in (("p5", P5_QUERY_ID), ("p1_05", P1_05_QUERY_ID)):
+        expected = P4_PAIR_PRIOR_LINEAGE[label]
+        manifest = connection.execute(
+            """
+            SELECT manifest.outcome_replay_manifest_id,
+                   manifest.research_run_spec_id,
+                   manifest.research_run_attempt_id,
+                   manifest.run_fingerprint,
+                   manifest.result_artifact_sha256,
+                   manifest.cell_summaries_sha256,
+                   manifest.status,
+                   attempt.result_summary #>> '{input_lineage_sha256}'
+                       AS input_lineage_sha256,
+                   attempt.result_summary #>> '{detail_shard_manifest_sha256}'
+                       AS detail_shard_manifest_sha256,
+                   attempt.result_summary #>> '{final_checkpoint_sha256}'
+                       AS final_checkpoint_sha256
+            FROM systematic_fx.phase1a_outcome_replay_manifests AS manifest
+            JOIN systematic_fx.research_run_attempts AS attempt
+              ON attempt.research_run_attempt_id = manifest.research_run_attempt_id
+             AND attempt.research_run_spec_id = manifest.research_run_spec_id
+            WHERE manifest.pattern_key = %s
+              AND manifest.outcome_replay_manifest_id = %s
+            FOR SHARE OF manifest, attempt
+            """,
+            (query_id, expected["outcome_replay_manifest_id"]),
+        ).fetchone()
+        if manifest is None or manifest.get("status") != "SUCCEEDED":
+            raise OutcomeRegistryStateError(
+                f"P4 pair requires the frozen successful {label} predecessor"
+            )
+        decisions = connection.execute(
+            """
+            SELECT direction, decision_sha256
+            FROM systematic_fx.phase1a_outcome_screening_decisions
+            WHERE outcome_replay_manifest_id = %s
+            ORDER BY direction
+            FOR SHARE
+            """,
+            (expected["outcome_replay_manifest_id"],),
+        ).fetchall()
+        actual = {
+            "cell_summaries_sha256": manifest["cell_summaries_sha256"],
+            "decision_sha256s": {
+                str(decision["direction"]): str(decision["decision_sha256"])
+                for decision in decisions
+            },
+            "detail_shard_manifest_sha256": manifest["detail_shard_manifest_sha256"],
+            "final_checkpoint_sha256": manifest["final_checkpoint_sha256"],
+            "input_lineage_sha256": manifest["input_lineage_sha256"],
+            "outcome_replay_manifest_id": int(manifest["outcome_replay_manifest_id"]),
+            "research_run_attempt_id": int(manifest["research_run_attempt_id"]),
+            "research_run_spec_id": int(manifest["research_run_spec_id"]),
+            "result_artifact_sha256": manifest["result_artifact_sha256"],
+            "run_fingerprint": manifest["run_fingerprint"],
+        }
+        if actual != expected:
+            raise OutcomeRegistryDriftError(f"frozen {label} predecessor lineage drift")
+        observed[label] = actual
+
+    expected_audit = P4_PAIR_PRIOR_LINEAGE["p5_equivalence_audit"]
+    audit = connection.execute(
+        """
+        SELECT audit.outcome_equivalence_audit_id,
+               audit.validation_research_run_spec_id,
+               audit.validation_research_run_attempt_id,
+               audit.validation_run_fingerprint,
+               artifact.sha256 AS audit_artifact_sha256,
+               audit.passed
+        FROM systematic_fx.phase1a_outcome_replay_equivalence_audits AS audit
+        JOIN systematic_fx.artifacts AS artifact
+          ON artifact.artifact_id = audit.audit_artifact_id
+        WHERE audit.outcome_equivalence_audit_id = %s
+        FOR SHARE OF audit, artifact
+        """,
+        (expected_audit["outcome_equivalence_audit_id"],),
+    ).fetchone()
+    if audit is None or audit.get("passed") is not True:
+        raise OutcomeRegistryStateError("P4 pair requires the frozen PASSED P5 audit")
+    actual_audit = {
+        key: audit[key]
+        for key in (
+            "audit_artifact_sha256",
+            "outcome_equivalence_audit_id",
+            "validation_research_run_attempt_id",
+            "validation_research_run_spec_id",
+            "validation_run_fingerprint",
+        )
+    }
+    if actual_audit != expected_audit:
+        raise OutcomeRegistryDriftError("frozen P5 equivalence-audit lineage drift")
+    observed["p5_equivalence_audit"] = actual_audit
+    if observed != P4_PAIR_PRIOR_LINEAGE:
+        raise OutcomeRegistryDriftError("P4 prior outcome lineage drift")
+    if _canonical_sha256(observed) != P4_PAIR_PRIOR_LINEAGE_SHA256:
+        raise OutcomeRegistryDriftError("P4 prior outcome lineage digest drift")
+    return observed
+
+
+@_translate_psycopg_errors("Phase 1A P4 outcome pair reservation")
+def reserve_phase1a_p4_outcome_pair(
+    database_url: str,
+    *,
+    p4_01_outcome_replay_manifest_id: int,
+    p4_01_run_fingerprint: str,
+    p4_02_outcome_replay_manifest_id: int,
+    p4_02_run_fingerprint: str,
+) -> P4OutcomePairReservation:
+    """Bind both queued P4 attempts and all prior/config lineage before either starts."""
+
+    target = _database_url(database_url)
+    member_inputs = {
+        P4_01_QUERY_ID: (
+            _positive_identifier(
+                p4_01_outcome_replay_manifest_id,
+                label="p4_01_outcome_replay_manifest_id",
+            ),
+            _sha256(p4_01_run_fingerprint, label="p4_01_run_fingerprint"),
+        ),
+        P4_02_QUERY_ID: (
+            _positive_identifier(
+                p4_02_outcome_replay_manifest_id,
+                label="p4_02_outcome_replay_manifest_id",
+            ),
+            _sha256(p4_02_run_fingerprint, label="p4_02_run_fingerprint"),
+        ),
+    }
+    if member_inputs[P4_01_QUERY_ID][0] == member_inputs[P4_02_QUERY_ID][0]:
+        raise OutcomeRegistryError("P4 pair members must use distinct replay manifests")
+    with psycopg.connect(target, row_factory=dict_row) as connection:
+        _set_serializable(connection)
+        with connection.transaction():
+            current = connection.execute(
+                """
+                SELECT *
+                FROM systematic_fx.phase1a_p4_outcome_pair_batches
+                WHERE pair_id = %s AND status = 'PREPARED'
+                FOR UPDATE
+                """,
+                (P4_PAIR_ID,),
+            ).fetchone()
+            released = connection.execute(
+                """
+                SELECT batch.*
+                FROM systematic_fx.phase1a_p4_outcome_pair_batches AS batch
+                JOIN systematic_fx.phase1a_p4_outcome_pair_releases AS release
+                  ON release.p4_pair_batch_id = batch.p4_pair_batch_id
+                WHERE batch.pair_id = %s AND batch.status = 'RELEASED'
+                FOR SHARE OF batch, release
+                """,
+                (P4_PAIR_ID,),
+            ).fetchone()
+            manifests: dict[str, dict[str, Any]] = {}
+            for query_id, (manifest_id, fingerprint) in sorted(
+                member_inputs.items(), key=lambda item: item[1][0]
+            ):
+                manifest = _load_manifest_for_update(
+                    connection,
+                    outcome_replay_manifest_id=manifest_id,
+                )
+                _assert_live_manifest(manifest, run_fingerprint=fingerprint)
+                if manifest.get("pattern_key") != query_id:
+                    raise OutcomeRegistryDriftError("P4 pair member query identity drift")
+                parameters = manifest["run_spec_canonical_spec"].get("parameters")
+                expected_parameters = phase1a_outcome_parameters(
+                    str(manifest["source_artifact_manifest_sha256"]),
+                    query_id=query_id,
+                )
+                if not isinstance(parameters, Mapping) or any(
+                    parameters.get(key) != value for key, value in expected_parameters.items()
+                ):
+                    raise OutcomeRegistryDriftError("P4 pair RunSpec parameter drift")
+                manifests[query_id] = manifest
+
+            prior_lineage = _validate_p4_prior_outcome_lineage(connection)
+            member_statuses = {str(manifest["status"]) for manifest in manifests.values()}
+            expected = {
+                "p4_01_outcome_replay_manifest_id": member_inputs[P4_01_QUERY_ID][0],
+                "p4_02_outcome_replay_manifest_id": member_inputs[P4_02_QUERY_ID][0],
+                "p4_01_run_fingerprint": member_inputs[P4_01_QUERY_ID][1],
+                "p4_02_run_fingerprint": member_inputs[P4_02_QUERY_ID][1],
+                "pair_config_sha256": P4_PAIR_CONFIG_SHA256,
+                "prior_outcome_lineage_sha256": P4_PAIR_PRIOR_LINEAGE_SHA256,
+                "prior_outcome_lineage": prior_lineage,
+            }
+            if released is not None:
+                mismatches = [key for key, value in expected.items() if released.get(key) != value]
+                if mismatches or member_statuses != {"SUCCEEDED"}:
+                    raise OutcomeRegistryStateError(
+                        "the singleton P4 pair is already released with different members"
+                    )
+                return _p4_pair_reservation(released, created=False)
+            if member_statuses == {"SUCCEEDED"}:
+                raise OutcomeRegistryDriftError(
+                    "successful P4 duplicate manifests lack their pair release"
+                )
+            if current is not None:
+                mismatches = [key for key, value in expected.items() if current.get(key) != value]
+                if mismatches:
+                    raise OutcomeRegistryDriftError(
+                        "active P4 pair batch drift in fields: " + ", ".join(sorted(mismatches))
+                    )
+                if not all(
+                    manifest["status"] in {"QUEUED", "RUNNING"} for manifest in manifests.values()
+                ):
+                    raise OutcomeRegistryStateError(
+                        "PREPARED P4 pair members must remain QUEUED or RUNNING"
+                    )
+                return _p4_pair_reservation(current, created=False)
+            if member_statuses != {"QUEUED"}:
+                raise OutcomeRegistryStateError(
+                    "a new P4 pair reservation requires both members QUEUED"
+                )
+            row = connection.execute(
+                """
+                INSERT INTO systematic_fx.phase1a_p4_outcome_pair_batches
+                    (pair_id, p4_01_outcome_replay_manifest_id,
+                     p4_02_outcome_replay_manifest_id,
+                     p4_01_run_fingerprint, p4_02_run_fingerprint,
+                     pair_config_sha256,
+                     p4_01_outcome_config_sha256,
+                     p4_02_outcome_config_sha256,
+                     p4_01_query_definition_sha256,
+                     p4_02_query_definition_sha256,
+                     p4_01_signal_manifest_sha256,
+                     p4_02_signal_manifest_sha256,
+                     p4_01_input_plan_sha256, p4_02_input_plan_sha256,
+                     prior_outcome_lineage,
+                     prior_outcome_lineage_sha256)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                        %s, %s)
+                RETURNING *
+                """,
+                (
+                    P4_PAIR_ID,
+                    member_inputs[P4_01_QUERY_ID][0],
+                    member_inputs[P4_02_QUERY_ID][0],
+                    member_inputs[P4_01_QUERY_ID][1],
+                    member_inputs[P4_02_QUERY_ID][1],
+                    P4_PAIR_CONFIG_SHA256,
+                    P4_01_OUTCOME_CONFIG_SHA256,
+                    P4_02_OUTCOME_CONFIG_SHA256,
+                    P4_01_QUERY_DEFINITION_SHA256,
+                    P4_02_QUERY_DEFINITION_SHA256,
+                    P4_01_SIGNAL_MANIFEST_SHA256,
+                    P4_02_SIGNAL_MANIFEST_SHA256,
+                    P4_01_INPUT_PLAN_SHA256,
+                    P4_02_INPUT_PLAN_SHA256,
+                    Jsonb(prior_lineage),
+                    P4_PAIR_PRIOR_LINEAGE_SHA256,
+                ),
+            ).fetchone()
+            if row is None:  # pragma: no cover - RETURNING is mandatory
+                raise OutcomeRegistryDatabaseError("P4 pair batch returned no identity")
+            return _p4_pair_reservation(row, created=True)
 
 
 @_translate_psycopg_errors("Phase 1A outcome replay start")
@@ -2189,6 +2797,47 @@ def start_phase1a_outcome_replay(
         _set_serializable(connection)
         with connection.transaction():
             audit_evidence: _HeldFile | None = None
+            preflight = connection.execute(
+                """
+                SELECT pattern_key, run_fingerprint
+                FROM systematic_fx.phase1a_outcome_replay_manifests
+                WHERE outcome_replay_manifest_id = %s
+                """,
+                (manifest_id,),
+            ).fetchone()
+            if preflight is None:
+                raise OutcomeRegistryError(f"outcome replay manifest {manifest_id} does not exist")
+            if preflight["run_fingerprint"] != fingerprint:
+                raise OutcomeRegistryDriftError("outcome replay fingerprint drift")
+            pair_batch = None
+            if preflight["pattern_key"] == P4_01_QUERY_ID:
+                pair_batch = connection.execute(
+                    """
+                    SELECT p4_pair_batch_id
+                    FROM systematic_fx.phase1a_p4_outcome_pair_batches
+                    WHERE p4_01_outcome_replay_manifest_id = %s
+                      AND p4_01_run_fingerprint = %s
+                      AND status = 'PREPARED'
+                    FOR SHARE
+                    """,
+                    (manifest_id, fingerprint),
+                ).fetchone()
+            elif preflight["pattern_key"] == P4_02_QUERY_ID:
+                pair_batch = connection.execute(
+                    """
+                    SELECT p4_pair_batch_id
+                    FROM systematic_fx.phase1a_p4_outcome_pair_batches
+                    WHERE p4_02_outcome_replay_manifest_id = %s
+                      AND p4_02_run_fingerprint = %s
+                      AND status = 'PREPARED'
+                    FOR SHARE
+                    """,
+                    (manifest_id, fingerprint),
+                ).fetchone()
+            if preflight["pattern_key"] in {P4_01_QUERY_ID, P4_02_QUERY_ID} and pair_batch is None:
+                raise OutcomeRegistryStateError(
+                    "P4 replay start requires its exact PREPARED pair batch"
+                )
             row = _load_manifest_for_update(
                 connection,
                 outcome_replay_manifest_id=manifest_id,
@@ -4732,27 +5381,62 @@ def _validate_final_checkpoint(
     lineage: _ValidatedCompletionLineage,
     data_root: Path | str,
     profile: OutcomeQueryProfile = P5_OUTCOME_QUERY_PROFILE,
+    lock_rows: bool = True,
 ) -> tuple[str, int]:
-    rows = connection.execute(
-        """
-        SELECT checkpoint.*,
-               artifact.artifact_id AS stored_artifact_id,
-               artifact.uri AS artifact_uri,
-               artifact.sha256 AS artifact_sha256,
-               artifact.byte_size AS artifact_byte_size,
-               artifact.artifact_type,
-               artifact.media_type,
-               artifact.producer_job_id,
-               artifact.metadata AS artifact_metadata
-        FROM systematic_fx.phase1a_outcome_replay_checkpoints AS checkpoint
-        JOIN systematic_fx.artifacts AS artifact
-          ON artifact.artifact_id = checkpoint.checkpoint_artifact_id
-        WHERE checkpoint.outcome_replay_manifest_id = %s
-        ORDER BY checkpoint.checkpoint_sequence
-        FOR SHARE OF checkpoint, artifact
-        """,
-        (manifest_id,),
-    ).fetchall()
+    if lock_rows:
+        rows = connection.execute(
+            """
+            SELECT checkpoint.*,
+                   artifact.artifact_id AS stored_artifact_id,
+                   artifact.artifact_key,
+                   artifact.uri AS artifact_uri,
+                   artifact.sha256 AS artifact_sha256,
+                   artifact.byte_size AS artifact_byte_size,
+                   artifact.artifact_type,
+                   artifact.media_type,
+                   artifact.producer_job_id,
+                   artifact.metadata AS artifact_metadata
+            FROM systematic_fx.phase1a_outcome_replay_checkpoints AS checkpoint
+            JOIN systematic_fx.artifacts AS artifact
+              ON artifact.artifact_id = checkpoint.checkpoint_artifact_id
+            WHERE checkpoint.outcome_replay_manifest_id = %s
+            ORDER BY checkpoint.checkpoint_sequence
+            FOR SHARE OF checkpoint, artifact
+            """,
+            (manifest_id,),
+        ).fetchall()
+    else:
+        rows = connection.execute(
+            """
+            SELECT checkpoint.*,
+                   artifact.artifact_id AS stored_artifact_id,
+                   artifact.artifact_key,
+                   artifact.uri AS artifact_uri,
+                   artifact.sha256 AS artifact_sha256,
+                   artifact.byte_size AS artifact_byte_size,
+                   artifact.artifact_type,
+                   artifact.media_type,
+                   artifact.producer_job_id,
+                   artifact.metadata AS artifact_metadata
+            FROM systematic_fx.phase1a_outcome_replay_checkpoints AS checkpoint
+            JOIN systematic_fx.artifacts AS artifact
+              ON artifact.artifact_id = checkpoint.checkpoint_artifact_id
+            WHERE checkpoint.outcome_replay_manifest_id = %s
+            ORDER BY checkpoint.checkpoint_sequence
+            """,
+            (manifest_id,),
+        ).fetchall()
+        if (
+            _validate_checkpoint_chain_rows(
+                rows,
+                outcome_replay_manifest_id=manifest_id,
+                run_fingerprint=run_fingerprint,
+                data_root=data_root,
+                profile=profile,
+            )
+            is None
+        ):
+            raise OutcomeRegistryStateError("outcome completion requires a checkpoint chain")
     planned_count = len(lineage.planned_source_dates)
     if not rows or len(rows) != planned_count:
         raise OutcomeRegistryStateError(
@@ -4946,6 +5630,41 @@ def _cell_insert_parameters(
     )
 
 
+def _cell_from_registry_row(row: Mapping[str, Any]) -> OutcomeCellSummary:
+    document = {
+        key: value
+        for key, value in row.items()
+        if key
+        not in {
+            "created_at",
+            "outcome_replay_manifest_id",
+            "run_fingerprint",
+            "summary_sha256",
+        }
+    }
+    for field_name in (
+        "fully_loaded_net_ev_ticks",
+        "fully_loaded_net_pnl_usd",
+        "calendar_month_net_pnl_usd",
+        "profit_factor",
+        "maximum_drawdown_usd",
+    ):
+        value = document.get(field_name)
+        if value is not None:
+            if not isinstance(value, Decimal):
+                raise OutcomeRegistryDriftError(f"stored outcome cell {field_name} is not numeric")
+            document[field_name] = format(value, "f")
+    try:
+        cell = OutcomeCellSummary.from_mapping(document)
+    except OutcomeRegistryError as error:
+        raise OutcomeRegistryDriftError("stored outcome cell payload is invalid") from error
+    if row.get("summary_sha256") != cell.summary_sha256:
+        raise OutcomeRegistryDriftError(
+            f"stored outcome cell summary SHA-256 drift: {cell.identity}"
+        )
+    return cell
+
+
 def _cell_matches_row(cell: OutcomeCellSummary, row: Mapping[str, Any]) -> bool:
     expected = {
         "allocated_fixed_cost_ticks": cell.allocated_fixed_cost_ticks,
@@ -5090,6 +5809,37 @@ def derive_phase1a_outcome_screening_decisions(
     return tuple(decisions)
 
 
+def _screening_decision_from_registry_row(
+    row: Mapping[str, Any],
+    *,
+    outcome_replay_manifest_id: int,
+) -> OutcomeScreeningDecision:
+    rejection_reasons = row.get("rejection_reasons")
+    if not isinstance(rejection_reasons, list):
+        raise OutcomeRegistryDriftError("stored screening rejection reasons are invalid")
+    try:
+        decision = OutcomeScreeningDecision(
+            direction=str(row.get("direction")),
+            decision_label=str(row.get("decision_label")),
+            selected_take_profit_ticks=row.get("selected_take_profit_ticks"),
+            selected_stop_loss_ticks=row.get("selected_stop_loss_ticks"),
+            positive_region_size=row.get("positive_region_size"),
+            rejection_reasons=tuple(rejection_reasons),
+        )
+    except OutcomeRegistryError as error:
+        raise OutcomeRegistryDriftError(
+            "stored outcome screening decision payload is invalid"
+        ) from error
+    expected_sha256 = _canonical_sha256(
+        decision.payload(outcome_replay_manifest_id=outcome_replay_manifest_id)
+    )
+    if row.get("decision_sha256") != expected_sha256:
+        raise OutcomeRegistryDriftError(
+            f"stored {decision.direction} screening decision SHA-256 drift"
+        )
+    return decision
+
+
 def _register_screening_decisions(
     connection: psycopg.Connection[dict[str, Any]],
     *,
@@ -5144,20 +5894,16 @@ def _register_screening_decisions(
         )
 
 
-def _ensure_result_artifact(
-    connection: psycopg.Connection[dict[str, Any]],
+def _result_artifact_metadata(
     *,
     run_fingerprint: str,
     source_artifact_manifest_sha256: str,
     cells_sha256: str,
     lineage: _ValidatedCompletionLineage,
     final_checkpoint_sha256: str,
-    held: _HeldFile,
     profile: OutcomeQueryProfile = P5_OUTCOME_QUERY_PROFILE,
     predecessor_gate: OutcomePredecessorGate | None = None,
-) -> tuple[int, bool, dict[str, object]]:
-    artifact_key = f"{CAMPAIGN_KEY}:outcome-replay:{run_fingerprint}"
-    artifact_uri = held.path.as_uri()
+) -> dict[str, object]:
     metadata: dict[str, object] = {
         "campaign_key": CAMPAIGN_KEY,
         "cache_manifest_sha256": lineage.cache_manifest_sha256,
@@ -5180,6 +5926,43 @@ def _ensure_result_artifact(
         if predecessor_gate is None:
             raise OutcomeRegistryStateError("p1_05 result requires predecessor proof")
         metadata.update(predecessor_gate.parameters)
+    if profile.pair_id is not None:
+        metadata.update(
+            {
+                "cumulative_economic_cell_count": (PHASE1A_CUMULATIVE_ECONOMIC_CELL_COUNT),
+                "pair_config_sha256": profile.pair_config_sha256,
+                "pair_economic_cell_count": P4_PAIR_ECONOMIC_CELL_COUNT,
+                "pair_id": profile.pair_id,
+                "paired_query_ids": list(profile.paired_query_ids),
+                "prior_outcome_lineage_sha256": P4_PAIR_PRIOR_LINEAGE_SHA256,
+            }
+        )
+    return metadata
+
+
+def _ensure_result_artifact(
+    connection: psycopg.Connection[dict[str, Any]],
+    *,
+    run_fingerprint: str,
+    source_artifact_manifest_sha256: str,
+    cells_sha256: str,
+    lineage: _ValidatedCompletionLineage,
+    final_checkpoint_sha256: str,
+    held: _HeldFile,
+    profile: OutcomeQueryProfile = P5_OUTCOME_QUERY_PROFILE,
+    predecessor_gate: OutcomePredecessorGate | None = None,
+) -> tuple[int, bool, dict[str, object]]:
+    artifact_key = f"{CAMPAIGN_KEY}:outcome-replay:{run_fingerprint}"
+    artifact_uri = held.path.as_uri()
+    metadata = _result_artifact_metadata(
+        run_fingerprint=run_fingerprint,
+        source_artifact_manifest_sha256=source_artifact_manifest_sha256,
+        cells_sha256=cells_sha256,
+        lineage=lineage,
+        final_checkpoint_sha256=final_checkpoint_sha256,
+        profile=profile,
+        predecessor_gate=predecessor_gate,
+    )
     rows = connection.execute(
         """
         SELECT artifact_id, artifact_key, artifact_type, uri, sha256, byte_size,
@@ -5264,6 +6047,889 @@ def _verify_completed_cells(
         raise OutcomeRegistryDriftError("successful outcome replay cell content drift")
 
 
+def _p4_pair_release_payload(
+    *,
+    p4_01_outcome_replay_manifest_id: int,
+    p4_01_run_fingerprint: str,
+    p4_01_result_artifact_sha256: str,
+    p4_01_cell_summaries_sha256: str,
+    p4_02_outcome_replay_manifest_id: int,
+    p4_02_run_fingerprint: str,
+    p4_02_result_artifact_sha256: str,
+    p4_02_cell_summaries_sha256: str,
+    decision_sha256s: Mapping[str, Mapping[str, str]],
+) -> dict[str, object]:
+    member_values = (
+        (
+            P4_01_OUTCOME_QUERY_PROFILE,
+            p4_01_outcome_replay_manifest_id,
+            p4_01_run_fingerprint,
+            p4_01_result_artifact_sha256,
+            p4_01_cell_summaries_sha256,
+        ),
+        (
+            P4_02_OUTCOME_QUERY_PROFILE,
+            p4_02_outcome_replay_manifest_id,
+            p4_02_run_fingerprint,
+            p4_02_result_artifact_sha256,
+            p4_02_cell_summaries_sha256,
+        ),
+    )
+    members: list[dict[str, object]] = []
+    canonical_decisions: dict[str, dict[str, str]] = {}
+    for profile, manifest_id, fingerprint, result_sha256, cells_sha256 in member_values:
+        decisions = decision_sha256s.get(profile.query_id)
+        if not isinstance(decisions, Mapping) or set(decisions) != set(DIRECTION_IDS):
+            raise OutcomeRegistryDriftError("P4 pair release decision identity drift")
+        canonical_decisions[profile.query_id] = {
+            direction: _sha256(
+                decisions[direction],
+                label=f"{profile.query_id} {direction} decision_sha256",
+            )
+            for direction in DIRECTION_IDS
+        }
+        members.append(
+            {
+                "cell_summaries_sha256": _sha256(
+                    cells_sha256, label=f"{profile.query_id} cell_summaries_sha256"
+                ),
+                "detail_record_count": profile.detail_record_count,
+                "direction_signal_counts": dict(profile.direction_signal_counts),
+                "input_plan_sha256": profile.input_plan_sha256,
+                "outcome_config_id": profile.outcome_config_id,
+                "outcome_config_sha256": profile.outcome_config_sha256,
+                "outcome_replay_manifest_id": _positive_identifier(
+                    manifest_id,
+                    label=f"{profile.query_id} outcome_replay_manifest_id",
+                ),
+                "planned_source_date_count": profile.planned_source_date_count,
+                "query_definition_sha256": profile.query_definition_sha256,
+                "query_id": profile.query_id,
+                "result_artifact_sha256": _sha256(
+                    result_sha256, label=f"{profile.query_id} result_artifact_sha256"
+                ),
+                "run_fingerprint": _sha256(
+                    fingerprint, label=f"{profile.query_id} run_fingerprint"
+                ),
+                "signal_manifest_sha256": profile.signal_manifest_sha256,
+                "source_occurrence_count": profile.source_occurrence_count,
+                "summary_count": EXPECTED_SUMMARY_COUNT,
+            }
+        )
+    return {
+        "cumulative_economic_cell_count": PHASE1A_CUMULATIVE_ECONOMIC_CELL_COUNT,
+        "decision_count": len(member_values) * len(DIRECTION_IDS),
+        "decision_sha256s": canonical_decisions,
+        "expected_candidate_count": len(member_values),
+        "expected_detail_record_count": sum(
+            profile.detail_record_count for profile, *_ in member_values
+        ),
+        "expected_signal_count": sum(
+            profile.source_occurrence_count for profile, *_ in member_values
+        ),
+        "expected_summary_count": len(member_values) * EXPECTED_SUMMARY_COUNT,
+        "members": members,
+        "pair_config_sha256": P4_PAIR_CONFIG_SHA256,
+        "pair_economic_cell_count": P4_PAIR_ECONOMIC_CELL_COUNT,
+        "pair_id": P4_PAIR_ID,
+        "prior_outcome_lineage_sha256": P4_PAIR_PRIOR_LINEAGE_SHA256,
+    }
+
+
+def _p4_pair_release_from_row(row: Mapping[str, Any]) -> P4OutcomePairRelease:
+    raw_decisions = row.get("decision_sha256s")
+    if not isinstance(raw_decisions, Mapping):
+        raise OutcomeRegistryDriftError("P4 pair release decisions are invalid")
+    decisions = {
+        str(query_id): {
+            str(direction): str(digest) for direction, digest in query_decisions.items()
+        }
+        for query_id, query_decisions in raw_decisions.items()
+        if isinstance(query_decisions, Mapping)
+    }
+    canonical_release_json = row.get("canonical_release_json")
+    if not isinstance(canonical_release_json, str):
+        raise OutcomeRegistryDriftError("P4 pair canonical release JSON is missing")
+    try:
+        stored_payload = json.loads(canonical_release_json)
+    except (TypeError, ValueError) as error:
+        raise OutcomeRegistryDriftError("P4 pair canonical release JSON is invalid") from error
+    if _canonical_json_bytes(stored_payload).decode("utf-8") != canonical_release_json:
+        raise OutcomeRegistryDriftError("P4 pair release JSON is not canonical")
+    release = P4OutcomePairRelease(
+        p4_pair_release_id=_positive_identifier(
+            row.get("p4_pair_release_id"), label="p4_pair_release_id"
+        ),
+        p4_pair_batch_id=_positive_identifier(
+            row.get("p4_pair_batch_id"), label="p4_pair_batch_id"
+        ),
+        pair_id=_nonempty(row.get("pair_id"), label="pair_id"),
+        p4_01_outcome_replay_manifest_id=_positive_identifier(
+            row.get("p4_01_outcome_replay_manifest_id"),
+            label="p4_01_outcome_replay_manifest_id",
+        ),
+        p4_02_outcome_replay_manifest_id=_positive_identifier(
+            row.get("p4_02_outcome_replay_manifest_id"),
+            label="p4_02_outcome_replay_manifest_id",
+        ),
+        p4_01_run_fingerprint=_sha256(
+            row.get("p4_01_run_fingerprint"), label="p4_01_run_fingerprint"
+        ),
+        p4_02_run_fingerprint=_sha256(
+            row.get("p4_02_run_fingerprint"), label="p4_02_run_fingerprint"
+        ),
+        p4_01_result_artifact_sha256=_sha256(
+            row.get("p4_01_result_artifact_sha256"),
+            label="p4_01_result_artifact_sha256",
+        ),
+        p4_02_result_artifact_sha256=_sha256(
+            row.get("p4_02_result_artifact_sha256"),
+            label="p4_02_result_artifact_sha256",
+        ),
+        p4_01_cell_summaries_sha256=_sha256(
+            row.get("p4_01_cell_summaries_sha256"),
+            label="p4_01_cell_summaries_sha256",
+        ),
+        p4_02_cell_summaries_sha256=_sha256(
+            row.get("p4_02_cell_summaries_sha256"),
+            label="p4_02_cell_summaries_sha256",
+        ),
+        decision_sha256s=decisions,
+        pair_config_sha256=_sha256(row.get("pair_config_sha256"), label="pair_config_sha256"),
+        prior_outcome_lineage_sha256=_sha256(
+            row.get("prior_outcome_lineage_sha256"),
+            label="prior_outcome_lineage_sha256",
+        ),
+        pair_economic_cell_count=_positive_identifier(
+            row.get("pair_economic_cell_count"), label="pair_economic_cell_count"
+        ),
+        cumulative_economic_cell_count=_positive_identifier(
+            row.get("cumulative_economic_cell_count"),
+            label="cumulative_economic_cell_count",
+        ),
+        pair_release_sha256=_sha256(row.get("pair_release_sha256"), label="pair_release_sha256"),
+        released_at=row["released_at"],
+    )
+    expected_payload = _p4_pair_release_payload(
+        p4_01_outcome_replay_manifest_id=release.p4_01_outcome_replay_manifest_id,
+        p4_01_run_fingerprint=release.p4_01_run_fingerprint,
+        p4_01_result_artifact_sha256=release.p4_01_result_artifact_sha256,
+        p4_01_cell_summaries_sha256=release.p4_01_cell_summaries_sha256,
+        p4_02_outcome_replay_manifest_id=release.p4_02_outcome_replay_manifest_id,
+        p4_02_run_fingerprint=release.p4_02_run_fingerprint,
+        p4_02_result_artifact_sha256=release.p4_02_result_artifact_sha256,
+        p4_02_cell_summaries_sha256=release.p4_02_cell_summaries_sha256,
+        decision_sha256s=release.decision_sha256s,
+    )
+    if stored_payload != expected_payload or release.release_sha256 != release.pair_release_sha256:
+        raise OutcomeRegistryDriftError("P4 pair release canonical payload drift")
+    return release
+
+
+@_translate_psycopg_errors("Phase 1A P4 outcome pair release loading")
+def load_phase1a_p4_outcome_pair_release(
+    database_url: str,
+    *,
+    p4_01_outcome_replay_manifest_id: int,
+    p4_01_run_fingerprint: str,
+    p4_02_outcome_replay_manifest_id: int,
+    p4_02_run_fingerprint: str,
+    data_root: Path | str,
+) -> P4OutcomePairRelease:
+    """Load one byte/DB-verified simultaneous P4 release for duplicate reuse."""
+
+    target = _database_url(database_url)
+    expected_ids = (
+        _positive_identifier(
+            p4_01_outcome_replay_manifest_id,
+            label="p4_01_outcome_replay_manifest_id",
+        ),
+        _positive_identifier(
+            p4_02_outcome_replay_manifest_id,
+            label="p4_02_outcome_replay_manifest_id",
+        ),
+    )
+    expected_fingerprints = (
+        _sha256(p4_01_run_fingerprint, label="p4_01_run_fingerprint"),
+        _sha256(p4_02_run_fingerprint, label="p4_02_run_fingerprint"),
+    )
+    _, derived = _resolved_data_root(data_root)
+    with psycopg.connect(target, row_factory=dict_row) as connection:
+        _set_serializable_read_only(connection)
+        with connection.transaction():
+            rows = connection.execute(
+                """
+                SELECT release.*, batch.status AS batch_status,
+                       batch.pair_config_sha256,
+                       batch.prior_outcome_lineage_sha256,
+                       p4_01.status AS p4_01_status,
+                       p4_02.status AS p4_02_status,
+                       p4_01.result_artifact_id AS p4_01_result_artifact_id,
+                       p4_02.result_artifact_id AS p4_02_result_artifact_id,
+                       p4_01.result_artifact_sha256 AS p4_01_manifest_result_sha256,
+                       p4_02.result_artifact_sha256 AS p4_02_manifest_result_sha256,
+                       p4_01.result_artifact_byte_size AS p4_01_result_byte_size,
+                       p4_02.result_artifact_byte_size AS p4_02_result_byte_size,
+                       p4_01.cell_summaries_sha256 AS p4_01_manifest_cells_sha256,
+                       p4_02.cell_summaries_sha256 AS p4_02_manifest_cells_sha256,
+                       a1.uri AS p4_01_result_uri,
+                       a2.uri AS p4_02_result_uri,
+                       a1.artifact_key AS p4_01_artifact_key,
+                       a2.artifact_key AS p4_02_artifact_key,
+                       a1.artifact_type AS p4_01_artifact_type,
+                       a2.artifact_type AS p4_02_artifact_type,
+                       a1.sha256 AS p4_01_artifact_sha256,
+                       a2.sha256 AS p4_02_artifact_sha256,
+                       a1.byte_size AS p4_01_artifact_byte_size,
+                       a2.byte_size AS p4_02_artifact_byte_size,
+                       a1.media_type AS p4_01_artifact_media_type,
+                       a2.media_type AS p4_02_artifact_media_type,
+                       a1.producer_job_id AS p4_01_artifact_producer_job_id,
+                       a2.producer_job_id AS p4_02_artifact_producer_job_id,
+                       a1.metadata AS p4_01_artifact_metadata,
+                       a2.metadata AS p4_02_artifact_metadata
+                FROM systematic_fx.phase1a_p4_outcome_pair_releases AS release
+                JOIN systematic_fx.phase1a_p4_outcome_pair_batches AS batch
+                  ON batch.p4_pair_batch_id = release.p4_pair_batch_id
+                JOIN systematic_fx.phase1a_outcome_replay_manifests AS p4_01
+                  ON p4_01.outcome_replay_manifest_id =
+                     release.p4_01_outcome_replay_manifest_id
+                JOIN systematic_fx.phase1a_outcome_replay_manifests AS p4_02
+                  ON p4_02.outcome_replay_manifest_id =
+                     release.p4_02_outcome_replay_manifest_id
+                JOIN systematic_fx.artifacts AS a1
+                  ON a1.artifact_id = p4_01.result_artifact_id
+                JOIN systematic_fx.artifacts AS a2
+                  ON a2.artifact_id = p4_02.result_artifact_id
+                WHERE release.pair_id = %s
+                  AND release.p4_01_outcome_replay_manifest_id = %s
+                  AND release.p4_02_outcome_replay_manifest_id = %s
+                  AND release.p4_01_run_fingerprint = %s
+                  AND release.p4_02_run_fingerprint = %s
+                """,
+                (
+                    P4_PAIR_ID,
+                    expected_ids[0],
+                    expected_ids[1],
+                    expected_fingerprints[0],
+                    expected_fingerprints[1],
+                ),
+            ).fetchall()
+            if len(rows) != 1:
+                raise OutcomeRegistryStateError(
+                    "exactly one released P4 pair is required for duplicate reuse"
+                )
+            row = rows[0]
+            release = _p4_pair_release_from_row(row)
+            expected_static = {
+                "batch_status": "RELEASED",
+                "p4_01_artifact_sha256": release.p4_01_result_artifact_sha256,
+                "p4_01_manifest_cells_sha256": release.p4_01_cell_summaries_sha256,
+                "p4_01_manifest_result_sha256": release.p4_01_result_artifact_sha256,
+                "p4_01_status": "SUCCEEDED",
+                "p4_02_artifact_sha256": release.p4_02_result_artifact_sha256,
+                "p4_02_manifest_cells_sha256": release.p4_02_cell_summaries_sha256,
+                "p4_02_manifest_result_sha256": release.p4_02_result_artifact_sha256,
+                "p4_02_status": "SUCCEEDED",
+                "pair_config_sha256": P4_PAIR_CONFIG_SHA256,
+                "prior_outcome_lineage_sha256": P4_PAIR_PRIOR_LINEAGE_SHA256,
+            }
+            mismatches = [key for key, value in expected_static.items() if row.get(key) != value]
+            if mismatches:
+                raise OutcomeRegistryDriftError(
+                    "P4 pair release DB drift in fields: " + ", ".join(sorted(mismatches))
+                )
+            for profile, prefix in (
+                (P4_01_OUTCOME_QUERY_PROFILE, "p4_01"),
+                (P4_02_OUTCOME_QUERY_PROFILE, "p4_02"),
+            ):
+                manifest_id = int(row[f"{prefix}_outcome_replay_manifest_id"])
+                fingerprint = str(row[f"{prefix}_run_fingerprint"])
+                manifest = _load_manifest_snapshot(
+                    connection,
+                    outcome_replay_manifest_id=manifest_id,
+                )
+                _assert_live_manifest(manifest, run_fingerprint=fingerprint)
+                source_sha256 = _sha256(
+                    manifest.get("source_artifact_manifest_sha256"),
+                    label=f"{profile.query_id} source_artifact_manifest_sha256",
+                )
+                _validate_governed_run_spec(
+                    manifest,
+                    run_fingerprint=fingerprint,
+                    source_artifact_manifest_sha256=source_sha256,
+                    profile=profile,
+                )
+                if (
+                    manifest.get("status") != "SUCCEEDED"
+                    or manifest.get("pattern_key") != profile.query_id
+                    or manifest.get("result_artifact_id") != row[f"{prefix}_result_artifact_id"]
+                    or manifest.get("attempt_result_artifact_id")
+                    != row[f"{prefix}_result_artifact_id"]
+                ):
+                    raise OutcomeRegistryDriftError(
+                        f"{profile.query_id} released manifest/attempt identity drift"
+                    )
+
+                cell_rows = connection.execute(
+                    """
+                    SELECT *
+                    FROM systematic_fx.phase1a_outcome_cell_summaries
+                    WHERE outcome_replay_manifest_id = %s
+                    ORDER BY scenario_id, direction,
+                             take_profit_ticks, stop_loss_ticks
+                    """,
+                    (manifest_id,),
+                ).fetchall()
+                try:
+                    loaded_cells = tuple(
+                        _cell_from_registry_row(cell_row) for cell_row in cell_rows
+                    )
+                    cells, cells_sha256 = validate_complete_cell_summaries(
+                        loaded_cells,
+                        query_id=profile.query_id,
+                    )
+                except OutcomeRegistryError as error:
+                    raise OutcomeRegistryDriftError(
+                        f"{profile.query_id} released cell surface drift"
+                    ) from error
+                if cells_sha256 != row[f"{prefix}_manifest_cells_sha256"]:
+                    raise OutcomeRegistryDriftError(
+                        f"{profile.query_id} released cell aggregate digest drift"
+                    )
+
+                decision_rows = connection.execute(
+                    """
+                    SELECT direction, decision_label,
+                           selected_take_profit_ticks,
+                           selected_stop_loss_ticks,
+                           positive_region_size, rejection_reasons,
+                           decision_sha256
+                    FROM systematic_fx.phase1a_outcome_screening_decisions
+                    WHERE outcome_replay_manifest_id = %s
+                    ORDER BY direction
+                    """,
+                    (manifest_id,),
+                ).fetchall()
+                stored_decisions = tuple(
+                    _screening_decision_from_registry_row(
+                        decision_row,
+                        outcome_replay_manifest_id=manifest_id,
+                    )
+                    for decision_row in decision_rows
+                )
+                expected_decisions = derive_phase1a_outcome_screening_decisions(
+                    cells,
+                    query_id=profile.query_id,
+                )
+                actual_decision_sha256s = {
+                    decision.direction: _canonical_sha256(
+                        decision.payload(outcome_replay_manifest_id=manifest_id)
+                    )
+                    for decision in stored_decisions
+                }
+                if (
+                    stored_decisions != expected_decisions
+                    or actual_decision_sha256s != release.decision_sha256s[profile.query_id]
+                ):
+                    raise OutcomeRegistryDriftError(
+                        f"{profile.query_id} released screening decision drift"
+                    )
+                artifact_path = _path_from_file_uri(
+                    row[f"{prefix}_result_uri"],
+                    label=f"{profile.query_id} result artifact",
+                )
+                if artifact_path != (
+                    derived / "outcomes" / profile.outcome_config_id / artifact_path.name
+                ):
+                    raise OutcomeRegistryDriftError(
+                        f"{profile.query_id} result artifact namespace drift"
+                    )
+                held = _open_held_immutable_file(artifact_path, data_root=data_root)
+                try:
+                    if (
+                        held.sha256 != row[f"{prefix}_artifact_sha256"]
+                        or held.byte_size != row[f"{prefix}_artifact_byte_size"]
+                        or held.byte_size != row[f"{prefix}_result_byte_size"]
+                    ):
+                        raise OutcomeRegistryDriftError(
+                            f"{profile.query_id} released result artifact byte drift"
+                        )
+                    lineage = _validate_result_artifact(
+                        held,
+                        run_fingerprint=fingerprint,
+                        source_artifact_manifest_sha256=source_sha256,
+                        cell_summaries_sha256=cells_sha256,
+                        cell_summaries=cells,
+                        data_root=data_root,
+                        profile=profile,
+                    )
+                    _validate_run_spec_completion_lineage(
+                        manifest,
+                        lineage,
+                        profile=profile,
+                    )
+                    final_checkpoint_sha256, planned_source_date_count = _validate_final_checkpoint(
+                        connection,
+                        manifest_id=manifest_id,
+                        run_fingerprint=fingerprint,
+                        lineage=lineage,
+                        data_root=data_root,
+                        profile=profile,
+                        lock_rows=False,
+                    )
+                    expected_artifact = {
+                        "artifact_key": (f"{CAMPAIGN_KEY}:outcome-replay:{fingerprint}"),
+                        "artifact_type": OUTCOME_ARTIFACT_TYPE,
+                        "media_type": "application/json",
+                        "producer_job_id": None,
+                        "metadata": _result_artifact_metadata(
+                            run_fingerprint=fingerprint,
+                            source_artifact_manifest_sha256=source_sha256,
+                            cells_sha256=cells_sha256,
+                            lineage=lineage,
+                            final_checkpoint_sha256=final_checkpoint_sha256,
+                            profile=profile,
+                        ),
+                    }
+                    actual_artifact = {
+                        "artifact_key": row[f"{prefix}_artifact_key"],
+                        "artifact_type": row[f"{prefix}_artifact_type"],
+                        "media_type": row[f"{prefix}_artifact_media_type"],
+                        "producer_job_id": row[f"{prefix}_artifact_producer_job_id"],
+                        "metadata": row[f"{prefix}_artifact_metadata"],
+                    }
+                    if (
+                        actual_artifact != expected_artifact
+                        or planned_source_date_count != profile.planned_source_date_count
+                    ):
+                        raise OutcomeRegistryDriftError(
+                            f"{profile.query_id} released artifact/checkpoint drift"
+                        )
+                    _verify_held_file(held)
+                finally:
+                    held.close()
+            return release
+
+
+@_translate_psycopg_errors("atomic Phase 1A P4 outcome pair completion")
+def complete_phase1a_p4_outcome_pair(
+    database_url: str,
+    *,
+    p4_pair_batch_id: int,
+    members: Sequence[P4OutcomePairMember],
+    data_root: Path | str,
+) -> P4OutcomePairCompletionReport:
+    """Validate both complete results, then publish one indivisible P4 pair."""
+
+    target = _database_url(database_url)
+    batch_id = _positive_identifier(p4_pair_batch_id, label="p4_pair_batch_id")
+    if isinstance(members, (str, bytes)) or not isinstance(members, Sequence):
+        raise OutcomeRegistryError("P4 pair members must be a sequence")
+    by_query: dict[str, P4OutcomePairMember] = {}
+    for member in members:
+        if not isinstance(member, P4OutcomePairMember):
+            raise OutcomeRegistryError("P4 pair members contain an invalid value")
+        if member.query_id in by_query:
+            raise OutcomeRegistryError("duplicate P4 pair query member")
+        by_query[member.query_id] = member
+    if tuple(by_query) != (P4_01_QUERY_ID, P4_02_QUERY_ID):
+        raise OutcomeRegistryError("P4 pair members must use the frozen query order")
+
+    prepared: dict[str, dict[str, Any]] = {}
+    with ExitStack() as held_files:
+        for query_id in (P4_01_QUERY_ID, P4_02_QUERY_ID):
+            member = by_query[query_id]
+            profile = outcome_query_profile(query_id)
+            manifest_id = _positive_identifier(
+                member.outcome_replay_manifest_id,
+                label=f"{query_id} outcome_replay_manifest_id",
+            )
+            fingerprint = _sha256(member.run_fingerprint, label=f"{query_id} run_fingerprint")
+            cells, cells_sha256 = validate_complete_cell_summaries(
+                member.cell_summaries,
+                query_id=query_id,
+            )
+            decisions = derive_phase1a_outcome_screening_decisions(
+                cells,
+                query_id=query_id,
+            )
+            held = _open_held_immutable_file(Path(member.result_artifact_path), data_root=data_root)
+            held_files.callback(held.close)
+            _require_held_parent(
+                held,
+                data_root=data_root,
+                expected_parent=PurePosixPath("outcomes") / profile.outcome_config_id,
+                label=f"{query_id} outcome result artifact",
+            )
+            prepared[query_id] = {
+                "cells": cells,
+                "cells_sha256": cells_sha256,
+                "decisions": decisions,
+                "fingerprint": fingerprint,
+                "held": held,
+                "manifest_id": manifest_id,
+                "profile": profile,
+            }
+
+        with psycopg.connect(target, row_factory=dict_row) as connection:
+            _set_serializable(connection)
+            with connection.transaction():
+                batch = connection.execute(
+                    """
+                    SELECT *
+                    FROM systematic_fx.phase1a_p4_outcome_pair_batches
+                    WHERE p4_pair_batch_id = %s
+                    FOR UPDATE
+                    """,
+                    (batch_id,),
+                ).fetchone()
+                if batch is None:
+                    raise OutcomeRegistryError("P4 pair batch does not exist")
+                batch_expected = {
+                    "pair_id": P4_PAIR_ID,
+                    "p4_01_outcome_replay_manifest_id": prepared[P4_01_QUERY_ID]["manifest_id"],
+                    "p4_02_outcome_replay_manifest_id": prepared[P4_02_QUERY_ID]["manifest_id"],
+                    "p4_01_run_fingerprint": prepared[P4_01_QUERY_ID]["fingerprint"],
+                    "p4_02_run_fingerprint": prepared[P4_02_QUERY_ID]["fingerprint"],
+                    "pair_config_sha256": P4_PAIR_CONFIG_SHA256,
+                    "prior_outcome_lineage_sha256": P4_PAIR_PRIOR_LINEAGE_SHA256,
+                }
+                mismatches = [
+                    key for key, value in batch_expected.items() if batch.get(key) != value
+                ]
+                if mismatches:
+                    raise OutcomeRegistryDriftError(
+                        "P4 pair batch drift in fields: " + ", ".join(sorted(mismatches))
+                    )
+                if batch.get("status") not in {"PREPARED", "RELEASED"}:
+                    raise OutcomeRegistryStateError(
+                        f"cannot complete P4 pair from {batch.get('status')}"
+                    )
+
+                manifests: dict[str, dict[str, Any]] = {}
+                validated: dict[str, dict[str, Any]] = {}
+                for query_id, item in sorted(
+                    prepared.items(), key=lambda pair: int(pair[1]["manifest_id"])
+                ):
+                    profile = item["profile"]
+                    manifest = _load_manifest_for_update(
+                        connection,
+                        outcome_replay_manifest_id=item["manifest_id"],
+                    )
+                    _assert_live_manifest(manifest, run_fingerprint=item["fingerprint"])
+                    if manifest.get("pattern_key") != query_id:
+                        raise OutcomeRegistryDriftError("P4 pair result query drift")
+                    source_sha256 = _sha256(
+                        manifest.get("source_artifact_manifest_sha256"),
+                        label=f"{query_id} source_artifact_manifest_sha256",
+                    )
+                    lineage = _validate_result_artifact(
+                        item["held"],
+                        run_fingerprint=item["fingerprint"],
+                        source_artifact_manifest_sha256=source_sha256,
+                        cell_summaries_sha256=item["cells_sha256"],
+                        cell_summaries=item["cells"],
+                        data_root=data_root,
+                        profile=profile,
+                    )
+                    _validate_run_spec_completion_lineage(
+                        manifest,
+                        lineage,
+                        profile=profile,
+                    )
+                    final_checkpoint_sha256, planned_source_date_count = _validate_final_checkpoint(
+                        connection,
+                        manifest_id=item["manifest_id"],
+                        run_fingerprint=item["fingerprint"],
+                        lineage=lineage,
+                        data_root=data_root,
+                        profile=profile,
+                    )
+                    manifests[query_id] = manifest
+                    validated[query_id] = {
+                        "final_checkpoint_sha256": final_checkpoint_sha256,
+                        "lineage": lineage,
+                        "planned_source_date_count": planned_source_date_count,
+                        "source_sha256": source_sha256,
+                    }
+
+                statuses = {str(manifest["status"]) for manifest in manifests.values()}
+                if statuses == {"SUCCEEDED"}:
+                    if batch.get("status") != "RELEASED":
+                        raise OutcomeRegistryDriftError(
+                            "successful P4 members require a RELEASED pair batch"
+                        )
+                    release_row = connection.execute(
+                        """
+                        SELECT release.*, batch.pair_config_sha256,
+                               batch.prior_outcome_lineage_sha256
+                        FROM systematic_fx.phase1a_p4_outcome_pair_releases AS release
+                        JOIN systematic_fx.phase1a_p4_outcome_pair_batches AS batch
+                          ON batch.p4_pair_batch_id = release.p4_pair_batch_id
+                        WHERE release.p4_pair_batch_id = %s
+                        FOR SHARE OF release, batch
+                        """,
+                        (batch_id,),
+                    ).fetchone()
+                    if release_row is None:
+                        raise OutcomeRegistryDriftError("P4 pair release row is missing")
+                    release = _p4_pair_release_from_row(release_row)
+                    completions: list[OutcomeCompletionReport] = []
+                    for query_id in (P4_01_QUERY_ID, P4_02_QUERY_ID):
+                        item = prepared[query_id]
+                        manifest = manifests[query_id]
+                        _verify_completed_cells(
+                            connection,
+                            manifest_id=item["manifest_id"],
+                            cells=item["cells"],
+                        )
+                        if (
+                            manifest.get("result_artifact_sha256") != item["held"].sha256
+                            or manifest.get("cell_summaries_sha256") != item["cells_sha256"]
+                        ):
+                            raise OutcomeRegistryDriftError(
+                                f"{query_id} released completion identity drift"
+                            )
+                        _verify_held_file(item["held"])
+                        completions.append(
+                            OutcomeCompletionReport(
+                                outcome_replay_manifest_id=item["manifest_id"],
+                                research_run_spec_id=int(manifest["research_run_spec_id"]),
+                                research_run_attempt_id=int(manifest["research_run_attempt_id"]),
+                                result_artifact_id=int(manifest["result_artifact_id"]),
+                                run_fingerprint=item["fingerprint"],
+                                result_artifact_sha256=item["held"].sha256,
+                                result_artifact_uri=item["held"].path.as_uri(),
+                                result_artifact_byte_size=item["held"].byte_size,
+                                cell_summaries_sha256=item["cells_sha256"],
+                                summary_row_count=EXPECTED_SUMMARY_COUNT,
+                                created_artifact=False,
+                                completed=False,
+                            )
+                        )
+                    return P4OutcomePairCompletionReport(
+                        release=release,
+                        completions=(completions[0], completions[1]),
+                        completed=False,
+                    )
+                if statuses != {"RUNNING"} or batch.get("status") != "PREPARED":
+                    raise OutcomeRegistryStateError(
+                        "P4 pair completion requires both members RUNNING in one PREPARED batch"
+                    )
+
+                artifact_results: dict[str, tuple[int, bool]] = {}
+                for query_id in (P4_01_QUERY_ID, P4_02_QUERY_ID):
+                    item = prepared[query_id]
+                    verified = validated[query_id]
+                    _register_cells(
+                        connection,
+                        manifest_id=item["manifest_id"],
+                        run_fingerprint=item["fingerprint"],
+                        cells=item["cells"],
+                    )
+                    artifact_id, created_artifact, _ = _ensure_result_artifact(
+                        connection,
+                        run_fingerprint=item["fingerprint"],
+                        source_artifact_manifest_sha256=verified["source_sha256"],
+                        cells_sha256=item["cells_sha256"],
+                        lineage=verified["lineage"],
+                        final_checkpoint_sha256=verified["final_checkpoint_sha256"],
+                        held=item["held"],
+                        profile=item["profile"],
+                    )
+                    artifact_results[query_id] = (artifact_id, created_artifact)
+
+                finished_at = datetime.now(UTC)
+                completions = []
+                for query_id in (P4_01_QUERY_ID, P4_02_QUERY_ID):
+                    item = prepared[query_id]
+                    manifest = manifests[query_id]
+                    verified = validated[query_id]
+                    lineage = verified["lineage"]
+                    artifact_id, created_artifact = artifact_results[query_id]
+                    result_summary = {
+                        "artifact_sha256": item["held"].sha256,
+                        "cache_manifest_sha256": lineage.cache_manifest_sha256,
+                        "cell_summaries_sha256": item["cells_sha256"],
+                        "cumulative_economic_cell_count": (PHASE1A_CUMULATIVE_ECONOMIC_CELL_COUNT),
+                        "detail_record_count": lineage.detail_record_count,
+                        "detail_shard_count": len(lineage.detail_shards),
+                        "detail_shard_manifest_sha256": (lineage.detail_shard_manifest_sha256),
+                        "final_checkpoint_sha256": verified["final_checkpoint_sha256"],
+                        "input_lineage_sha256": lineage.input_lineage_sha256,
+                        "outcome_config_id": item["profile"].outcome_config_id,
+                        "pair_config_sha256": P4_PAIR_CONFIG_SHA256,
+                        "pair_economic_cell_count": P4_PAIR_ECONOMIC_CELL_COUNT,
+                        "pair_id": P4_PAIR_ID,
+                        "paired_query_ids": [P4_01_QUERY_ID, P4_02_QUERY_ID],
+                        "planned_source_date_count": verified["planned_source_date_count"],
+                        "prior_outcome_lineage_sha256": (P4_PAIR_PRIOR_LINEAGE_SHA256),
+                        "query_id": query_id,
+                        "source_artifact_manifest_sha256": verified["source_sha256"],
+                        "summary_row_count": EXPECTED_SUMMARY_COUNT,
+                    }
+                    attempt = connection.execute(
+                        """
+                        UPDATE systematic_fx.research_run_attempts
+                        SET status = 'SUCCEEDED', result_artifact_id = %s,
+                            result_summary = %s, finished_at = %s
+                        WHERE research_run_attempt_id = %s AND status = 'RUNNING'
+                        RETURNING research_run_attempt_id
+                        """,
+                        (
+                            artifact_id,
+                            Jsonb(result_summary),
+                            finished_at,
+                            int(manifest["research_run_attempt_id"]),
+                        ),
+                    ).fetchone()
+                    if attempt is None:
+                        raise OutcomeRegistryStateError(
+                            "running P4 pair attempt changed before completion"
+                        )
+                    completions.append(
+                        OutcomeCompletionReport(
+                            outcome_replay_manifest_id=item["manifest_id"],
+                            research_run_spec_id=int(manifest["research_run_spec_id"]),
+                            research_run_attempt_id=int(manifest["research_run_attempt_id"]),
+                            result_artifact_id=artifact_id,
+                            run_fingerprint=item["fingerprint"],
+                            result_artifact_sha256=item["held"].sha256,
+                            result_artifact_uri=item["held"].path.as_uri(),
+                            result_artifact_byte_size=item["held"].byte_size,
+                            cell_summaries_sha256=item["cells_sha256"],
+                            summary_row_count=EXPECTED_SUMMARY_COUNT,
+                            created_artifact=created_artifact,
+                            completed=True,
+                        )
+                    )
+
+                for query_id in (P4_01_QUERY_ID, P4_02_QUERY_ID):
+                    item = prepared[query_id]
+                    artifact_id, _ = artifact_results[query_id]
+                    updated = connection.execute(
+                        """
+                        UPDATE systematic_fx.phase1a_outcome_replay_manifests
+                        SET status = 'SUCCEEDED', result_artifact_id = %s,
+                            result_artifact_sha256 = %s,
+                            result_artifact_byte_size = %s,
+                            cell_summaries_sha256 = %s,
+                            finished_at = %s
+                        WHERE outcome_replay_manifest_id = %s AND status = 'RUNNING'
+                        RETURNING outcome_replay_manifest_id
+                        """,
+                        (
+                            artifact_id,
+                            item["held"].sha256,
+                            item["held"].byte_size,
+                            item["cells_sha256"],
+                            finished_at,
+                            item["manifest_id"],
+                        ),
+                    ).fetchone()
+                    if updated is None:
+                        raise OutcomeRegistryStateError(
+                            "running P4 pair manifest changed before completion"
+                        )
+                    _register_screening_decisions(
+                        connection,
+                        manifest_id=item["manifest_id"],
+                        decisions=item["decisions"],
+                    )
+
+                decision_sha256s = {
+                    query_id: {
+                        decision.direction: _canonical_sha256(
+                            decision.payload(
+                                outcome_replay_manifest_id=prepared[query_id]["manifest_id"]
+                            )
+                        )
+                        for decision in prepared[query_id]["decisions"]
+                    }
+                    for query_id in (P4_01_QUERY_ID, P4_02_QUERY_ID)
+                }
+                payload = _p4_pair_release_payload(
+                    p4_01_outcome_replay_manifest_id=prepared[P4_01_QUERY_ID]["manifest_id"],
+                    p4_01_run_fingerprint=prepared[P4_01_QUERY_ID]["fingerprint"],
+                    p4_01_result_artifact_sha256=prepared[P4_01_QUERY_ID]["held"].sha256,
+                    p4_01_cell_summaries_sha256=prepared[P4_01_QUERY_ID]["cells_sha256"],
+                    p4_02_outcome_replay_manifest_id=prepared[P4_02_QUERY_ID]["manifest_id"],
+                    p4_02_run_fingerprint=prepared[P4_02_QUERY_ID]["fingerprint"],
+                    p4_02_result_artifact_sha256=prepared[P4_02_QUERY_ID]["held"].sha256,
+                    p4_02_cell_summaries_sha256=prepared[P4_02_QUERY_ID]["cells_sha256"],
+                    decision_sha256s=decision_sha256s,
+                )
+                canonical_release_json = _canonical_json_bytes(payload).decode("utf-8")
+                pair_release_sha256 = hashlib.sha256(
+                    canonical_release_json.encode("utf-8")
+                ).hexdigest()
+                release_row = connection.execute(
+                    """
+                    INSERT INTO systematic_fx.phase1a_p4_outcome_pair_releases
+                        (p4_pair_batch_id, pair_id,
+                         p4_01_outcome_replay_manifest_id,
+                         p4_02_outcome_replay_manifest_id,
+                         p4_01_run_fingerprint, p4_02_run_fingerprint,
+                         p4_01_result_artifact_sha256,
+                         p4_02_result_artifact_sha256,
+                         p4_01_cell_summaries_sha256,
+                         p4_02_cell_summaries_sha256,
+                         decision_sha256s, pair_config_sha256,
+                         prior_outcome_lineage_sha256,
+                         pair_economic_cell_count,
+                         cumulative_economic_cell_count,
+                         canonical_release_json, pair_release_sha256)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                            %s, %s, %s, %s)
+                    RETURNING *
+                    """,
+                    (
+                        batch_id,
+                        P4_PAIR_ID,
+                        prepared[P4_01_QUERY_ID]["manifest_id"],
+                        prepared[P4_02_QUERY_ID]["manifest_id"],
+                        prepared[P4_01_QUERY_ID]["fingerprint"],
+                        prepared[P4_02_QUERY_ID]["fingerprint"],
+                        prepared[P4_01_QUERY_ID]["held"].sha256,
+                        prepared[P4_02_QUERY_ID]["held"].sha256,
+                        prepared[P4_01_QUERY_ID]["cells_sha256"],
+                        prepared[P4_02_QUERY_ID]["cells_sha256"],
+                        Jsonb(decision_sha256s),
+                        P4_PAIR_CONFIG_SHA256,
+                        P4_PAIR_PRIOR_LINEAGE_SHA256,
+                        P4_PAIR_ECONOMIC_CELL_COUNT,
+                        PHASE1A_CUMULATIVE_ECONOMIC_CELL_COUNT,
+                        canonical_release_json,
+                        pair_release_sha256,
+                    ),
+                ).fetchone()
+                if release_row is None:  # pragma: no cover
+                    raise OutcomeRegistryDatabaseError("P4 pair release returned no identity")
+                connection.execute(
+                    """
+                    UPDATE systematic_fx.phase1a_p4_outcome_pair_batches
+                    SET status = 'RELEASED', finished_at = %s
+                    WHERE p4_pair_batch_id = %s AND status = 'PREPARED'
+                    """,
+                    (finished_at, batch_id),
+                )
+                for item in prepared.values():
+                    _verify_held_file(item["held"])
+                release = _p4_pair_release_from_row(
+                    {
+                        **release_row,
+                        "pair_config_sha256": P4_PAIR_CONFIG_SHA256,
+                        "prior_outcome_lineage_sha256": (P4_PAIR_PRIOR_LINEAGE_SHA256),
+                    }
+                )
+                return P4OutcomePairCompletionReport(
+                    release=release,
+                    completions=(completions[0], completions[1]),
+                    completed=True,
+                )
+
+
 @_translate_psycopg_errors("atomic Phase 1A outcome replay completion")
 def complete_phase1a_outcome_replay(
     database_url: str,
@@ -5279,6 +6945,10 @@ def complete_phase1a_outcome_replay(
 
     target = _database_url(database_url)
     profile = outcome_query_profile(query_id)
+    if profile.pair_id is not None:
+        raise OutcomeRegistryStateError(
+            "P4 outcome results may be published only through atomic pair completion"
+        )
     manifest_id = _positive_identifier(
         outcome_replay_manifest_id,
         label="outcome_replay_manifest_id",
@@ -5535,6 +7205,239 @@ def complete_phase1a_outcome_replay(
         held.close()
 
 
+@_translate_psycopg_errors("unpaired Phase 1A P4 outcome replay failure")
+def fail_unpaired_phase1a_p4_outcome_replay(
+    database_url: str,
+    *,
+    outcome_replay_manifest_id: int,
+    run_fingerprint: str,
+    error_message: str,
+) -> OutcomeReplayState:
+    """Fail one queued P4 orphan only when it has never belonged to a pair batch."""
+
+    target = _database_url(database_url)
+    manifest_id = _positive_identifier(
+        outcome_replay_manifest_id, label="outcome_replay_manifest_id"
+    )
+    fingerprint = _sha256(run_fingerprint, label="run_fingerprint")
+    message = _nonempty(error_message, label="error_message")
+    with psycopg.connect(target, row_factory=dict_row) as connection:
+        _set_serializable(connection)
+        with connection.transaction():
+            manifest = _load_manifest_for_update(
+                connection,
+                outcome_replay_manifest_id=manifest_id,
+            )
+            _assert_live_manifest(manifest, run_fingerprint=fingerprint)
+            if str(manifest.get("pattern_key")) not in {
+                P4_01_QUERY_ID,
+                P4_02_QUERY_ID,
+            }:
+                raise OutcomeRegistryStateError("unpaired failure is restricted to P4")
+            pair_reference = connection.execute(
+                """
+                SELECT p4_pair_batch_id
+                FROM systematic_fx.phase1a_p4_outcome_pair_batches
+                WHERE p4_01_outcome_replay_manifest_id = %s
+                   OR p4_02_outcome_replay_manifest_id = %s
+                LIMIT 1
+                FOR SHARE
+                """,
+                (manifest_id, manifest_id),
+            ).fetchone()
+            if pair_reference is not None:
+                raise OutcomeRegistryStateError(
+                    "a pair-bound P4 replay must fail through atomic pair failure"
+                )
+            if manifest.get("status") == "FAILED":
+                if manifest.get("error_message") != message:
+                    raise OutcomeRegistryDriftError("failed P4 orphan error drift")
+                return _manifest_state(manifest)
+            if manifest.get("status") != "QUEUED":
+                raise OutcomeRegistryStateError("unpaired P4 failure requires a QUEUED replay")
+            finished_at = datetime.now(UTC)
+            attempt = connection.execute(
+                """
+                UPDATE systematic_fx.research_run_attempts
+                SET status = 'FAILED', finished_at = %s, error_message = %s
+                WHERE research_run_attempt_id = %s AND status = 'QUEUED'
+                RETURNING research_run_attempt_id
+                """,
+                (
+                    finished_at,
+                    message,
+                    int(manifest["research_run_attempt_id"]),
+                ),
+            ).fetchone()
+            if attempt is None:
+                raise OutcomeRegistryStateError("queued P4 orphan attempt changed")
+            updated = connection.execute(
+                """
+                UPDATE systematic_fx.phase1a_outcome_replay_manifests
+                SET status = 'FAILED', finished_at = %s, error_message = %s
+                WHERE outcome_replay_manifest_id = %s AND status = 'QUEUED'
+                RETURNING *, %s::integer AS attempt_number
+                """,
+                (
+                    finished_at,
+                    message,
+                    manifest_id,
+                    int(manifest["attempt_number"]),
+                ),
+            ).fetchone()
+            if updated is None:
+                raise OutcomeRegistryStateError("queued P4 orphan manifest changed")
+            return _manifest_state(updated)
+
+
+@_translate_psycopg_errors("atomic Phase 1A P4 outcome pair failure")
+def fail_phase1a_p4_outcome_pair(
+    database_url: str,
+    *,
+    p4_pair_batch_id: int,
+    p4_01_run_fingerprint: str,
+    p4_02_run_fingerprint: str,
+    error_message: str,
+) -> P4OutcomePairFailureReport:
+    """Terminalize both members of one PREPARED P4 pair in one transaction."""
+
+    target = _database_url(database_url)
+    batch_id = _positive_identifier(p4_pair_batch_id, label="p4_pair_batch_id")
+    fingerprints = {
+        P4_01_QUERY_ID: _sha256(p4_01_run_fingerprint, label="p4_01_run_fingerprint"),
+        P4_02_QUERY_ID: _sha256(p4_02_run_fingerprint, label="p4_02_run_fingerprint"),
+    }
+    message = _nonempty(error_message, label="error_message")
+    with psycopg.connect(target, row_factory=dict_row) as connection:
+        _set_serializable(connection)
+        with connection.transaction():
+            batch = connection.execute(
+                """
+                SELECT *
+                FROM systematic_fx.phase1a_p4_outcome_pair_batches
+                WHERE p4_pair_batch_id = %s
+                FOR UPDATE
+                """,
+                (batch_id,),
+            ).fetchone()
+            if batch is None:
+                raise OutcomeRegistryError("P4 pair batch does not exist")
+            expected_batch = {
+                "pair_id": P4_PAIR_ID,
+                "p4_01_run_fingerprint": fingerprints[P4_01_QUERY_ID],
+                "p4_02_run_fingerprint": fingerprints[P4_02_QUERY_ID],
+                "pair_config_sha256": P4_PAIR_CONFIG_SHA256,
+                "prior_outcome_lineage_sha256": P4_PAIR_PRIOR_LINEAGE_SHA256,
+            }
+            mismatches = [key for key, value in expected_batch.items() if batch.get(key) != value]
+            if mismatches:
+                raise OutcomeRegistryDriftError(
+                    "P4 pair failure batch drift in fields: " + ", ".join(sorted(mismatches))
+                )
+            manifests: dict[str, dict[str, Any]] = {}
+            for query_id, id_field in (
+                (P4_01_QUERY_ID, "p4_01_outcome_replay_manifest_id"),
+                (P4_02_QUERY_ID, "p4_02_outcome_replay_manifest_id"),
+            ):
+                manifest = _load_manifest_for_update(
+                    connection,
+                    outcome_replay_manifest_id=int(batch[id_field]),
+                )
+                _assert_live_manifest(
+                    manifest,
+                    run_fingerprint=fingerprints[query_id],
+                )
+                if manifest.get("pattern_key") != query_id:
+                    raise OutcomeRegistryDriftError("P4 pair failure query drift")
+                manifests[query_id] = manifest
+            if batch.get("status") == "FAILED":
+                if any(
+                    manifest.get("status") != "FAILED" or manifest.get("error_message") != message
+                    for manifest in manifests.values()
+                ):
+                    raise OutcomeRegistryDriftError("failed P4 pair terminal state drift")
+                states = tuple(
+                    _manifest_state(manifests[query_id])
+                    for query_id in (P4_01_QUERY_ID, P4_02_QUERY_ID)
+                )
+                return P4OutcomePairFailureReport(
+                    p4_pair_batch_id=batch_id,
+                    pair_id=P4_PAIR_ID,
+                    states=(states[0], states[1]),
+                    status="FAILED",
+                )
+            if batch.get("status") != "PREPARED" or any(
+                manifest.get("status") not in {"QUEUED", "RUNNING"}
+                for manifest in manifests.values()
+            ):
+                raise OutcomeRegistryStateError(
+                    "P4 pair failure requires one PREPARED nonterminal pair"
+                )
+
+            finished_at = datetime.now(UTC)
+            states_by_query: dict[str, OutcomeReplayState] = {}
+            for query_id in (P4_01_QUERY_ID, P4_02_QUERY_ID):
+                manifest = manifests[query_id]
+                attempt = connection.execute(
+                    """
+                    UPDATE systematic_fx.research_run_attempts
+                    SET status = 'FAILED', finished_at = %s, error_message = %s
+                    WHERE research_run_attempt_id = %s
+                      AND status IN ('QUEUED', 'RUNNING')
+                    RETURNING research_run_attempt_id
+                    """,
+                    (
+                        finished_at,
+                        message,
+                        int(manifest["research_run_attempt_id"]),
+                    ),
+                ).fetchone()
+                if attempt is None:
+                    raise OutcomeRegistryStateError("P4 pair attempt changed before atomic failure")
+            for query_id in (P4_01_QUERY_ID, P4_02_QUERY_ID):
+                manifest = manifests[query_id]
+                updated = connection.execute(
+                    """
+                    UPDATE systematic_fx.phase1a_outcome_replay_manifests
+                    SET status = 'FAILED', finished_at = %s, error_message = %s
+                    WHERE outcome_replay_manifest_id = %s
+                      AND status IN ('QUEUED', 'RUNNING')
+                    RETURNING *, %s::integer AS attempt_number
+                    """,
+                    (
+                        finished_at,
+                        message,
+                        int(manifest["outcome_replay_manifest_id"]),
+                        int(manifest["attempt_number"]),
+                    ),
+                ).fetchone()
+                if updated is None:
+                    raise OutcomeRegistryStateError(
+                        "P4 pair manifest changed before atomic failure"
+                    )
+                states_by_query[query_id] = _manifest_state(updated)
+            updated_batch = connection.execute(
+                """
+                UPDATE systematic_fx.phase1a_p4_outcome_pair_batches
+                SET status = 'FAILED', finished_at = %s, error_message = %s
+                WHERE p4_pair_batch_id = %s AND status = 'PREPARED'
+                RETURNING p4_pair_batch_id
+                """,
+                (finished_at, message, batch_id),
+            ).fetchone()
+            if updated_batch is None:
+                raise OutcomeRegistryStateError("P4 pair batch changed before failure")
+            return P4OutcomePairFailureReport(
+                p4_pair_batch_id=batch_id,
+                pair_id=P4_PAIR_ID,
+                states=(
+                    states_by_query[P4_01_QUERY_ID],
+                    states_by_query[P4_02_QUERY_ID],
+                ),
+                status="FAILED",
+            )
+
+
 @_translate_psycopg_errors("Phase 1A outcome replay failure")
 def fail_phase1a_outcome_replay(
     database_url: str,
@@ -5560,6 +7463,10 @@ def fail_phase1a_outcome_replay(
                 outcome_replay_manifest_id=manifest_id,
             )
             _assert_live_manifest(row, run_fingerprint=fingerprint)
+            if outcome_query_profile(str(row["pattern_key"])).pair_id is not None:
+                raise OutcomeRegistryStateError(
+                    "P4 replay failures must terminalize through atomic pair failure"
+                )
             if row["status"] == "FAILED":
                 if row.get("error_message") != message:
                     raise OutcomeRegistryDriftError("failed outcome error message drift")
