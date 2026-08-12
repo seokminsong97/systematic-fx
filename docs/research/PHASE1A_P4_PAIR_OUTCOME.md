@@ -1,8 +1,7 @@
 # Phase 1A P4 Paired Outcome Replay
 
-Status: preregistered implementation contract. Economic results must not be
-added to this document until the governed pair has reached one atomic terminal
-release.
+Status: released Discovery result. The governed pair reached one atomic
+terminal release on 2026-08-11.
 
 ## Purpose and authority
 
@@ -133,6 +132,40 @@ PostgreSQL superuser access can still inspect internal staging; the operational
 contract therefore also forbids operator or AI inspection between members.
 Cryptographic blinding would require a separately privileged worker and is not
 claimed here.
+
+## Released Discovery result
+
+Batch 1 and release 1 completed atomically. Both member manifests and attempts
+are `SUCCEEDED`; the release contains exactly 5,808 cell summaries, four
+directional decisions, and two result artifacts. No partial result was observed
+before the release transaction. The canonical pair-release SHA-256 is
+`e7f1d8e6e19f55c816478d4d6d7804e6e0db874ced31acbb77de41d59478a507`.
+
+An exact rerun returned `SKIPPED_DUPLICATE` for both members with the same
+batch, release, result, and release SHA-256 values. The official read-only
+release loader then reconstructed all 5,808 stored cells, re-derived all four
+decisions, and verified the result files, RunSpecs, input/detail lineage, and
+472 plus 455 checkpoint chains. The member result and ordered-cell SHA-256
+values are:
+
+| Query | Result SHA-256 | Ordered-cell SHA-256 |
+| --- | --- | --- |
+| P4-01 | `5c0d59b6155a80c7a0963449604d69741cfc73a67d23be5ac765fcfd1db7d78e` | `e4ec4a4338b184141a743522c259a48546c25f6bdb7ea58996b3aa6ecef838e9` |
+| P4-02 | `8fbfd7fa5e2a87fbe28c018aee24e7863dfeda8f7727614047d6a5b1ce739716` | `e705a90639c12522929e64cdfae9cc09ccf7c422064364509ffd99a946a8b67f` |
+
+All four direction-level candidates are `SCREENING_REJECT` with
+`positive_region_size=0` and no selected TP/SL cell:
+
+| Query | Direction | Decision SHA-256 | Rejection reasons |
+| --- | --- | --- | --- |
+| P4-01 | LONG | `681a52feb1a698f8c34d7283116c7ae7f1de01789b08e9837e029548f9f879f8` | disconnected joint-positive region; no interior 7-of-9 stable cell; no stable-region medoid |
+| P4-01 | SHORT | `54ecc7eeb116a280e6237ee1fba83e79d575553c002d8198f5eaa677de6148a1` | disconnected joint-positive region; no stable-region medoid |
+| P4-02 | LONG | `36fd6cf672981a529154f7e9eb0e486b7ef4108d46624bef04a72162394160a0` | disconnected joint-positive region; no stable-region medoid |
+| P4-02 | SHORT | `deec74339124d3955b7c7ae41c6ec2c6bc7c897b6f9c8a7f6683c26966eaec75` | disconnected joint-positive region; no interior 7-of-9 stable cell; no stable-region medoid |
+
+Because no candidate survived the frozen selector, there are no selected
+Baseline, Moderate, or Severe scenario rows to report. A post-hoc best cell is
+not substituted. No walk-forward or sealed-holdout content was opened.
 
 ## Interpretation and next boundary
 
