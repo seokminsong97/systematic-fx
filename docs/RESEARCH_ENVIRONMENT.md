@@ -183,6 +183,67 @@ URL, and no arbitrary database name is accepted.
 
 ## 6. Research Commands
 
+### M0a finite-budget walking skeleton
+
+M0a is the first complete daemon loop, but it is deliberately an engineering
+fixture run rather than production performance research. The current full
+dataset is still research-ineligible and the repository has no verified CME
+session/status reference from which `NO_CROSS_CLOSED_MARKET` can be proven for
+real rows. The checked-in fixture therefore models ordinary liquid sessions, a
+previous-day-volume contract change, roll guards, Friday, and the session-close
+boundary with explicit metadata and expected behavior. It also contains one
+explicitly planted deterministic mechanics pattern so the skeleton exercises
+raw-versus-flat occupancy, sequential replay, walk-forward, null controls, and
+`REGISTER`; that fixture result is not market evidence or an alpha claim.
+
+```bash
+# Defaults: epochs/m0a_fixture_v1.toml and .local/m0a/
+uv run systematic-fx research m0a build-features
+uv run systematic-fx research m0a build-labels
+uv run systematic-fx research m0a run-epoch
+uv run systematic-fx research m0a daemon start --keep-alive
+uv run systematic-fx research m0a report
+uv run systematic-fx research m0a verify-invariants
+```
+
+The feature and label commands publish immutable content-addressed JSONL and
+verify exact existing bytes on replay. `run-epoch` registers the manifest's
+fixed 12 real and 24 null experiments, then processes or resumes the durable
+queue. `daemon start` drains/resumes the finite epoch and exits when idle;
+`--keep-alive` keeps the healthy process polling after generation is exhausted,
+but it cannot enqueue beyond those budgets. Candidate errors are isolated; stale
+leases become `CRASHED` and receive a new numbered attempt; an exact successful
+rerun reopens the stored artifact. `report` writes an exploratory Markdown
+report below `reports/generated/`; no output is Paper- or Live-eligible.
+
+The SQLite ledger is intentionally local and Discovery-only. It does not
+replace PostgreSQL governance for a future production-scale epoch, and M0a adds
+no migration after the frozen `0001`–`0028` lineage.
+
+### Sealed-holdout deployment boundary
+
+The current workstation PostgreSQL bootstrap does **not** create separate
+research and holdout roles, and a logical `SEALED` marker alone is not a SELECT
+permission boundary. M0a therefore fails closed at the process boundary:
+
+- its manifest schema rejects holdout/sealed/credential/path keys;
+- startup fails if any `SYSTEMATIC_FX_HOLDOUT_*` variable is present;
+- only the staged M0a input-artifact root is opened;
+- no holdout evaluator, unseal, promotion, Paper, Live, broker, or LLM API is
+  imported by the daemon.
+
+Production provisioning before M0b/M2 must put sealed bytes in a separate
+storage namespace or database schema and issue distinct credentials. The
+recommended roles are a DDL-owning `migration_admin`, a Discovery-only
+`research_daemon`, and a separately provisioned `holdout_executor`. Revoke
+schema/table/object-store read access from `research_daemon`, do not mount or
+export holdout paths/tokens into that process, and verify the deployment with
+`has_schema_privilege` / `has_table_privilege` plus an actual denied read. The
+holdout executor must not be interactive or AI-accessible and must run only
+after a separate immutable authorization. Until that external permission test
+passes, reports must retain `UNTOUCHED_ACCESS_DENIED` and no holdout claim may
+be made beyond M0a's fixture boundary.
+
 ### Complete readiness workflow
 
 ```bash

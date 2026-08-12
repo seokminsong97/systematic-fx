@@ -1,0 +1,80 @@
+[epoch]
+schema_version = 1
+epoch_id = "m0a-fixture-v1"
+parent_epoch_id = ""
+dataset_version = "m0a-6e-mbp10-deterministic-v1"
+dataset_hash = "c184d6074661f784f7ce782c80aaeea2b44a9ca6897697aba5c3d198cdd8ee65"
+feature_version = "m0a-event-features-v1"
+label_version = "m0a-quote-first-passage-v1"
+execution_model_version = "m0a-conservative-next-quote-v1"
+code_commit = "600d77e745d08db0add6c3646c23856ef5b01c40"
+code_snapshot_sha256 = "fc26fc088a311f927d1753121d2fda0080f8cc157c97604535a144087e4f75ab"
+family_id = "pullback_continuation_v1"
+real_candidate_budget = 12
+null_candidate_budget = 24
+random_seeds = [1601, 1607, 1613, 1619]
+
+[data]
+decision_clock_seconds = 300
+feature_timeframes_seconds = [300, 1800, 3600]
+session_policy = "NO_CROSS_CLOSED_MARKET"
+active_contract_policy = "previous_day_volume"
+hold_same_instrument_until_exit = true
+no_entry_inside_roll_guard = true
+
+[features]
+atr_lookback_bars = 6
+quantile_lookback_bars = 12
+short_trend_lookback_bars = 6
+
+[family]
+trend_1h_min_ticks = [1, 2, 3, 4, 6]
+pullback_length_min = [1, 2, 3]
+pullback_length_max = [3, 4, 6, 8]
+close_location_threshold_ppm = [550000, 650000, 750000, 850000]
+volatility_quantile_min_ppm = [0, 100000, 200000, 300000]
+volatility_quantile_max_ppm = [700000, 800000, 900000, 1000000]
+imbalance_threshold_ppm = ["NONE", "0", "50000", "150000", "250000"]
+directions = ["long", "short"]
+feature_tier = "M0A_MINIMAL"
+max_generation_attempts_per_candidate = 200
+min_generation_attempts = 1000
+
+[barriers]
+k_tp = ["0.75", "1.00", "1.25"]
+k_sl = ["0.50", "0.75", "1.00"]
+max_hold_minutes = [30, 60, 120]
+
+[execution]
+route_delay_seconds = 1
+entry_adverse_ticks = 1
+tp_trade_through_ticks = 1
+round_trip_cost_ticks = 2
+
+[admission]
+min_raw_events = 3
+min_sequential_trades = 2
+min_active_days = 1
+min_tp_probability_ppm = 500000
+min_positive_folds = 1
+require_positive_net_ev = true
+
+[evaluation]
+cooldown_seconds = 0
+feature_lookback_seconds = 3600
+purge_policy = "MAX_HOLD_PLUS_FEATURE_LOOKBACK"
+fold_count = 3
+control_block_size = 4
+stressed_cost_numerator = 3
+stressed_cost_denominator = 2
+
+[daemon]
+lease_seconds = 60
+system_error_threshold = 3
+worker_restart_after_experiments = 12
+run_epoch_max_cycles = 1000
+run_epoch_stop_when_idle = true
+poll_interval_milliseconds = 0
+
+[fixture]
+fixture_version = "m0a-6e-mbp10-fixture-v1"

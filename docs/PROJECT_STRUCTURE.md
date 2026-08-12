@@ -43,6 +43,7 @@ systematic-fx/
 ├── .venv/                      # ignored: uv-managed environment
 ├── Makefile                    # canonical setup, check, and lifecycle commands
 ├── configs/                    # versioned campaign/feature/cost/execution inputs
+├── epochs/                     # immutable finite-budget research epoch manifests
 ├── data/                       # ignored: all raw, reference, and derived market data
 │   ├── mbp-10/                 # immutable daily source files (existing layout)
 │   ├── reference/              # point-in-time definition/status inputs (pending)
@@ -57,7 +58,8 @@ systematic-fx/
 │   ├── config/                 # environment-owned paths and credentials
 │   ├── data/                   # inventory, mappings, contracts, and quality gates
 │   ├── features/               # one-second and closed five-minute builders
-│   ├── research/               # AI packages, ledgers, experiment registration
+│   ├── research/               # bounded research engines, ledgers, registration
+│   │   └── m0a/                # deterministic Discovery-only walking skeleton
 │   ├── strategies/             # immutable executable bracket policies
 │   ├── backtest/               # event replay, fills, OCO, costs, and metrics
 │   ├── validation/             # splitter, walk-forward, stress, and holdout
@@ -75,6 +77,11 @@ systematic-fx/
 Phase 2 broker adapters and Live execution packages are intentionally absent.
 They should be added only after Phase 1 produces an eligible strategy and the
 provider contracts are measured.
+
+The M0a daemon uses an ignored local SQLite/WAL ledger and content-addressed
+JSONL inputs below `.local/m0a/`. This is an engineering walking skeleton, not
+governed performance evidence in PostgreSQL. It intentionally leaves the
+checksum-frozen PostgreSQL migrations `0001`–`0028` unchanged.
 
 ## 3. Storage Boundaries
 
@@ -136,6 +143,9 @@ generated files remain out of Git.
 - `features` may consume validated `data`; it cannot inspect future events.
 - `strategies` defines policies without depending on a backtest implementation.
 - `research` consumes feature summaries and emits registered strategy inputs.
+- `research.m0a` may use only its explicitly staged Discovery fixture/input
+  artifacts. It cannot import holdout credentials, invoke an LLM, or call a
+  broker/promotion package.
 - `backtest` consumes validated events and frozen strategies; it cannot mutate
   either.
 - `validation` orchestrates frozen backtests over deterministic splits.

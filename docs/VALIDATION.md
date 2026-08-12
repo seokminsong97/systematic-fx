@@ -598,7 +598,9 @@ that holdout. A failed artifact remains permanently recorded.
 
 ## 15. Paper Entry and Paper Evidence
 
-`PASS_BACKTEST` automatically permits Paper entry with one simulated contract.
+`PASS_BACKTEST` does not automatically permit Paper entry. It permits creation
+of a Paper promotion package for a separately authorized decision; the
+research daemon has no promotion or broker authority.
 
 Before a strategy may request Live approval, Paper evidence must include:
 

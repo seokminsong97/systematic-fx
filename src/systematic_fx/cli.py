@@ -7,8 +7,10 @@ import json
 import os
 import sys
 from collections.abc import Sequence
+from dataclasses import asdict, is_dataclass
 from datetime import date, datetime
 from pathlib import Path
+from time import sleep
 
 from systematic_fx.config import Settings
 from systematic_fx.data.inventory import summarize_inventory
@@ -664,6 +666,182 @@ def _phase1a_p4_pair_outcomes_command(args: argparse.Namespace) -> int:
     return _phase1a_outcomes_command(args, runner_name="run_phase1a_p4_outcome_pair")
 
 
+def _m0a_json_value(value: object) -> object:
+    """Convert CLI report objects into plain deterministic JSON values."""
+
+    if is_dataclass(value) and not isinstance(value, type):
+        return _m0a_json_value(asdict(value))
+    if isinstance(value, dict):
+        return {str(key): _m0a_json_value(item) for key, item in value.items()}
+    if isinstance(value, (tuple, list)):
+        return [_m0a_json_value(item) for item in value]
+    if isinstance(value, Path):
+        return str(value)
+    if isinstance(value, (date, datetime)):
+        return value.isoformat()
+    return value
+
+
+def _m0a_state_paths(args: argparse.Namespace) -> tuple[Path, Path, Path]:
+    state_root = args.state_root.expanduser().resolve()
+    return state_root / "ledger.sqlite3", state_root / "artifacts", state_root
+
+
+def _m0a_emit(payload: object, *, emit_json: bool) -> None:
+    value = _m0a_json_value(payload)
+    if emit_json:
+        print(json.dumps(value, indent=2, sort_keys=True))
+        return
+    if isinstance(value, dict):
+        for key, item in value.items():
+            print(f"{key}: {item}")
+        return
+    print(value)
+
+
+def _m0a_build_features_command(args: argparse.Namespace) -> int:
+    from systematic_fx.research.m0a.ledger import M0aLedgerError
+    from systematic_fx.research.m0a.model import M0aError
+    from systematic_fx.research.m0a.pipeline import build_feature_artifact
+
+    _, artifact_root, _ = _m0a_state_paths(args)
+    try:
+        result = build_feature_artifact(args.epoch, artifact_root=artifact_root)
+    except (M0aError, M0aLedgerError, OSError) as error:
+        print(error, file=sys.stderr)
+        return 2
+    _m0a_emit(result, emit_json=args.json)
+    return 0
+
+
+def _m0a_build_labels_command(args: argparse.Namespace) -> int:
+    from systematic_fx.research.m0a.ledger import M0aLedgerError
+    from systematic_fx.research.m0a.model import M0aError
+    from systematic_fx.research.m0a.pipeline import build_label_artifact
+
+    _, artifact_root, _ = _m0a_state_paths(args)
+    try:
+        result = build_label_artifact(args.epoch, artifact_root=artifact_root)
+    except (M0aError, M0aLedgerError, OSError) as error:
+        print(error, file=sys.stderr)
+        return 2
+    _m0a_emit(result, emit_json=args.json)
+    return 0
+
+
+def _m0a_run_once(args: argparse.Namespace) -> tuple[int, object | None]:
+    from systematic_fx.research.m0a.daemon import ForcedCrash, force_crash_after_claim
+    from systematic_fx.research.m0a.ledger import M0aLedgerError
+    from systematic_fx.research.m0a.model import M0aError
+    from systematic_fx.research.m0a.pipeline import run_epoch_pipeline
+
+    ledger_path, artifact_root, _ = _m0a_state_paths(args)
+    try:
+        result = run_epoch_pipeline(
+            args.epoch,
+            ledger_path=ledger_path,
+            artifact_root=artifact_root,
+            worker_id=args.worker_id,
+            crash_hook=force_crash_after_claim if args.simulate_crash_after_claim else None,
+        )
+    except ForcedCrash as error:
+        print(error, file=sys.stderr)
+        return 75, None
+    except (M0aError, M0aLedgerError, OSError) as error:
+        print(error, file=sys.stderr)
+        return 2, None
+    if not result.invariants.valid or result.ledger.status == "HALTED":
+        return 1, result
+    # Another live worker may still own an unexpired lease.  That is a healthy,
+    # resumable state, but a one-shot command must not report the epoch complete.
+    return (0 if result.ledger.status == "COMPLETED" else 3), result
+
+
+def _m0a_run_epoch_command(args: argparse.Namespace) -> int:
+    status, result = _m0a_run_once(args)
+    if result is not None:
+        _m0a_emit(result, emit_json=args.json)
+    return status
+
+
+def _m0a_daemon_start_command(args: argparse.Namespace) -> int:
+    """Run one finite epoch, optionally keeping the idle process alive."""
+
+    while True:
+        status, result = _m0a_run_once(args)
+        if result is not None:
+            _m0a_emit(result, emit_json=args.json)
+        if status not in {0, 3} or not args.keep_alive:
+            return status
+        try:
+            sleep(args.keep_alive_poll_seconds)
+        except KeyboardInterrupt:
+            return 0
+
+
+def _m0a_report_command(args: argparse.Namespace) -> int:
+    from systematic_fx.research.m0a.config import load_epoch
+    from systematic_fx.research.m0a.ledger import M0aLedgerError
+    from systematic_fx.research.m0a.model import M0aError
+    from systematic_fx.research.m0a.pipeline import render_report_from_ledger
+
+    ledger_path, artifact_root, _ = _m0a_state_paths(args)
+    try:
+        epoch = load_epoch(args.epoch)
+        content = render_report_from_ledger(
+            ledger_path,
+            epoch.epoch_id,
+            artifact_root=artifact_root,
+            epoch_path=args.epoch,
+        )
+        output = (
+            args.output.expanduser().resolve()
+            if args.output is not None
+            else (Path.cwd() / "reports" / "generated" / f"{epoch.epoch_id}.md").resolve()
+        )
+        output.parent.mkdir(parents=True, exist_ok=True)
+        temporary = output.with_name(f".{output.name}.tmp-{os.getpid()}")
+        temporary.write_text(content, encoding="utf-8")
+        os.replace(temporary, output)
+    except (M0aError, M0aLedgerError, OSError) as error:
+        print(error, file=sys.stderr)
+        return 2
+    if args.json:
+        _m0a_emit(
+            {
+                "epoch_id": epoch.epoch_id,
+                "report_path": output,
+                "byte_size": len(content.encode("utf-8")),
+            },
+            emit_json=True,
+        )
+    else:
+        print(content, end="")
+        print(f"report_path: {output}", file=sys.stderr)
+    return 0
+
+
+def _m0a_verify_invariants_command(args: argparse.Namespace) -> int:
+    from systematic_fx.research.m0a.config import load_epoch
+    from systematic_fx.research.m0a.ledger import M0aLedgerError
+    from systematic_fx.research.m0a.model import M0aError
+    from systematic_fx.research.m0a.pipeline import verify_epoch_invariants
+
+    ledger_path, artifact_root, _ = _m0a_state_paths(args)
+    try:
+        epoch = load_epoch(args.epoch)
+        result = verify_epoch_invariants(
+            ledger_path,
+            epoch.epoch_id,
+            artifact_root=artifact_root,
+        )
+    except (M0aError, M0aLedgerError, OSError) as error:
+        print(error, file=sys.stderr)
+        return 2
+    _m0a_emit(result, emit_json=args.json)
+    return 0 if result.valid else 1
+
+
 def _phase1a_p5_equivalence_audit_command(args: argparse.Namespace) -> int:
     from systematic_fx.research.outcome_equivalence_audit import (
         OutcomeEquivalenceAuditError,
@@ -1299,6 +1477,94 @@ def build_parser() -> argparse.ArgumentParser:
         "--json", action="store_true", help="emit both terminal reports as one JSON object"
     )
     phase1a_p4_pair_parser.set_defaults(handler=_phase1a_p4_pair_outcomes_command)
+
+    m0a_parser = research_commands.add_parser(
+        "m0a",
+        help="run the deterministic finite-budget M0a research walking skeleton",
+    )
+    m0a_commands = m0a_parser.add_subparsers(dest="m0a_command", required=True)
+
+    def add_m0a_common(command: argparse.ArgumentParser) -> None:
+        command.add_argument(
+            "--epoch",
+            type=Path,
+            default=Path("epochs/m0a_fixture_v1.toml"),
+            help="immutable M0a epoch manifest",
+        )
+        command.add_argument(
+            "--state-root",
+            type=Path,
+            default=Path(".local/m0a"),
+            help="local SQLite ledger and content-addressed artifact root",
+        )
+        command.add_argument("--json", action="store_true", help="emit JSON")
+
+    m0a_build_features = m0a_commands.add_parser(
+        "build-features",
+        help="build the fixture and point-in-time feature artifacts idempotently",
+    )
+    add_m0a_common(m0a_build_features)
+    m0a_build_features.set_defaults(handler=_m0a_build_features_command)
+
+    m0a_build_labels = m0a_commands.add_parser(
+        "build-labels",
+        help="reopen exact feature inputs and build quote-aware label artifacts",
+    )
+    add_m0a_common(m0a_build_labels)
+    m0a_build_labels.set_defaults(handler=_m0a_build_labels_command)
+
+    def add_m0a_run(command: argparse.ArgumentParser) -> None:
+        add_m0a_common(command)
+        command.add_argument("--worker-id", default="m0a-worker-1")
+        command.add_argument(
+            "--simulate-crash-after-claim",
+            action="store_true",
+            help="leave one RUNNING lease to verify restart recovery",
+        )
+
+    m0a_run_epoch = m0a_commands.add_parser(
+        "run-epoch",
+        help="register and drain exactly the precommitted REAL and NULL budgets",
+    )
+    add_m0a_run(m0a_run_epoch)
+    m0a_run_epoch.set_defaults(handler=_m0a_run_epoch_command)
+
+    m0a_daemon = m0a_commands.add_parser(
+        "daemon",
+        help="operate the LLM-free lease-based research daemon",
+    )
+    m0a_daemon_commands = m0a_daemon.add_subparsers(dest="m0a_daemon_command", required=True)
+    m0a_daemon_start = m0a_daemon_commands.add_parser(
+        "start",
+        help="resume the finite epoch and optionally remain healthy while idle",
+    )
+    add_m0a_run(m0a_daemon_start)
+    m0a_daemon_start.add_argument(
+        "--keep-alive",
+        action="store_true",
+        help="stay alive after the finite epoch budget is exhausted",
+    )
+    m0a_daemon_start.add_argument(
+        "--keep-alive-poll-seconds",
+        type=_positive_int,
+        default=30,
+    )
+    m0a_daemon_start.set_defaults(handler=_m0a_daemon_start_command)
+
+    m0a_report = m0a_commands.add_parser(
+        "report",
+        help="verify durable artifacts and render a search-data Markdown report",
+    )
+    add_m0a_common(m0a_report)
+    m0a_report.add_argument("--output", type=Path)
+    m0a_report.set_defaults(handler=_m0a_report_command)
+
+    m0a_verify = m0a_commands.add_parser(
+        "verify-invariants",
+        help="verify budget, lineage, attempt, artifact, and event-chain invariants",
+    )
+    add_m0a_common(m0a_verify)
+    m0a_verify.set_defaults(handler=_m0a_verify_invariants_command)
 
     exposure_parser = research_commands.add_parser(
         "exposure",

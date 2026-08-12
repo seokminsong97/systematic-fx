@@ -91,8 +91,8 @@ Report Backtest, Paper, and Live results separately.
 
 | Transition | Required evidence | Authority |
 |---|---|---|
-| `RESEARCH → BACKTEST_PASSED` | Phase 1 validation pass | Automatic |
-| `BACKTEST_PASSED → PAPER` | Phase 1 deployment package | Automatic |
+| `RESEARCH → BACKTEST_PASSED` | Phase 1 validation pass | Deterministic evaluator, never the research daemon |
+| `BACKTEST_PASSED → PAPER` | Phase 1 deployment package | Separately authorized promotion |
 | `PAPER → LIVE_APPROVED` | Phase 2 approval package | User |
 | `LIVE_APPROVED → CANARY` | Passing Phase 3 activation gate | Automatic |
 | `CANARY → ACTIVE` | Phase 3 Live evidence | Lifecycle policy |

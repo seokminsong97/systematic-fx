@@ -1,7 +1,7 @@
-# Phase 1 Design: AI Research and Backtesting
+# Phase 1 Design: Deterministic Research and Backtesting
 
-- Document version: 1.10.0-draft
-- Revised: 2026-08-09
+- Document version: 1.11.0-draft
+- Revised: 2026-08-11
 - Status: `DRAFT`
 - Parent document: [`DESIGN.md`](../DESIGN.md)
 - Input: Historical MBP-10 from the Data Source
@@ -12,16 +12,17 @@
 
 ## 1. Objective
 
-Phase 1 lets AI explore Discovery data through reproducible computations and
-turns measured patterns into executable, realistically tested bracket
-strategies.
+Phase 1 runs reproducible, finite-budget Discovery computations and turns
+measured patterns into registered executable bracket candidates. An optional
+LLM may propose a hypothesis before an epoch is frozen, but it is never part of
+the daemon runtime loop or a result/promotion authority.
 
 ```text
 Verified MBP-10
     ↓
 one-second features and five-minute research rows
     ↓
-AI-directed exploration
+finite precommitted search epoch
     ↓
 Registered experiment
     ↓
@@ -31,7 +32,7 @@ Deterministic backtest
     ↓
 Validation and stress tests
     ↓
-Reject or mark Paper-eligible
+Reject or REGISTER for separate evaluation
 ```
 
 ## 2. Document Authority
@@ -84,7 +85,7 @@ Owns:
 - Event-level MBP-10 remains the source for book state, ordering, first-touch,
   and simulated execution.
 - One-second buckets are the default layer for intrabucket feature generation.
-- Five-minute closed buckets are the default AI discovery rows and signal
+- Five-minute closed buckets are the default discovery rows and signal
   decision interval.
 - A faster signal interval requires a separately registered research campaign
   and evidence that its economic value justifies the added data and execution
@@ -100,6 +101,9 @@ Owns:
 - Risk, emergency, roll, and delivery-avoidance exits override the strategy.
 - Discovery labels that do not resolve inside the registered observation window
   are censored, never silently dropped or counted as wins or losses.
+- M0a is a bounded engineering exception that explicitly preregisters a
+  volatility-normalized 30/60/120-minute label horizon. It is not a deployment
+  holding policy and cannot create Paper eligibility.
 
 ---
 
@@ -153,9 +157,9 @@ common champion beforehand.
 
 ---
 
-## 5. AI Research Loop
+## 5. Deterministic Research Loop and Optional Proposer
 
-### AI may inspect and propose
+### An optional external proposer may inspect and propose
 
 - Discovery-only feature rows, registered summaries, and representative event
   windows
@@ -169,7 +173,12 @@ common champion beforehand.
 - Bounded hyperparameter ranges
 - Failure analyses and next experiments
 
-### AI may not
+These proposals must be converted to an immutable epoch manifest before the
+daemon starts. The daemon continues normally when the proposer is absent,
+fails, or times out; the proposer cannot choose the next runtime experiment,
+approve a result, continue a spent epoch, or alter a budget.
+
+### AI and the daemon may not
 
 - Modify `VALIDATION.md`
 - Reuse the sealed holdout
@@ -179,6 +188,7 @@ common champion beforehand.
 - Inspect sealed-holdout features, labels, trades, or aggregate results before
   the artifact is frozen
 - Treat AI-visible chronological slices as independent evidence
+- Open sealed holdout data, promote to Paper/Live, or place an order
 
 Live authority and capital restrictions are governed by `DESIGN.md`.
 
@@ -205,6 +215,9 @@ execution_model
 train_validation_plan
 random_seed, when applicable
 parent_experiment_id
+dataset/feature/label/execution/code versions and hashes
+real candidate budget and null candidate budget
+admission rules and parent epoch
 ```
 
 Changing a parameter boundary or success criterion after execution creates a

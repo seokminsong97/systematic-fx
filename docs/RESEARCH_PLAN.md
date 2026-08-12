@@ -14,7 +14,8 @@
 
 This document bounds what Phase 1 may explore. It owns:
 
-- The AI-directed discovery workflow
+- The deterministic finite-budget discovery workflow and the optional
+  pre-epoch hypothesis-proposer boundary
 - Permitted data representations and feature families
 - Hypothesis families and their economic rationale
 - Strategy and model families
@@ -23,7 +24,9 @@ This document bounds what Phase 1 may explore. It owns:
 - Research priorities and stopping rules
 
 `VALIDATION.md` owns all pass/fail thresholds. This plan cannot weaken those
-thresholds or expose the sealed holdout to AI.
+thresholds or expose the sealed holdout to AI or the research daemon. An LLM
+may propose a hypothesis only outside the runtime loop; its absence or failure
+cannot block or steer an active epoch.
 
 The research objective is not to maximize prediction accuracy. It is to find a
 reproducible policy that converts point-in-time MBP-10 information into an

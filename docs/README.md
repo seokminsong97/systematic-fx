@@ -14,6 +14,9 @@
   PostgreSQL lifecycle, readiness commands, and recovery
 - [`RESEARCH_EXECUTION_STATUS.md`](RESEARCH_EXECUTION_STATUS.md): active Phase 1
   campaign boundary, gate order, data paths, verified contracts, and blockers
+- `epochs/m0a_fixture_v1.toml` plus `research/m0a`: finite-budget,
+  deterministic Discovery-only daemon walking skeleton (commands and holdout
+  boundary are documented in `RESEARCH_ENVIRONMENT.md`)
 
 ## Phase Designs
 

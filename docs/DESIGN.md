@@ -1,11 +1,11 @@
 # CME 6E Systematic Trading System
 
-- Document version: 1.7.0-draft
-- Revised: 2026-08-06
+- Document version: 1.8.0-draft
+- Revised: 2026-08-11
 - Status: `DRAFT`
 - Documentation language: English
 - Market: CME Euro FX Futures (`6E`), outright futures only
-- Default AI discovery and signal interval: 5 minutes
+- Default deterministic discovery and signal interval: 5 minutes
 - Intrabucket feature interval: 1 second where supported by the data
 - Exit model: price-barrier first touch with no alpha-imposed holding target
 - Live platform candidates: IBKR and AMP Futures with Rithmic
@@ -55,7 +55,8 @@ gross return is not sufficient.
 
 - CME `6E` only
 - Actual expiry contracts
-- AI-directed discovery on 5-minute feature rows built from verified MBP-10
+- Deterministic, finite-budget discovery on 5-minute feature rows built from
+  verified MBP-10
 - One-second intrabucket features when they preserve economically useful book
   dynamics
 - Event-level MBP-10 execution and first-touch validation
@@ -74,6 +75,9 @@ gross return is not sufficient.
 - Simultaneous Live trading on two platforms
 - Automatic broker failover
 - AI authority to approve Live trading, relax risk, or increase capital
+- LLM participation in the research daemon runtime control loop
+- Research-daemon authority to open sealed holdout data or promote a candidate
+  to Paper or Live
 - Strategies that depend on unverified provider behavior
 - Strategies whose result is only a forecast, score, or chart pattern and does
   not resolve to an executable bracket policy
@@ -85,9 +89,9 @@ gross return is not sufficient.
 ```text
 Historical MBP-10 data
     ↓
-One-second features and five-minute research rows
+Point-in-time event features and quote-aware first-passage labels
     ↓
-AI-directed data exploration and registered bracket strategies
+Finite, precommitted deterministic search epochs
     ↓
 Content-addressed date/contract event cache
     ↓
@@ -106,6 +110,25 @@ Promote / Scale / Reduce / Pause / Retire
 
 Risk management is cross-cutting. A minimum Risk Engine must be complete
 before Paper Trading and strengthened before Live trading and scaling.
+
+### Research-daemon invariant
+
+The research daemon may remain alive indefinitely without a human or LLM in
+its runtime control loop. Each research epoch is nevertheless finite and must
+freeze its dataset and feature/label/execution versions, code identity,
+strategy families, parameter and barrier ranges, real/null budgets, seeds,
+admission rules, and parent identity before the first candidate is queued. A
+spent epoch may finish registered work, retries, and reporting, but it may not
+generate more candidates or adapt its frozen search space after observing a
+result.
+
+The daemon's maximum authority is `REGISTER`. Search walk-forward output is
+exploratory search-data evidence, not final OOS evidence. Sealed holdout data
+must be absent from the daemon credential and storage namespace, and only a
+separately authorized process may ever evaluate it. The daemon cannot unseal a
+holdout, enter Paper, enter Live, or submit an order. An LLM may later propose
+hypotheses outside this loop, but failure or absence of that optional proposer
+cannot affect daemon health or progress.
 
 ### Historical replay invariant
 
@@ -169,20 +192,24 @@ their invalid-only observations are excluded from the economic stream.
 
 ## 5. Development Phases
 
-### Phase 1: AI Research and Backtesting
+### Phase 1: Deterministic Research and Backtesting
 
 Objectives:
 
-- Let AI inspect Discovery data through bounded, reproducible queries and
-  generate hypotheses from measured behavior.
+- Run bounded, reproducible Discovery epochs without an LLM in the runtime
+  control loop. Optional externally proposed hypotheses must be frozen before
+  an epoch starts.
 - Convert every candidate into a directional entry policy with take-profit and
   stop-loss prices.
 - Implement and test each hypothesis reproducibly.
 - Measure performance with realistic costs, latency, spread, slippage, and
   risk.
-- Send only strategies that pass `VALIDATION.md` to Paper Trading.
+- Register only search-data survivors for a separately authorized holdout,
+  forward-evidence, and promotion process.
 
-Paper entry does not require user approval. AI cannot change the pass criteria.
+The research daemon cannot enter Paper Trading. Holdout opening and Paper or
+Live promotion are separate authorized actions; neither may be inferred from a
+search-data result. No AI or daemon may change the frozen pass criteria.
 
 Design: [`PHASE_1_DESIGN.md`](phases/PHASE_1_DESIGN.md)
 
@@ -305,8 +332,9 @@ After selection, only one platform may hold Live order credentials.
 
 ## 8. Live Approval
 
-A strategy that passes backtesting may enter Paper Trading automatically.
-Explicit user approval is mandatory before real capital is used.
+A strategy that passes backtesting does not enter Paper Trading automatically.
+Paper entry requires a separately authorized promotion decision, and explicit
+user approval remains mandatory before real capital is used.
 
 The approval package must include:
 
@@ -332,7 +360,8 @@ Production orders are prohibited before approval.
 
 ## 9. Governing Risk Rules
 
-1. AI cannot place Live orders, change risk limits, or increase capital.
+1. AI and research daemons cannot place Paper or Live orders, change risk
+   limits, unseal holdout data, promote candidates, or increase capital.
 2. Exactly one automated Production broker writer may exist. Manual emergency
    actions must be detected and reconciled before automation continues.
 3. The selected broker is the operational source of truth for orders, fills,
@@ -370,7 +399,7 @@ evidence. Child designs may specialize these rules but cannot weaken them.
 RESEARCH
     ↓ validation pass
 BACKTEST_PASSED
-    ↓ automatic Paper deployment
+    ↓ separately authorized Paper promotion
 PAPER
     ↓ evidence package and user approval
 LIVE_APPROVED

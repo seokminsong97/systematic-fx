@@ -39,6 +39,31 @@ make notebook
 make db-stop
 ```
 
+## M0a deterministic research daemon
+
+M0a is a small, Discovery-only walking skeleton for one finite
+`pullback_continuation_v1` search family. It deliberately uses a checked-in,
+deterministic 6E MBP-10-like fixture with normal, roll, Friday, and session-close
+cases because the production dataset still lacks the verified point-in-time
+calendar/status references required for a research-eligible run. It does not
+claim alpha and it cannot access sealed holdout data, promote a candidate, or
+place an order.
+
+```bash
+uv run systematic-fx research m0a build-features
+uv run systematic-fx research m0a build-labels
+uv run systematic-fx research m0a run-epoch
+uv run systematic-fx research m0a daemon start --keep-alive
+uv run systematic-fx research m0a report
+uv run systematic-fx research m0a verify-invariants
+```
+
+The manifest at `epochs/m0a_fixture_v1.toml` freezes 12 real candidates and 24
+null/control experiments before execution. Local state is content-addressed
+below ignored `.local/m0a/`; generated Markdown goes below
+`reports/generated/`. Reruns verify or resume the same bytes and never enlarge
+the spent epoch budget.
+
 See [`RESEARCH_ENVIRONMENT.md`](docs/RESEARCH_ENVIRONMENT.md) for setup,
 configuration, command, PostgreSQL lifecycle, and recovery details.
 
