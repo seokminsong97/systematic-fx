@@ -104,6 +104,29 @@ the exact artifact chain without scanning for a substitute.
 See [`RESEARCH_ENVIRONMENT.md`](docs/RESEARCH_ENVIRONMENT.md) for setup,
 configuration, command, PostgreSQL lifecycle, and recovery details.
 
+## Autonomous AI pattern discovery
+
+The first bounded autonomous proposal run is now implemented and started. A
+feature-only symbolic AI examined the visible Discovery prefix—489 active days
+and 106,605 completed 5-minute decision bars—without labels, outcomes, PnL,
+walk-forward, or sealed holdout access. Its manifest precommits an exact
+620-rule catalog and a 12-proposal output budget, then freezes every request,
+compact context, result, and report in an append-only hash chain.
+
+```bash
+uv run systematic-fx research ai-pattern run --json     # one finite run only
+uv run systematic-fx research ai-pattern verify --json  # read-only exact replay
+```
+
+Batch 1 proposed 12 morphology rules from 620 candidates. Its durable batch
+SHA-256 is
+`46a038bc7af2aa4947389674d015f730d60d0f7ae25dadee25e661cf02153df6`.
+This is autonomous hypothesis generation, not performance or alpha evidence:
+the status remains `HYPOTHESES_GENERATED_AWAITING_ELIGIBLE_DATA`. The current
+M0b quote slice intentionally has zero entry-eligible labels, so the proposals
+will not be evaluated or registered as an M0b epoch until official
+schedule/status/active-contract evidence makes that transition honest.
+
 Environment readiness is not research-data eligibility. All 1,434 source files
 are fully hashed and registered as `HASHED` in PostgreSQL, but the dataset
 remains `VALIDATING`. The DRAFT campaign contains 60 registered a-priori parent

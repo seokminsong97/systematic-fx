@@ -59,6 +59,7 @@ systematic-fx/
 │   ├── data/                   # inventory, mappings, contracts, and quality gates
 │   ├── features/               # one-second and closed five-minute builders
 │   ├── research/               # bounded research engines, ledgers, registration
+│   │   ├── ai_*.py             # feature-only autonomous proposer and replay boundary
 │   │   ├── m0a/                # deterministic Discovery-only walking skeleton
 │   │   └── m0b/                # real bridge, first-passage shards, bounded worker
 │   ├── strategies/             # immutable executable bracket policies

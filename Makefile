@@ -10,7 +10,7 @@ QC_MANIFEST = data/derived/manifests/mbp10_structural_qc_v1.jsonl
 QC_MUTATION_MANIFEST = data/derived/manifests/mbp10_clean_trade_none_book_mutations_v1.jsonl
 QC_PROGRESS_EVERY ?= 250
 
-.PHONY: setup db-init db-start db-stop db-status db-bootstrap db-bootstrap-test db-up catalog hash data-register qc qc-inspect qc-register smoke pilot doctor test lint format notebook research-ready m0b-real-slice m0b-active-contract m0b-schedule-fixture m0b-status-fixture m0b-first-passage m0b-worker-cycle m0b-pg-gate m0b-holdout-verify m0b-worker-verify
+.PHONY: setup db-init db-start db-stop db-status db-bootstrap db-bootstrap-test db-up catalog hash data-register qc qc-inspect qc-register smoke pilot doctor test lint format notebook research-ready ai-pattern-run ai-pattern-verify m0b-real-slice m0b-active-contract m0b-schedule-fixture m0b-status-fixture m0b-first-passage m0b-worker-cycle m0b-pg-gate m0b-holdout-verify m0b-worker-verify
 
 setup:
 	$(UV) sync --all-extras --locked
@@ -77,6 +77,12 @@ notebook:
 	$(UV_RUN) jupyter lab
 
 research-ready: setup data-register smoke test doctor
+
+ai-pattern-run:
+	$(UV_RUN) systematic-fx research ai-pattern run --json
+
+ai-pattern-verify:
+	$(UV_RUN) systematic-fx research ai-pattern verify --json
 
 m0b-real-slice:
 	$(UV_RUN) systematic-fx research m0b materialize-real-slice

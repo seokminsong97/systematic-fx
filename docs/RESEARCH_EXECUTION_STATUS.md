@@ -658,3 +658,42 @@ No selected TP/SL or Production Buying/Sell/Loss price exists. The conclusion
 is limited to the exact V2B representation, thresholds, execution rules, costs,
 and Discovery interval; it is not a claim that every possible market-state
 representation is uninformative.
+
+## 16. Autonomous AI Pattern Proposal Batch 1 Started
+
+On 2026-08-13 the first outcome-blind autonomous proposal batch completed over
+the visible bar Discovery prefix. The model is a constrained symbolic AI, not
+an adaptive runtime optimizer: its manifest fixes an exact catalog of 620
+integer AND-rules and an exact output budget of 12 before any context is
+opened. It reads only completed 5-minute bar morphology. Labels, outcomes,
+costs, PnL, walk-forward, sealed holdout, database credentials, and promotion
+surfaces are absent from the context and proposer.
+
+```text
+visible active days:           489
+decision active days:          469
+visible completed 5m bars:     111,297
+decision-prefix 5m bars:       106,605
+finite candidates evaluated:   620
+support-eligible candidates:   576
+diversity rejections:          12
+proposals frozen:              12
+```
+
+The request SHA-256 is
+`8539fbce5ea6335edacdac8e2f6fed3b7b504614efc5bedc0f82c261e56735b7`;
+the reduced feature-only context SHA-256 is
+`2d1d72ad6f135513240d57d46000507ad1fd94f8c133863fcfb9de3df9e5e60e`;
+and the proposal-batch SHA-256 is
+`46a038bc7af2aa4947389674d015f730d60d0f7ae25dadee25e661cf02153df6`.
+An independent CLI replay reopened and reconstructed every source and result
+artifact and produced the same batch bytes. The persistent workstation
+database remained at migrations `(28, 28)` before and after the run.
+
+The terminal state is
+`HYPOTHESES_GENERATED_AWAITING_ELIGIBLE_DATA`. Support counts describe only how
+often a morphology occurred; they are not hit rates, returns, alpha, or
+strategy evidence. No M0b epoch was registered because the current real quote
+slice still has zero entry-eligible labels. This batch may advance only after a
+new governed transition binds research-eligible schedule, status, active
+contract, label, cost, null-control, and evaluation evidence.

@@ -1117,6 +1117,45 @@ def _m0b_worker_cycle_command(args: argparse.Namespace) -> int:
     return 1 if result.status == "FAILED" else 0
 
 
+def _ai_pattern_discovery_command(args: argparse.Namespace) -> int:
+    from systematic_fx.research.ai_discovery_context import AIDiscoveryContextError
+    from systematic_fx.research.ai_pattern_config import AIPatternConfigError
+    from systematic_fx.research.ai_pattern_discovery import PatternDiscoveryError
+    from systematic_fx.research.ai_pattern_run import (
+        AIPatternRunError,
+        publish_ai_pattern_markdown_report,
+        run_ai_pattern_research,
+        verify_ai_pattern_research,
+    )
+
+    try:
+        project_root = Path.cwd()
+        if args.ai_pattern_action == "run":
+            run = run_ai_pattern_research(project_root)
+            report_path = publish_ai_pattern_markdown_report(project_root, run)
+        else:
+            run = verify_ai_pattern_research(project_root)
+            report_path = project_root / "reports/generated/ai_pattern_discovery_batch_1.md"
+            if not report_path.is_file():
+                report_path = None
+    except (
+        AIDiscoveryContextError,
+        AIPatternConfigError,
+        AIPatternRunError,
+        FileNotFoundError,
+        OSError,
+        PatternDiscoveryError,
+        ValueError,
+    ) as error:
+        print(error, file=sys.stderr)
+        return 2
+    _m0a_emit(
+        {**run.as_dict(), "markdown_report_path": report_path},
+        emit_json=args.json,
+    )
+    return 0
+
+
 def _verify_holdout_isolation_command(args: argparse.Namespace) -> int:
     import psycopg
 
@@ -2025,6 +2064,27 @@ def build_parser() -> argparse.ArgumentParser:
     m0b_worker_cycle.add_argument("--expected-session-user")
     m0b_worker_cycle.add_argument("--json", action="store_true", help="emit JSON")
     m0b_worker_cycle.set_defaults(handler=_m0b_worker_cycle_command)
+
+    ai_pattern_parser = research_commands.add_parser(
+        "ai-pattern",
+        help="autonomously mine or replay the one finite outcome-blind Discovery proposal batch",
+    )
+    ai_pattern_commands = ai_pattern_parser.add_subparsers(
+        dest="ai_pattern_action",
+        required=True,
+    )
+    ai_pattern_run = ai_pattern_commands.add_parser(
+        "run",
+        help="precommit, mine, and freeze exactly twelve proposal-only hypotheses",
+    )
+    ai_pattern_run.add_argument("--json", action="store_true", help="emit JSON")
+    ai_pattern_run.set_defaults(handler=_ai_pattern_discovery_command)
+    ai_pattern_verify = ai_pattern_commands.add_parser(
+        "verify",
+        help="reopen every input/artifact and deterministically reproduce the frozen batch",
+    )
+    ai_pattern_verify.add_argument("--json", action="store_true", help="emit JSON")
+    ai_pattern_verify.set_defaults(handler=_ai_pattern_discovery_command)
 
     exposure_parser = research_commands.add_parser(
         "exposure",

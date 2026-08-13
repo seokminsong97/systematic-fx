@@ -1,0 +1,53 @@
+schema_version = "systematic_fx.ai_pattern_discovery_config.v1"
+config_id = "ai_pattern_discovery_v1"
+request_key = "ai_pattern_discovery_2026_08_13_v1"
+authority = "PROPOSE_CANDIDATES_ONLY"
+proposer_mode = "DETERMINISTIC_OUTCOME_BLIND_V1"
+provider_id = "SYSTEMATIC_FX_LOCAL"
+model_id = "OUTCOME_BLIND_SUPPORT_STABILITY_DIVERSITY"
+model_version = "v1"
+precommitted_at_utc = "2026-08-13T00:00:00Z"
+deterministic_seed = 20260813
+candidate_evaluation_budget = 620
+candidate_catalog_sha256 = "b5ab777126eace96858c57cf619a954195d19187902bc1b6fbf56b8e1ad90ef3"
+code_commit = "ee8e307833eb25c5eff0581e5d65c6daea1af5e1"
+proposer_implementation_sha256 = "f1cafb5e279596e0537fb56bcd3f8c4e98fd94bb0591b65f8519b08570aee24e"
+dependency_lock_sha256 = "d5192590f9c80d3c2f23f65323d4963ee3fb9aa209301770651f4376c491bd1b"
+
+[source]
+context_sha256 = "a7219ac7c2a27f16cdbdfae58a9fe17c4d69372d315444987cc3605c4ff633a4"
+context_identity_sha256 = "12de34f325b5788330401e10275cad8e06471d589f561b003387d220c25806cd"
+feature_version = "completed_5m_bar_morphology_v1"
+discovery_split_sha256 = "5594725f6769a706018d414a5b27e3903f1d7d1cc22c98e93b6e973ead1af043"
+source_interval_start = "2022-01-03"
+source_interval_end = "2023-07-10"
+visible_active_days = 489
+decision_active_days = 469
+source_bar_rows = 111297
+decision_bar_rows = 106605
+expected_context_bins = 84207
+
+[budgets]
+max_source_rows = 120000
+max_context_bins = 120000
+proposal_budget = 12
+max_predicates_per_rule = 3
+max_model_calls = 0
+max_input_tokens = 0
+max_output_tokens = 0
+max_response_bytes = 0
+
+[selection]
+minimum_support_rows = 500
+minimum_session_count = 80
+minimum_stability_ppm = 0
+maximum_pairwise_overlap_ppm = 950000
+ranking_inputs = ["SUPPORT", "SESSION_STABILITY", "SIGNAL_DIVERSITY"]
+
+[status]
+terminal_status = "HYPOTHESES_GENERATED_AWAITING_ELIGIBLE_DATA"
+performance_evaluated = false
+m0b_epoch_registered = false
+persistent_database_mutated = false
+walk_forward_touched = false
+sealed_holdout_touched = false

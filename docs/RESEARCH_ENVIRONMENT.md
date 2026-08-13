@@ -614,6 +614,36 @@ This reads one row group from the fixed early-Discovery fixture. It verifies the
 event schema and basic structural invariants only; it is not a whole-dataset
 quality pass and cannot produce research evidence.
 
+### Autonomous proposal-only AI research
+
+The first autonomous proposer is intentionally outside the M0b worker and
+PostgreSQL mutation boundary. It receives one content-addressed Discovery-only
+bar-morphology context, evaluates the exact 620-rule catalog frozen in
+`configs/research/ai_pattern_discovery_v1.toml`, and publishes exactly 12
+hypotheses to an append-only predecessor-hash ledger. It cannot inspect labels,
+outcomes, PnL, walk-forward, or sealed holdout state, and it has no database
+URL or promotion API.
+
+```bash
+make ai-pattern-run       # allowed exactly once for the frozen request
+make ai-pattern-verify    # read-only source/artifact reconstruction
+```
+
+The durable ignored root is
+`data/derived/bar_patterns/ai_pattern_discovery_v1/`. The public command does
+not accept another root, provider, budget, or threshold grid. A second `run`
+is rejected instead of expanding the exposed search. `verify` does not create
+or rewrite evidence; it reopens the approved 489-day source context, rebuilds
+the 106,605-row decision projection and 620-rule batch, and byte-compares all
+four immutable artifacts. The generated Markdown is a convenience view only;
+the canonical JSON report and ledger are the evidence.
+
+The completed batch status is
+`HYPOTHESES_GENERATED_AWAITING_ELIGIBLE_DATA`. It is a research start at the
+hypothesis-generation stage, not a performance run. The M0b worker remains
+idle for these proposals until research-eligible schedule/status/active-
+contract coverage and a separately frozen label/null/evaluation epoch exist.
+
 ### Non-research pilot and governed registration
 
 ```bash

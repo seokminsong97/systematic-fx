@@ -268,6 +268,10 @@ Objectives:
 - Run bounded, reproducible Discovery epochs without an LLM in the runtime
   control loop. Optional externally proposed hypotheses must be frozen before
   an epoch starts.
+- Generate candidate hypotheses autonomously through a feature-only symbolic
+  AI outside the worker. Its exact catalog, context, output budget, request,
+  and implementation identity are frozen before scoring; it has proposal-only
+  authority and cannot inspect labels or expand an epoch.
 - Convert every candidate into a directional entry policy with take-profit and
   stop-loss prices.
 - Implement and test each hypothesis reproducibly.
