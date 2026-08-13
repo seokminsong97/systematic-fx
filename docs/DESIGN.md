@@ -130,6 +130,34 @@ holdout, enter Paper, enter Live, or submit an order. An LLM may later propose
 hypotheses outside this loop, but failure or absence of that optional proposer
 cannot affect daemon health or progress.
 
+M0b defines that authority boundary in PostgreSQL. One `m0b_epochs` row binds a
+single frozen campaign to its canonical manifest and exact dataset, scheduled
+CME calendar, contract reference, Discovery split, feature, label, execution,
+cost, engine, dependency lock, code, retry ceiling, and finite REAL/NULL budgets.
+Candidate RunSpecs must be `SCREEN` runs
+with `SEARCH`/`DISCOVERY` parameters, and successful attempts, exact result
+artifact links, and `SCREENED_OUT` or `REGISTERED` candidate states commit
+together. Checkpoint chains and linked artifact bytes are append-preserved.
+The database rejects RunSpecs before epoch registration, attempts before
+candidate registration, lifecycle regression, unfinished epoch failure, and
+post-terminal mutation; this prevents a generic ledger row from bypassing the
+M0b authority boundary.
+No M0b table or procedure represents holdout opening, Paper/Live eligibility,
+or order authority. The current M0b PostgreSQL path is a control-plane API and
+disposable lifecycle gate, not yet a production daemon runner: candidate
+RunSpec and budget-row registration must use the atomic
+`register_m0b_candidate` boundary, and a separately provisioned unprivileged
+login must pass the deployment verifier before a governed real epoch may run.
+That verifier currently proves a denial-only credential and intentionally
+rejects direct M0b ledger DML and all reachable `SECURITY DEFINER` routines; a
+future worker needs a separately audited, allowlisted mutation API.
+
+The scheduled CME reference and trading-status evidence are distinct inputs.
+A scheduled-open interval proves only that a known close is not crossed; it
+does not prove the market was continuously tradable. Consequently a real M0b
+label stays ineligible whenever status coverage is absent, even if its
+quote-aware first-passage outcome can be computed for pipeline diagnostics.
+
 ### Historical replay invariant
 
 Phase 1 raw MBP-10 files are qualification and cache-construction inputs, not

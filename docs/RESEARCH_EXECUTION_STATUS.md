@@ -1,7 +1,7 @@
 # Phase 1 Research Execution Status
 
 - Started: 2026-08-03
-- Updated: 2026-08-11
+- Updated: 2026-08-12
 - Campaigns: `phase1_discovery_v1`, `phase1a_conservative_screening_v1`, and
   `bar_pattern_discovery_v1`; the completed state-model lineage is
   `bar_state_conditional_v2` -> `v2a` -> `v2b`
@@ -31,6 +31,18 @@ Discovery run with twelve rejected candidates and no finalist. Its predecessor
 failures, exact schema-only amendment, and completed result are recorded in
 [`research/BAR_STATE_CONDITIONAL_V2B.md`](research/BAR_STATE_CONDITIONAL_V2B.md).
 No walk-forward or holdout access is authorized for this branch.
+
+M0a is now a complete finite-budget engineering walking skeleton on a
+deterministic fixture. M0b adds a bounded real-MBP-10 mechanics bridge and the
+unapplied migration `0029` for a future governed search-data epoch. The actual
+bridge materializes successfully, but every label is deliberately
+non-entry-eligible: scheduled CME hours are verified only for the narrow
+2022-08-30..09-03 reference window, unscheduled trading status is not covered,
+and the staged Z2 transition context is not a previous-day-volume active
+selection. No M0b performance epoch, walk-forward, sealed-holdout evaluation,
+Paper, or Live action is authorized. The workstation also remains
+`NOT_PROVISIONED` until an actual non-superuser daemon LOGIN passes the physical
+sealed-schema denied-read and forbidden-DML verifier.
 
 A-priori proposals belong in `experiments` with no `pattern_id`. Only patterns
 actually observed in a registered Discovery exposure belong in

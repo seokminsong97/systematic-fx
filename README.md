@@ -64,6 +64,39 @@ below ignored `.local/m0a/`; generated Markdown goes below
 `reports/generated/`. Reruns verify or resume the same bytes and never enlarge
 the spent epoch budget.
 
+## M0b bounded real-data bridge
+
+M0b now has a deliberately small real CME 6E bridge, not a full research
+epoch. The checked-in CME reference and real-slice manifest stream an exact
+four-file allowlist into three four-hour contexts (normal, contract transition,
+and Friday close), then publish content-addressed one-second quote/trade,
+point-in-time feature, and quote-aware label artifacts. The canonical local
+gate produced 33,854 quote seconds, 144 feature rows, and 7,776 labels.
+
+```bash
+uv run systematic-fx research m0b materialize-real-slice
+
+SYSTEMATIC_FX_RUN_M0B_REAL_SLICE=1 \
+  uv run python -B -m pytest \
+  tests/integration/test_m0b_real_slice_materialization.py -q
+
+SYSTEMATIC_FX_RUN_M0B_PG_GATE=1 \
+  uv run pytest tests/integration/test_m0b_control_plane_postgres.py \
+  tests/integration/test_m0b_holdout_provisioning_postgres.py -q -s
+```
+
+Every real label is intentionally non-entry-eligible: the bounded CME calendar
+proves scheduled hours but not unscheduled trading status, and the September 1
+Z2 sample is contract-transition context rather than a previous-day-volume
+active-contract selection. Migration `0029` supplies the finite PostgreSQL
+search control plane for later governed epochs; no production M0b worker is
+claimed yet. The separate holdout provisioning SQL and verifier live under
+`deploy/postgres/` and `scripts/`; the current workstation remains
+`NOT_PROVISIONED` until an actual unprivileged daemon login and separate sealed
+storage credential pass the denied-read gate. `materialize-real-slice` is
+idempotent by content hash; `verify-real-slice --build <build-...json>` reopens
+the exact artifact chain without scanning for a substitute.
+
 See [`RESEARCH_ENVIRONMENT.md`](docs/RESEARCH_ENVIRONMENT.md) for setup,
 configuration, command, PostgreSQL lifecycle, and recovery details.
 

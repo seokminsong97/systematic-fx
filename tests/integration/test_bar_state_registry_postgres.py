@@ -1372,7 +1372,7 @@ def _complete_gate_campaign_lifecycle(
 def test_bar_state_v2_postgresql_release_gate(tmp_path: Path) -> None:
     database_url = _disposable_database_url()
     migrations = discover_migrations(ROOT / "migrations")
-    assert tuple(item.version for item in migrations) == tuple(range(1, 29))
+    assert tuple(item.version for item in migrations) == tuple(range(1, 30))
     migration_by_version = {item.version: item for item in migrations}
     assert migration_by_version[24].checksum == EXPECTED_MIGRATION_0024_SHA256
     assert migration_by_version[25].checksum == EXPECTED_MIGRATION_0025_SHA256
@@ -1384,7 +1384,7 @@ def test_bar_state_v2_postgresql_release_gate(tmp_path: Path) -> None:
         directory=ROOT / "migrations",
         psql_binary=os.environ.get("SYSTEMATIC_FX_PSQL"),
     )
-    assert first.applied == tuple(range(1, 29))
+    assert first.applied == tuple(range(1, 30))
     assert first.skipped == ()
     repeated = apply_migrations(
         database_url,
@@ -1392,7 +1392,7 @@ def test_bar_state_v2_postgresql_release_gate(tmp_path: Path) -> None:
         psql_binary=os.environ.get("SYSTEMATIC_FX_PSQL"),
     )
     assert repeated.applied == ()
-    assert repeated.skipped == tuple(range(1, 29))
+    assert repeated.skipped == tuple(range(1, 30))
 
     with psycopg.connect(database_url, row_factory=dict_row) as connection:
         latest = connection.execute(
@@ -1424,9 +1424,9 @@ def test_bar_state_v2_postgresql_release_gate(tmp_path: Path) -> None:
             """
         ).fetchone()
     assert latest == {
-        "version": 28,
-        "name": "phase1a_p4_paired_outcomes",
-        "checksum": migration_by_version[28].checksum,
+        "version": 29,
+        "name": "m0b_governed_control_plane",
+        "checksum": migration_by_version[29].checksum,
     }
     assert trigger_count == 1
     assert canonical_index_guard == {
@@ -2429,20 +2429,20 @@ def test_bar_state_v2_postgresql_release_gate(tmp_path: Path) -> None:
 def test_bar_state_v2a_postgresql_release_gate(tmp_path: Path) -> None:
     database_url = _disposable_v2a_database_url()
     migrations = discover_migrations(ROOT / "migrations")
-    assert tuple(item.version for item in migrations) == tuple(range(1, 29))
+    assert tuple(item.version for item in migrations) == tuple(range(1, 30))
     first = apply_migrations(
         database_url,
         directory=ROOT / "migrations",
         psql_binary=os.environ.get("SYSTEMATIC_FX_PSQL"),
     )
-    assert first.applied == tuple(range(1, 29))
+    assert first.applied == tuple(range(1, 30))
     repeated = apply_migrations(
         database_url,
         directory=ROOT / "migrations",
         psql_binary=os.environ.get("SYSTEMATIC_FX_PSQL"),
     )
     assert repeated.applied == ()
-    assert repeated.skipped == tuple(range(1, 29))
+    assert repeated.skipped == tuple(range(1, 30))
 
     _seed_dataset(
         database_url,
@@ -3052,28 +3052,28 @@ def test_bar_state_v2a_postgresql_release_gate(tmp_path: Path) -> None:
     }
     assert link_counts == {"links": 144, "global_identities": 1}
     assert predecessor_snapshot_after == predecessor_snapshot
-    assert latest["version"] == 28
-    assert latest["name"] == "phase1a_p4_paired_outcomes"
+    assert latest["version"] == 29
+    assert latest["name"] == "m0b_governed_control_plane"
     assert latest["checksum"] == migrations[-1].checksum
 
 
 def test_bar_state_v2b_postgresql_release_gate(tmp_path: Path) -> None:
     database_url = _disposable_v2b_database_url()
     migrations = discover_migrations(ROOT / "migrations")
-    assert tuple(item.version for item in migrations) == tuple(range(1, 29))
+    assert tuple(item.version for item in migrations) == tuple(range(1, 30))
     first = apply_migrations(
         database_url,
         directory=ROOT / "migrations",
         psql_binary=os.environ.get("SYSTEMATIC_FX_PSQL"),
     )
-    assert first.applied == tuple(range(1, 29))
+    assert first.applied == tuple(range(1, 30))
     repeated = apply_migrations(
         database_url,
         directory=ROOT / "migrations",
         psql_binary=os.environ.get("SYSTEMATIC_FX_PSQL"),
     )
     assert repeated.applied == ()
-    assert repeated.skipped == tuple(range(1, 29))
+    assert repeated.skipped == tuple(range(1, 30))
     _seed_dataset(
         database_url,
         tmp_path,
@@ -3574,7 +3574,7 @@ def test_bar_state_v2b_postgresql_release_gate(tmp_path: Path) -> None:
         ).fetchone()
     assert v2a_snapshot_after == v2a_snapshot
     assert latest == {
-        "version": 28,
-        "name": "phase1a_p4_paired_outcomes",
+        "version": 29,
+        "name": "m0b_governed_control_plane",
         "checksum": migrations[-1].checksum,
     }

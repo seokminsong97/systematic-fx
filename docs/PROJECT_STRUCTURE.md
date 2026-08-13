@@ -59,7 +59,8 @@ systematic-fx/
 │   ├── data/                   # inventory, mappings, contracts, and quality gates
 │   ├── features/               # one-second and closed five-minute builders
 │   ├── research/               # bounded research engines, ledgers, registration
-│   │   └── m0a/                # deterministic Discovery-only walking skeleton
+│   │   ├── m0a/                # deterministic Discovery-only walking skeleton
+│   │   └── m0b/                # bounded real MBP-10 materialization bridge
 │   ├── strategies/             # immutable executable bracket policies
 │   ├── backtest/               # event replay, fills, OCO, costs, and metrics
 │   ├── validation/             # splitter, walk-forward, stress, and holdout
@@ -80,8 +81,9 @@ provider contracts are measured.
 
 The M0a daemon uses an ignored local SQLite/WAL ledger and content-addressed
 JSONL inputs below `.local/m0a/`. This is an engineering walking skeleton, not
-governed performance evidence in PostgreSQL. It intentionally leaves the
-checksum-frozen PostgreSQL migrations `0001`–`0028` unchanged.
+governed performance evidence in PostgreSQL. M0b adds migration `0029` for
+future finite-budget search evidence plus a bounded real-data adapter; the
+current real rows stay non-entry-eligible until trading-status coverage exists.
 
 ## 3. Storage Boundaries
 
@@ -146,6 +148,10 @@ generated files remain out of Git.
 - `research.m0a` may use only its explicitly staged Discovery fixture/input
   artifacts. It cannot import holdout credentials, invoke an LLM, or call a
   broker/promotion package.
+- `research.m0b` may open only the exact source allowlist and output root in its
+  immutable manifest. It treats the CME schedule and trading-status feed as
+  separate contracts and cannot assert active selection or entry eligibility
+  when either proof is missing.
 - `backtest` consumes validated events and frozen strategies; it cannot mutate
   either.
 - `validation` orchestrates frozen backtests over deterministic splits.

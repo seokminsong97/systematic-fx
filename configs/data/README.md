@@ -27,3 +27,12 @@ calendar. It does not convert the full-dataset `FAIL` into a pass, and it does
 not yet make the campaign research-eligible. Reconsideration requires
 point-in-time `status` evidence, preferably matching MBO reconstruction, and a
 new checker/config version; a hard-coded 22:00 UTC exception is prohibited.
+
+`cme_6e_reference_v1.toml` is the bounded M0b scheduled-hours and contract
+reference for 2022-08-30 through 2022-09-03. It records the regular CME Globex
+17:00–16:00 America/Chicago session, the one-hour scheduled break, 6EU2/6EZ2
+tick and delivery metadata, and a five-business-day roll guard. Its
+`status_coverage=false` field is deliberate: a published schedule cannot prove
+unscheduled halts or point-in-time trading status, so this reference can reject
+scheduled closed-market crossings but cannot make real rows entry-eligible by
+itself.

@@ -842,6 +842,84 @@ def _m0a_verify_invariants_command(args: argparse.Namespace) -> int:
     return 0 if result.valid else 1
 
 
+def _m0b_real_slice_command(args: argparse.Namespace) -> int:
+    from systematic_fx.research.m0b import (
+        RealSliceError,
+        load_materialized_real_slice,
+        load_real_slice_config,
+        materialize_real_slice,
+        verify_real_slice,
+    )
+
+    settings = Settings.from_env()
+    try:
+        config = load_real_slice_config(args.config)
+        output_root = (
+            args.output_root if args.output_root is not None else Path.cwd() / config.staged_root
+        )
+        if args.m0b_action == "materialize-real-slice":
+            build = materialize_real_slice(
+                config,
+                data_root=args.data_root or settings.data_root,
+                output_root=output_root,
+            )
+        else:
+            if args.build is None:
+                raise RealSliceError("--build is required for verify-real-slice")
+            build = load_materialized_real_slice(args.build)
+            verify_real_slice(
+                build,
+                config,
+                data_root=args.data_root or settings.data_root,
+                staged_root=output_root,
+            )
+    except (FileNotFoundError, OSError, RealSliceError) as error:
+        print(error, file=sys.stderr)
+        return 2
+    _m0a_emit(
+        {
+            **build.as_dict(),
+            "build_sha256": build.sha256,
+            "status": "SEARCH_CONTEXT_ONLY_STATUS_UNVERIFIED",
+        },
+        emit_json=args.json,
+    )
+    return 0
+
+
+def _verify_holdout_isolation_command(args: argparse.Namespace) -> int:
+    import psycopg
+
+    from systematic_fx.db.holdout_isolation import (
+        HoldoutIsolationError,
+        verify_research_holdout_isolation,
+    )
+
+    database_url = args.database_url or os.environ.get("SYSTEMATIC_FX_RESEARCH_DATABASE_URL")
+    expected_session_user = args.expected_session_user or os.environ.get(
+        "SYSTEMATIC_FX_RESEARCH_DATABASE_USER"
+    )
+    if not database_url or not expected_session_user:
+        print(
+            "research database URL and expected session user are required",
+            file=sys.stderr,
+        )
+        return 2
+    try:
+        report = verify_research_holdout_isolation(
+            database_url,
+            expected_session_user=expected_session_user,
+        )
+    except (HoldoutIsolationError, psycopg.Error) as error:
+        _m0a_emit(
+            {"status": "NOT_PROVISIONED", "error": str(error)},
+            emit_json=args.json,
+        )
+        return 2
+    _m0a_emit(report, emit_json=args.json)
+    return 0
+
+
 def _phase1a_p5_equivalence_audit_command(args: argparse.Namespace) -> int:
     from systematic_fx.research.outcome_equivalence_audit import (
         OutcomeEquivalenceAuditError,
@@ -1566,6 +1644,37 @@ def build_parser() -> argparse.ArgumentParser:
     add_m0a_common(m0a_verify)
     m0a_verify.set_defaults(handler=_m0a_verify_invariants_command)
 
+    m0b_parser = research_commands.add_parser(
+        "m0b",
+        help="materialize or verify the bounded search-only real CME 6E bridge",
+    )
+    m0b_commands = m0b_parser.add_subparsers(dest="m0b_action", required=True)
+
+    def add_m0b_real_slice_common(command: argparse.ArgumentParser) -> None:
+        command.add_argument(
+            "--config",
+            type=Path,
+            default=Path("configs/research/m0b_real_slice_v1.toml"),
+        )
+        command.add_argument("--data-root", type=Path)
+        command.add_argument("--output-root", type=Path)
+        command.add_argument("--json", action="store_true", help="emit JSON")
+
+    m0b_materialize = m0b_commands.add_parser(
+        "materialize-real-slice",
+        help="stream the exact four-file allowlist into immutable quote/features/labels",
+    )
+    add_m0b_real_slice_common(m0b_materialize)
+    m0b_materialize.set_defaults(handler=_m0b_real_slice_command)
+
+    m0b_verify = m0b_commands.add_parser(
+        "verify-real-slice",
+        help="reopen one exact build manifest and verify every content-addressed artifact",
+    )
+    add_m0b_real_slice_common(m0b_verify)
+    m0b_verify.add_argument("--build", type=Path, required=True)
+    m0b_verify.set_defaults(handler=_m0b_real_slice_command)
+
     exposure_parser = research_commands.add_parser(
         "exposure",
         help="record one immutable AI-visible query or non-research pipeline pilot",
@@ -1584,6 +1693,15 @@ def build_parser() -> argparse.ArgumentParser:
     migrate_parser.add_argument("--database-url")
     migrate_parser.add_argument("--migrations-dir", type=Path)
     migrate_parser.set_defaults(handler=_migrate_command)
+
+    holdout_verify_parser = db_commands.add_parser(
+        "verify-holdout-isolation",
+        help="prove sealed-holdout denial from the daemon's actual unprivileged login",
+    )
+    holdout_verify_parser.add_argument("--database-url")
+    holdout_verify_parser.add_argument("--expected-session-user")
+    holdout_verify_parser.add_argument("--json", action="store_true", help="emit JSON")
+    holdout_verify_parser.set_defaults(handler=_verify_holdout_isolation_command)
 
     local_parser = db_commands.add_parser(
         "local",

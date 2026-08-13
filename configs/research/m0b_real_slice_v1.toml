@@ -1,0 +1,123 @@
+[slice]
+schema_version = 1
+slice_id = "m0b-cme-6e-roll-slice-v1"
+source_schema = "GLBX.MDP3/mbp-10"
+reference_config = "configs/data/cme_6e_reference_v1.toml"
+source_manifest = "data/derived/manifests/mbp10_source_sha256_v1.jsonl"
+source_manifest_sha256 = "14db710d8a522a83d495faeac1c05c9a0169f80f088dfbeb7a66b38f14b6e3de"
+reference_config_sha256 = "43b58dd0a4f69efffb5f34e6d649bbca56afffecf631c5ef74de5f2c8ac6f721"
+staged_root = "artifacts/research/m0b_real_slice_v1"
+source_dates = [2022-08-30, 2022-08-31, 2022-09-01, 2022-09-02]
+trading_dates = [2022-08-31, 2022-09-01, 2022-09-02]
+roles = ["NORMAL", "CONTRACT_TRANSITION_CONTEXT_NOT_ACTIVE_SELECTION", "FRIDAY"]
+expected_contracts = ["6EU2", "6EZ2", "6EZ2"]
+expected_instrument_ids = [44629, 191026, 191026]
+active_selection_proven = [false, false, false]
+max_source_dates = 4
+max_trading_dates = 3
+research_authority = "SEARCH_ONLY_NOT_HOLDOUT_NOT_FORWARD"
+session_policy = "NO_CROSS_CLOSED_MARKET"
+
+# These are observed raw trade rows/volume from the exact previous UTC source
+# file. They are provenance/context evidence only: a CME trading-date session
+# spans two UTC partitions, and the schedule-only v1 reference cannot prove an
+# active execution contract. Sep-1 explicitly demonstrates that 6EZ2 was not
+# the previous-source-volume winner.
+[[previous_source_volume_context]]
+trading_date = 2022-08-31
+evidence_source_date = 2022-08-30
+selected_raw_symbol = "6EU2"
+selected_trade_rows = 84305
+selected_trade_volume = 248296
+other_raw_symbol = "6EZ2"
+other_trade_rows = 942
+other_trade_volume = 1755
+
+[[previous_source_volume_context]]
+trading_date = 2022-09-01
+evidence_source_date = 2022-08-31
+selected_raw_symbol = "6EZ2"
+selected_trade_rows = 1163
+selected_trade_volume = 2850
+other_raw_symbol = "6EU2"
+other_trade_rows = 88671
+other_trade_volume = 261517
+
+[[previous_source_volume_context]]
+trading_date = 2022-09-02
+evidence_source_date = 2022-09-01
+selected_raw_symbol = "6EZ2"
+selected_trade_rows = 1652
+selected_trade_volume = 4894
+other_raw_symbol = "6EU2"
+other_trade_rows = 83265
+other_trade_volume = 263027
+
+[versions]
+source_adapter_version = "m0b_real_mbp10_slice_v1"
+feature_version = "m0b_real_event_features_v1"
+label_version = "m0b_real_quote_first_passage_v1"
+execution_model_version = "m0b_actual_trade_through_v1"
+
+[execution]
+tick_size_raw = 50000
+route_delay_seconds = 1
+entry_adverse_ticks = 1
+tp_trade_through_ticks = 1
+round_trip_cost_ticks = 2
+
+[materialization]
+# Each offset is relative to the corresponding CME trading-session open.  The
+# first two windows cover liquid daytime trading; the final window ends at the
+# Friday scheduled close so NO_CROSS_CLOSED_MARKET exclusions are exercised.
+window_start_seconds = [54000, 54000, 68400]
+window_duration_seconds = 14400
+decision_clock_seconds = 300
+atr_lookback_bars = 12
+quantile_lookback_bars = 12
+short_trend_lookback_bars = 3
+batch_rows = 65536
+max_selected_raw_events = 3000000
+max_quote_seconds = 43200
+max_feature_rows = 144
+max_label_rows = 7776
+barrier_k_tp_numerators = [3, 4, 5]
+barrier_k_tp_denominator = 4
+barrier_k_sl_numerators = [2, 3, 4]
+barrier_k_sl_denominator = 4
+max_hold_seconds = [1800, 3600, 7200]
+
+[[sources]]
+source_date = 2022-08-30
+relative_uri = "2022/08/30/glbx-mdp3-20220830.mbp-10.parquet"
+sha256 = "ff3c914e26305238ff9af29d60e0a0910d9267eb00beda44c8e693ab919538f1"
+
+[[sources]]
+source_date = 2022-08-31
+relative_uri = "2022/08/31/glbx-mdp3-20220831.mbp-10.parquet"
+sha256 = "8434edbd678735f413a6427cb1477f153405e9c7a4f30c8038bd74d3abc670d1"
+
+[[sources]]
+source_date = 2022-09-01
+relative_uri = "2022/09/01/glbx-mdp3-20220901.mbp-10.parquet"
+sha256 = "2601a0e59440247f63115182811d8ce66d2684f6cb6062b738814bb125c87af9"
+
+[[sources]]
+source_date = 2022-09-02
+relative_uri = "2022/09/02/glbx-mdp3-20220902.mbp-10.parquet"
+sha256 = "4583b351dba19166b10535d1d8d6f51b8e300630c3b5c3f891301eabd03f01b3"
+
+[[cache_expectations]]
+source_date = 2022-08-31
+raw_symbol = "6EU2"
+status = "PRESENT"
+
+[[cache_expectations]]
+source_date = 2022-09-01
+raw_symbol = "6EZ2"
+status = "MISSING_BUILD_FROM_RAW"
+
+[[cache_expectations]]
+source_date = 2022-09-02
+raw_symbol = "6EZ2"
+status = "PRESENT"

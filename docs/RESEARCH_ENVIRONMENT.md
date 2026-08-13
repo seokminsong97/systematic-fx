@@ -216,15 +216,57 @@ leases become `CRASHED` and receive a new numbered attempt; an exact successful
 rerun reopens the stored artifact. `report` writes an exploratory Markdown
 report below `reports/generated/`; no output is Paper- or Live-eligible.
 
-The SQLite ledger is intentionally local and Discovery-only. It does not
-replace PostgreSQL governance for a future production-scale epoch, and M0a adds
-no migration after the frozen `0001`–`0028` lineage.
+The SQLite ledger is intentionally local and Discovery-only. It remains the
+M0a fixture authority. M0b migration `0029` adds a separate PostgreSQL
+finite-budget search ledger for later governed real-data epochs; it does not
+retroactively turn the M0a fixture into market evidence.
+
+The PostgreSQL M0b control plane currently has no production worker/daemon
+launcher. Its public registration boundary is
+`systematic_fx.db.m0b_registry.register_m0b_candidate`, which inserts the
+immutable RunSpec and its budgeted candidate atomically. Direct generic
+RunSpec registration is deliberately rejected for an M0b campaign. Running a
+real performance epoch remains a later M0b step after trading-status coverage,
+active-contract evidence, a real worker, and the actual-login isolation gate.
+
+### M0b real-slice bridge
+
+`configs/data/cme_6e_reference_v1.toml` and
+`configs/research/m0b_real_slice_v1.toml` freeze a four-source-file, three-
+session bridge through the actual MBP-10 reader. The materializer reads only
+the allowlisted contract and four-hour window, retains raw event order for
+same-second TP/SL fallback, and publishes content-addressed quote-second,
+feature, label, and build manifests. Passive TP needs an aggressor-side trade
+through; executable quote touch alone is insufficient.
+
+The observed 2022-08-31 volumes were U2 261,517 versus Z2 2,850. Therefore the
+September 1 Z2 slice is explicitly
+`CONTRACT_TRANSITION_CONTEXT_NOT_ACTIVE_SELECTION`, not a point-in-time active
+contract claim. Every materialized label keeps `status_coverage=false` and
+`entry_eligible=false`; mechanically valid outcomes carry
+`SCHEDULE_ONLY_STATUS_UNVERIFIED`, because the CME schedule cannot prove an
+unscheduled halt. These rows test mechanics and lineage only; they cannot enter
+the search daemon as eligible trades.
+
+```bash
+# Exact allowlist → content-addressed source/quote/feature/label/build bytes.
+uv run systematic-fx research m0b materialize-real-slice
+
+# Reopen the exact returned build filename without substitute discovery.
+uv run systematic-fx research m0b verify-real-slice \
+  --build artifacts/research/m0b_real_slice_v1/build-<sha256>.json
+
+# Fresh disposable PostgreSQL 1..29 plus lifecycle and negative gates.
+SYSTEMATIC_FX_RUN_M0B_PG_GATE=1 \
+  uv run pytest tests/integration/test_m0b_control_plane_postgres.py \
+  tests/integration/test_m0b_holdout_provisioning_postgres.py -q -s
+```
 
 ### Sealed-holdout deployment boundary
 
-The current workstation PostgreSQL bootstrap does **not** create separate
-research and holdout roles, and a logical `SEALED` marker alone is not a SELECT
-permission boundary. M0a therefore fails closed at the process boundary:
+The ordinary workstation PostgreSQL bootstrap does **not** provision a distinct
+research daemon LOGIN credential. A logical `SEALED` marker alone is not a
+SELECT permission boundary. M0a therefore fails closed at the process boundary:
 
 - its manifest schema rejects holdout/sealed/credential/path keys;
 - startup fails if any `SYSTEMATIC_FX_HOLDOUT_*` variable is present;
@@ -232,7 +274,7 @@ permission boundary. M0a therefore fails closed at the process boundary:
 - no holdout evaluator, unseal, promotion, Paper, Live, broker, or LLM API is
   imported by the daemon.
 
-Production provisioning before M0b/M2 must put sealed bytes in a separate
+Production provisioning must put sealed bytes in a separate
 storage namespace or database schema and issue distinct credentials. The
 recommended roles are a DDL-owning `migration_admin`, a Discovery-only
 `research_daemon`, and a separately provisioned `holdout_executor`. Revoke
@@ -242,7 +284,37 @@ export holdout paths/tokens into that process, and verify the deployment with
 holdout executor must not be interactive or AI-accessible and must run only
 after a separate immutable authorization. Until that external permission test
 passes, reports must retain `UNTOUCHED_ACCESS_DENIED` and no holdout claim may
-be made beyond M0a's fixture boundary.
+be made beyond the process boundary.
+
+The checked-in verifier deliberately rejects direct DML on the M0b ledger as
+well as every reachable `SECURITY DEFINER` capability. The verified research
+credential is therefore a denial proof today, not yet a production-worker
+credential. Before such a worker exists, add a separately audited
+least-privilege mutation service or an explicitly allowlisted capability API
+and extend the same actual-login attack gate; do not grant broad table DML.
+
+The repository now includes `deploy/postgres/provision_m0b_holdout.sql` and
+`scripts/verify_m0b_holdout_isolation.py`. Provisioning creates separate
+NOLOGIN group roles and revokes the research group from the sealed schema; the
+verifier accepts only the daemon database URL and rejects superuser,
+`BYPASSRLS`, direct or transitive `SET ROLE`, executor/owner membership,
+declared privileges, or a successful direct read. Provisioning also refuses a
+pre-existing sealed table whose owner, persistence, columns, defaults, or
+constraints differ from the frozen shape. Deployment still has to create the
+distinct LOGIN credential and object-store mount outside the repository. The
+current local cluster uses a privileged session and trust authentication, so
+its correct state is `NOT_PROVISIONED`, not a simulated PASS via `SET ROLE`.
+
+```bash
+# Run as migration administrator, never as the daemon.
+psql -X --set=ON_ERROR_STOP=1 "$SYSTEMATIC_FX_ADMIN_DATABASE_URL" \
+  --file deploy/postgres/provision_m0b_holdout.sql
+
+# Run with the daemon's actual NOSUPERUSER/NOBYPASSRLS LOGIN URL.
+SYSTEMATIC_FX_RESEARCH_DATABASE_URL=postgresql://... \
+SYSTEMATIC_FX_RESEARCH_DATABASE_USER=research_login \
+  uv run systematic-fx db verify-holdout-isolation --json
+```
 
 ### Complete readiness workflow
 

@@ -110,7 +110,7 @@ P4_02_PIPELINE_VERSION: Final = "phase1a_p4_02_outcome_pipeline_v1"
 PIPELINE_VERSION: Final = P5_PIPELINE_VERSION
 RANDOM_SEED: Final = 0
 EXPECTED_SUMMARY_COUNT: Final = 3 * 2 * len(BARRIER_TICKS) ** 2
-_SUPPORTED_MIGRATIONS: Final = tuple(range(1, 29))
+_SUPPORTED_MIGRATIONS: Final = tuple(range(1, 30))
 _MODES: Final = frozenset({"PLAN_ONLY", "CACHE_ONLY", "RUN"})
 _P4_RELEASE_NOT_FOUND_MESSAGE: Final = (
     "exactly one released P4 pair is required for duplicate reuse"
@@ -428,7 +428,7 @@ def _git_head(project_root: Path) -> str:
 def _postgres_runtime(database_url: str, *, migrations_directory: Path) -> dict[str, object]:
     migrations = discover_migrations(migrations_directory)
     if tuple(item.version for item in migrations) != _SUPPORTED_MIGRATIONS:
-        raise Phase1AOutcomePipelineError("outcome replay requires migrations 0001-0028")
+        raise Phase1AOutcomePipelineError("outcome replay requires migrations 0001-0029")
     with psycopg.connect(database_url, row_factory=dict_row) as connection:
         version = connection.execute(
             "SELECT current_setting('server_version') AS version, "

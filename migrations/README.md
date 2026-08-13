@@ -21,7 +21,7 @@ migration contains its own `BEGIN`/`COMMIT`, so a failed file leaves neither a
 partial schema nor a migration record.
 
 Governed research pipelines require the exact contiguous migration history
-from `0001` through `0023`.
+from `0001` through `0029`.
 
 Integration tests require an explicitly disposable or repository-private
 database. The test target is never inferred from the application URL:
@@ -197,3 +197,16 @@ pair can publish its two economic surfaces and four screening decisions only
 as one atomic release; partial completion is forbidden, while paired failure
 and narrowly scoped unpaired-queue cleanup keep retry state terminal and
 auditable.
+
+`0029_m0b_governed_control_plane.sql` adds the finite-budget M0b search-data
+control plane without granting holdout or promotion authority. One immutable
+epoch is bound to one frozen, open, unrevealed campaign and to exact dataset,
+CME calendar/contract, split, feature, label, cost, execution, engine,
+dependency-lock, code, retry, and manifest identities. Its canonical document
+also freezes strategy families, parameter ranges, the volatility-normalized
+barrier grid, seeds, null controls, execution/session/roll assumptions,
+admission rules, and REAL/NULL budgets. Candidates, canonical RunSpecs,
+attempts, hash-chain checkpoints, and single-owner result artifacts must agree.
+Successful attempts and `SCREENED_OUT`/`REGISTERED` candidates terminalize
+atomically, NULL controls cannot register, and governed artifacts/campaign
+identity are append-preserved.

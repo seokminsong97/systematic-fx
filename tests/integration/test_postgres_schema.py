@@ -25,6 +25,10 @@ EXPECTED_TABLES = {
     "instrument_mappings",
     "instruments",
     "jobs",
+    "m0b_artifact_links",
+    "m0b_candidates",
+    "m0b_checkpoints",
+    "m0b_epochs",
     "pattern_ledger",
     "publication_outbox",
     "quality_checks",
@@ -50,6 +54,8 @@ EXPECTED_CONSTRAINTS = {
     "research_run_specs_experiment_ownership",
     "research_run_specs_fingerprint_valid",
     "phase1a_outcome_equivalence_one_per_subject",
+    "m0b_candidates_parent_fk",
+    "m0b_epochs_manifest_fk",
     "source_files_dataset_fk",
     "strategies_take_profit_positive",
 }
@@ -59,6 +65,7 @@ EXPECTED_TRIGGERS = {
     "artifacts_protect_phase1a_lineage",
     "campaigns_protect_bar_pattern_identity",
     "campaigns_protect_phase1a_identity",
+    "campaigns_protect_m0b_identity",
     "derived_partition_sources_protect_phase1a_lineage",
     "derived_partitions_protect_phase1a_lineage",
     "discovery_exposures_require_phase1a_success",
@@ -67,6 +74,12 @@ EXPECTED_TRIGGERS = {
     "experiment_trials_require_bar_pattern_terminal_pair",
     "experiments_protect_bar_pattern_identity",
     "phase1a_outcome_checkpoints_publication_refresh",
+    "m0b_candidates_terminal_pair",
+    "m0b_checkpoints_validate_insert",
+    "m0b_artifact_links_validate_insert",
+    "m0b_epochs_terminal_cardinality",
+    "research_run_attempts_protect_m0b_lifecycle",
+    "research_run_attempts_require_m0b_candidate_pair",
     "research_run_attempts_publication_refresh",
     "research_run_attempts_enforce_bar_pattern_immediate",
     "research_run_attempts_require_bar_pattern_terminal_pair",
@@ -117,7 +130,7 @@ class PostgreSQLSchemaIntegrationTest(unittest.TestCase):
     def test_migration_is_repeatable_and_expected_tables_exist(self) -> None:
         report = apply_migrations(self.database_url, psql_binary=self.psql)
         self.assertEqual(report.applied, ())
-        self.assertEqual(report.skipped, tuple(range(1, 29)))
+        self.assertEqual(report.skipped, tuple(range(1, 30)))
 
         result = self._run_sql(
             "SELECT tablename FROM pg_catalog.pg_tables "

@@ -10,7 +10,7 @@ QC_MANIFEST = data/derived/manifests/mbp10_structural_qc_v1.jsonl
 QC_MUTATION_MANIFEST = data/derived/manifests/mbp10_clean_trade_none_book_mutations_v1.jsonl
 QC_PROGRESS_EVERY ?= 250
 
-.PHONY: setup db-init db-start db-stop db-status db-bootstrap db-bootstrap-test db-up catalog hash data-register qc qc-inspect qc-register smoke pilot doctor test lint format notebook research-ready
+.PHONY: setup db-init db-start db-stop db-status db-bootstrap db-bootstrap-test db-up catalog hash data-register qc qc-inspect qc-register smoke pilot doctor test lint format notebook research-ready m0b-real-slice m0b-pg-gate m0b-holdout-verify
 
 setup:
 	$(UV) sync --all-extras --locked
@@ -77,3 +77,14 @@ notebook:
 	$(UV_RUN) jupyter lab
 
 research-ready: setup data-register smoke test doctor
+
+m0b-real-slice:
+	$(UV_RUN) systematic-fx research m0b materialize-real-slice
+
+m0b-pg-gate:
+	SYSTEMATIC_FX_RUN_M0B_PG_GATE=1 $(UV_RUN) pytest \
+		tests/integration/test_m0b_control_plane_postgres.py \
+		tests/integration/test_m0b_holdout_provisioning_postgres.py -q -s
+
+m0b-holdout-verify:
+	$(UV_RUN) systematic-fx db verify-holdout-isolation --json

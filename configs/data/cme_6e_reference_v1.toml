@@ -1,0 +1,48 @@
+[reference]
+schema = "systematic_fx.cme_6e_reference.v1"
+version = "cme_6e_reference_2022_v1"
+timezone = "America/Chicago"
+covered_start = 2022-08-30
+covered_end_exclusive = 2022-09-04
+scheduled_hours_only = true
+status_coverage = false
+
+[[sources]]
+source_id = "cme_rulebook_chapter_261_2026-08-11"
+url = "https://www.cmegroup.com/content/dam/cmegroup/rulebook/CME/III/250/261/261.pdf"
+retrieved_on = 2026-08-11
+supports = ["contract_size", "tick_size", "termination_rule", "delivery_rule"]
+
+[[sources]]
+source_id = "cme_fx_product_guide_2022"
+url = "https://www.cmegroup.com/trading/fx/files/fx-product-guide-2022-us.pdf"
+retrieved_on = 2026-08-11
+supports = ["regular_hours", "2022_holiday_hours", "last_trade_time"]
+
+[product]
+root = "6E"
+venue = "CME_GLOBEX"
+contract_multiplier = 125000
+currency = "EUR"
+settlement = "PHYSICAL"
+tick_size_numerator = 1
+tick_size_denominator = 20000
+regular_open_local = "17:00"
+regular_close_local = "16:00"
+last_trade_local = "09:16"
+roll_guard_business_days = 5
+activation_semantics = "REFERENCE_COVERAGE_START_NOT_EXCHANGE_LISTING"
+
+[[contracts]]
+raw_symbol = "6EU2"
+contract_month = 2022-09-01
+activation_date = 2022-08-30
+last_trade_date = 2022-09-19
+delivery_date = 2022-09-21
+
+[[contracts]]
+raw_symbol = "6EZ2"
+contract_month = 2022-12-01
+activation_date = 2022-08-30
+last_trade_date = 2022-12-19
+delivery_date = 2022-12-21

@@ -62,6 +62,7 @@ from systematic_fx.research.phase1a_outcome_pipeline import (
 )
 
 EXPECTED_MIGRATION_0028_SHA256 = "fb5683dca1b054516b6ee94b721aeeb1ac9662993ac7495d41961fb66e5e172e"
+EXPECTED_MIGRATION_0029_SHA256 = "5f6d002fb0f9ad89b0b8eb8256799df14e00879a8fcf4a95faab414b06d9ac45"
 
 
 def test_outcome_pipeline_supports_exact_p4_paired_outcome_migration() -> None:
@@ -69,7 +70,7 @@ def test_outcome_pipeline_supports_exact_p4_paired_outcome_migration() -> None:
     migration_by_version = {item.version: item for item in migrations}
 
     assert tuple(item.version for item in migrations) == _SUPPORTED_MIGRATIONS
-    assert _SUPPORTED_MIGRATIONS == tuple(range(1, 29))
+    assert _SUPPORTED_MIGRATIONS == tuple(range(1, 30))
     assert migration_by_version[24].checksum == (
         "4aa845757f1a220c8d5595d4db6053f6374d99d067ab7e20c3e40ea22d610010"
     )
@@ -82,8 +83,10 @@ def test_outcome_pipeline_supports_exact_p4_paired_outcome_migration() -> None:
     assert migration_by_version[27].checksum == (
         "f0f69db031dc555b260da1fceef5f1fb4087f25717f1472ae4b006e77182cdb8"
     )
-    assert migrations[-1].name == "phase1a_p4_paired_outcomes"
-    assert migrations[-1].checksum == EXPECTED_MIGRATION_0028_SHA256
+    assert migrations[-2].name == "phase1a_p4_paired_outcomes"
+    assert migrations[-2].checksum == EXPECTED_MIGRATION_0028_SHA256
+    assert migrations[-1].name == "m0b_governed_control_plane"
+    assert migrations[-1].checksum == EXPECTED_MIGRATION_0029_SHA256
 
 
 class _Phase1ACompleteTestEconomics(OutcomeEconomicsAccumulator):
