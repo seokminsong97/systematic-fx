@@ -1,0 +1,4 @@
+TEST ONLY - NOT CME SCHEDULE EVIDENCE
+2022-09-01 revision=1 close=21:00Z
+2022-09-01 revision=2 published=2022-08-31T12:00:00Z close=20:00Z
+2022-09-02 revision=1 close=21:00Z

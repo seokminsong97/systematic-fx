@@ -60,7 +60,7 @@ systematic-fx/
 │   ├── features/               # one-second and closed five-minute builders
 │   ├── research/               # bounded research engines, ledgers, registration
 │   │   ├── m0a/                # deterministic Discovery-only walking skeleton
-│   │   └── m0b/                # bounded real MBP-10 materialization bridge
+│   │   └── m0b/                # real bridge, first-passage shards, bounded worker
 │   ├── strategies/             # immutable executable bracket policies
 │   ├── backtest/               # event replay, fills, OCO, costs, and metrics
 │   ├── validation/             # splitter, walk-forward, stress, and holdout
@@ -81,9 +81,10 @@ provider contracts are measured.
 
 The M0a daemon uses an ignored local SQLite/WAL ledger and content-addressed
 JSONL inputs below `.local/m0a/`. This is an engineering walking skeleton, not
-governed performance evidence in PostgreSQL. M0b adds migration `0029` for
-future finite-budget search evidence plus a bounded real-data adapter; the
-current real rows stay non-entry-eligible until trading-status coverage exists.
+governed performance evidence in PostgreSQL. M0b adds migrations `0029` and
+`0030` for finite-budget search evidence and a least-privilege worker API,
+plus a bounded real-data adapter and immutable first-passage store. The current
+real rows stay non-entry-eligible until trading-status coverage exists.
 
 ## 3. Storage Boundaries
 

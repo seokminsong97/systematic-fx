@@ -1,0 +1,59 @@
+[manifest]
+schema = "systematic_fx.cme_active_contract_volume.v1"
+version = "cme_6e_active_contract_roll_context_2022_v1"
+source_schema = "GLBX.MDP3/mbp-10"
+venue = "CME_GLOBEX"
+product_root = "6E"
+policy_version = "previous_completed_trading_date_volume_v1"
+
+# Exact raw source identities. Sep-19 is target-session context and is not
+# allowed to influence the Sep-19 selection, which is frozen at Sep-16 close.
+[[sources]]
+source_date = 2022-09-14
+relative_uri = "2022/09/14/glbx-mdp3-20220914.mbp-10.parquet"
+sha256 = "5ccf75850b9f9c32f2b1dbfb5c05308104cadfacc9343bb479e634763bd0dcda"
+role = "EVIDENCE"
+
+[[sources]]
+source_date = 2022-09-15
+relative_uri = "2022/09/15/glbx-mdp3-20220915.mbp-10.parquet"
+sha256 = "f54cef8815af2dfefc1a3e4468eea766b613ecd090e04a0be9a734c2d8414319"
+role = "EVIDENCE_AND_TARGET"
+
+[[sources]]
+source_date = 2022-09-16
+relative_uri = "2022/09/16/glbx-mdp3-20220916.mbp-10.parquet"
+sha256 = "30aaf3eac1fdf006dd590e3263d0fd287bf03821fa50adcfcb7d89d4630df8ca"
+role = "EVIDENCE_AND_TARGET"
+
+[[sources]]
+source_date = 2022-09-19
+relative_uri = "2022/09/19/glbx-mdp3-20220919.mbp-10.parquet"
+sha256 = "36234fd9cefb0e81dea4cf5359a042d62221beb78cf00fbe22f5852fbeda4018"
+role = "TARGET_CONTEXT"
+
+[[mappings]]
+trading_date = 2022-09-16
+evidence_trading_date = 2022-09-15
+evidence_open_ts_ns = 1663192800000000000
+evidence_close_ts_ns = 1663275600000000000
+selection_available_ts_ns = 1663275600000000000
+target_session_open_ts_ns = 1663279200000000000
+evidence_source_dates = [2022-09-14, 2022-09-15]
+candidates = [
+  { raw_symbol = "6EU2", instrument_id = 44629, trade_rows = 56695, trade_volume = 158500 },
+  { raw_symbol = "6EZ2", instrument_id = 191026, trade_rows = 25446, trade_volume = 62531 },
+]
+
+[[mappings]]
+trading_date = 2022-09-19
+evidence_trading_date = 2022-09-16
+evidence_open_ts_ns = 1663279200000000000
+evidence_close_ts_ns = 1663362000000000000
+selection_available_ts_ns = 1663362000000000000
+target_session_open_ts_ns = 1663538400000000000
+evidence_source_dates = [2022-09-15, 2022-09-16]
+candidates = [
+  { raw_symbol = "6EU2", instrument_id = 44629, trade_rows = 11009, trade_volume = 24706 },
+  { raw_symbol = "6EZ2", instrument_id = 191026, trade_rows = 73049, trade_volume = 224580 },
+]

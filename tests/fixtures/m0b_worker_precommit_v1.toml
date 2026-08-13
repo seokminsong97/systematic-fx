@@ -1,0 +1,70 @@
+[identity]
+artifact_schema = "systematic_fx.m0b_worker_test_precommit.v1"
+candidate_sha256 = "fb4284bc03c3b5caa06f95cdf02cfb0deb0d251474416b4615b85efb025fdf89"
+epoch_sha256 = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+code_snapshot_sha256 = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+feature_sha256 = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+
+[signal_artifact]
+row_count = 4
+byte_size = 1200
+content_sha256 = "5a177ddfd6247b579548821a0fa7dd312e9844fb413e4bcb42f0f318270b0e8e"
+
+[evaluation]
+candidate_kind = "REAL"
+direction = "LONG"
+barrier_id = "tp3of4_sl2of4_h1800"
+k_tp_num = 3
+k_tp_den = 4
+k_sl_num = 2
+k_sl_den = 4
+max_hold_seconds = 1800
+cooldown_ns = 0
+stress_extra_cost_ticks = 1
+search_fold_count = 2
+max_signals = 4
+max_trades = 4
+checkpoint_shard_interval = 1
+deterministic_seed = 7
+execution_contract_version = "m0b_worker_execution_v1"
+one_position = true
+passive_tp_fill = "POST_ENTRY_AGGRESSOR_TRADE_THROUGH_ONLY"
+timeout = "EXACT_EVENT_TS_PLUS_MAX_HOLD"
+maximum_authority = "REGISTER"
+sealed_holdout_untouched = true
+
+[admission_rules]
+contract_version = "m0b_numeric_admission_v1"
+maximum_authority = "REGISTER"
+min_raw_events = 4
+min_flat_trades = 3
+min_sequential_trades = 3
+min_active_days = 3
+min_tp_probability_ppm = 600000
+require_positive_net_ev = true
+min_positive_search_folds = 2
+max_stressed_cost_ev_floor_ticks = 1
+
+[[signals]]
+event_ts_ns = 100
+instrument_id = 1
+session_id = "D1"
+search_fold = 0
+
+[[signals]]
+event_ts_ns = 110
+instrument_id = 1
+session_id = "D1"
+search_fold = 0
+
+[[signals]]
+event_ts_ns = 200
+instrument_id = 1
+session_id = "D2"
+search_fold = 1
+
+[[signals]]
+event_ts_ns = 300
+instrument_id = 1
+session_id = "D3"
+search_fold = 1

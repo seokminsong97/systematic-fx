@@ -1,0 +1,44 @@
+[archive]
+schema = "systematic_fx.cme_schedule_archive.v1"
+version = "deterministic_schedule_fixture_v1"
+evidence_kind = "DETERMINISTIC_TEST_FIXTURE"
+venue = "CME_GLOBEX"
+product_root = "6E"
+timezone = "UTC"
+source_id = "TEST_ONLY_NOT_CME_SCHEDULE_EVIDENCE"
+source_sha256 = "1be333bdb00c3bcc53a6c94381e0e92f644c3ab3309300aee59664225e182292"
+covered_start = 2022-09-01
+covered_end_exclusive = 2022-09-03
+
+# Revision 1 is known first. Revision 2 is a synthetic early close published
+# later, allowing tests to prove that an as-of query never reads that revision
+# before its publication timestamp.
+[[sessions]]
+trading_date = 2022-09-01
+revision = 1
+published_ts_ns = 1659312000000000000
+open_ts_ns = 1661983200000000000
+close_ts_ns = 1662066000000000000
+breaks = [{ start_ts_ns = 1662026400000000000, end_ts_ns = 1662026700000000000 }]
+schedule_kind = "SYNTHETIC_REGULAR"
+holiday_name = ""
+
+[[sessions]]
+trading_date = 2022-09-01
+revision = 2
+published_ts_ns = 1661947200000000000
+open_ts_ns = 1661983200000000000
+close_ts_ns = 1662062400000000000
+breaks = [{ start_ts_ns = 1662026400000000000, end_ts_ns = 1662026700000000000 }]
+schedule_kind = "SYNTHETIC_EARLY_CLOSE"
+holiday_name = "TEST_ONLY"
+
+[[sessions]]
+trading_date = 2022-09-02
+revision = 1
+published_ts_ns = 1659312000000000000
+open_ts_ns = 1662069600000000000
+close_ts_ns = 1662152400000000000
+breaks = []
+schedule_kind = "SYNTHETIC_REGULAR"
+holiday_name = ""

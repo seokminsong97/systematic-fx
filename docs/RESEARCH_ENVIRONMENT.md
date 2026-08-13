@@ -221,13 +221,22 @@ M0a fixture authority. M0b migration `0029` adds a separate PostgreSQL
 finite-budget search ledger for later governed real-data epochs; it does not
 retroactively turn the M0a fixture into market evidence.
 
-The PostgreSQL M0b control plane currently has no production worker/daemon
-launcher. Its public registration boundary is
+The public M0b registration boundary is
 `systematic_fx.db.m0b_registry.register_m0b_candidate`, which inserts the
-immutable RunSpec and its budgeted candidate atomically. Direct generic
-RunSpec registration is deliberately rejected for an M0b campaign. Running a
-real performance epoch remains a later M0b step after trading-status coverage,
-active-contract evidence, a real worker, and the actual-login isolation gate.
+immutable CandidateWork artifact, RunSpec and budgeted candidate atomically.
+Direct generic RunSpec registration is deliberately rejected for an M0b
+campaign. The bounded `research m0b worker-cycle` command claims at most one
+already-registered item. PostgreSQL returns the immutable CandidateWork hash
+and byte size; the runner reopens that exact content-addressed local file,
+verifies its signal and first-passage lineage, and publishes
+checkpoints and the terminal classification through migration `0030`'s four
+allowlisted capabilities. An owner-only durable lease token, heartbeat,
+expired-attempt recovery and exact failure/terminal replay make a killed cycle
+restart safe. The command cannot generate candidates, change an epoch, open a
+holdout or promote a result. It is a finite operational worker cycle, not a
+deployed autonomous performance epoch. A real eligible epoch still requires
+official schedule/status coverage, point-in-time active-contract evidence and
+an externally provisioned actual worker/holdout credential boundary.
 
 ### M0b real-slice bridge
 
@@ -248,6 +257,142 @@ contract claim. Every materialized label keeps `status_coverage=false` and
 unscheduled halt. These rows test mechanics and lineage only; they cannot enter
 the search daemon as eligible trades.
 
+The independent roll-context manifest
+`configs/data/cme_6e_active_contract_roll_context_v1.toml` proves the
+point-in-time `previous_completed_trading_date_volume_v1` mapping on an exact
+four-file allowlist. It aggregates each complete CME trading session across
+both intersecting UTC partitions rather than treating one UTC file as a
+trading day. The immutable identities are:
+
+- manifest bytes:
+  `0df60badcfc0f191f22ca26b2d0ee6a439cb6c90b715580398577af8bcfc5b82`;
+- normalized manifest semantics:
+  `cfe0f62425f5cdb2e1d7687d1163de800334aca2881d5775a4f74b19ac2d5626`;
+- materialized mapping artifact:
+  `3092fdb96e5aba7e64ac41f051f670c7ae8d969323d00766d3b94032256220a0`.
+
+The September 15 completed session contains U2 volume 158,500 versus Z2
+62,531, so the mapping available for the September 16 session selects U2.
+That fact does not authorize entry: U2 is already in its delivery roll guard,
+and entry eligibility rejects it. The September 16 completed session contains
+U2 volume 24,706 versus Z2 224,580, so the mapping frozen before the September
+19 open selects Z2. `active_contract_mapping_as_of` refuses either result
+before its evidence session has closed.
+
+`CmeTradingStatusEvidence.status_at` is the separate archived-status lookup. It
+rejects future-published and stale observations, wrong scope, and missing
+temporal coverage; its `coverage_verified` flag says only that a timely
+in-scope observation exists. The loader separately rejects protected paths and
+ancestor symlinks, while full entry eligibility reopens the archive and its
+upstream bytes and requires their exact identities plus a schedule-safe horizon
+and entry-time OPEN status.
+The repository contains only the explicitly opt-in deterministic fixture
+`tests/fixtures/cme_trading_status_fixture_v1.toml` plus its separately hashed
+test upstream bytes; it is marked
+`TEST_ONLY_NOT_CME_EVIDENCE` and cannot be loaded without
+`allow_test_fixture=true`. No actual archived CME status feed has been
+fabricated, so the August real bridge remains correctly ineligible.
+
+Long-horizon calendar coverage has the same evidence boundary. The existing
+`cme_6e_reference_v1.toml` remains a narrow August/September mechanics
+reference and is not stretched into a fabricated 2022--2026 holiday archive.
+`CmeScheduleArchive` instead accepts exact session revisions, publication
+timestamps, closes, and intra-session breaks; `session_as_of` selects only a
+revision already published at the requested time. Coverage gaps, overlapping
+sessions or breaks, future revisions, and missing archives fail closed. The
+only checked-in archive is the explicitly synthetic test fixture with file
+SHA-256
+`6476edaaa819177dbcd3bc337bcc906d9d40e8a92d8777256c78b43ce3d55864`
+and its test-only upstream source SHA-256 is
+`1be333bdb00c3bcc53a6c94381e0e92f644c3ab3309300aee59664225e182292`;
+there are no asserted official long-range CME schedule bytes yet.
+
+These evidence boundaries are executable. A schedule archive is reopened with
+its separately archived upstream bytes, and entry queries require schedule
+knowledge exactly as of the event:
+
+```bash
+uv run systematic-fx research m0b verify-schedule-archive \
+  --archive path/to/cme_schedule_archive.toml \
+  --source path/to/archived_upstream_bytes
+
+uv run systematic-fx research m0b verify-status-evidence \
+  --evidence path/to/cme_status_archive.toml \
+  --source path/to/archived_status_feed_bytes \
+  --event-ts-ns 1662040000000000000
+```
+
+Active-contract evidence can resolve its previous completed session through
+the same schedule archive, so a holiday is not approximated as an ordinary
+weekday. The checked-in schedule/status files are deterministic fixtures and
+require `--allow-test-fixture`; library entry authorization additionally
+rejects them unless an explicit test-only switch is supplied. They exercise
+mechanics but cannot authorize the currently nonexistent production epoch.
+A schedule-safe horizon remains ineligible unless an independently verified,
+already-observed `OPEN` status covers the entry instant.
+
+```bash
+uv run systematic-fx research m0b verify-active-contract-mapping \
+  --manifest path/to/active_contract_manifest.toml \
+  --schedule-archive path/to/cme_schedule_archive.toml \
+  --schedule-source path/to/archived_upstream_bytes \
+  --data-root path/to/search_only_raw_root
+```
+
+Without an archive, the command fails closed. The explicit
+`--allow-bounded-weekday-fallback` option exists only for the checked-in,
+holiday-free engineering fixture and is not production calendar evidence.
+
+The bounded real label artifact can be converted without recomputation into
+eight immutable, event-group-preserving first-passage shards. The current
+checked-in identities are config bytes
+`93a9120661b4c11a6a05e36c3d5ca24da3005918635c25a041179b61479da6d7`,
+store spec
+`bc3a1cb4ececf7a4960900778b576b09782f971cd98b0015e91599e81affa4fb`,
+and reconstructed store
+`18670ad2e98e5a18fb3ad7c18f2768e60c9ca2560e6a3dd7ac0e7dc2fe6f5ab4`.
+Verification decodes every row and proves the shard concatenation equals the
+original label SHA, feature lineage, version, global order and cardinality.
+
+The operator stages those bytes before registering CandidateWork:
+
+```bash
+uv run systematic-fx research m0b materialize-real-slice \
+  --output-root artifacts/research/m0b_real_slice_v1
+
+uv run systematic-fx research m0b build-first-passage-store \
+  --build artifacts/research/m0b_real_slice_v1/build-17f4ccdcb839c70bfdd95c9d00a2b37ca6d31fff89c34439a2adcaac4c32cf5f.json \
+  --store-root artifacts/research/m0b_first_passage_store_v1
+
+uv run systematic-fx research m0b verify-first-passage-store \
+  --store artifacts/research/m0b_first_passage_store_v1/first-passage-store-18670ad2e98e5a18fb3ad7c18f2768e60c9ca2560e6a3dd7ac0e7dc2fe6f5ab4.json
+```
+
+After an operator has atomically registered CandidateWork and a frozen epoch,
+one least-privilege cycle is:
+
+```bash
+SYSTEMATIC_FX_M0B_WORKER_DATABASE_URL='postgresql://...' \
+SYSTEMATIC_FX_M0B_WORKER_DATABASE_USER='systematic_fx_m0b_worker_login' \
+  uv run systematic-fx research m0b worker-cycle \
+    --epoch-key '<frozen-epoch-key>' \
+    --worker-id 'm0b-worker-1' \
+    --worker-root artifacts/research/m0b_worker
+```
+
+Repeated invocations drain only the precommitted finite queue. A healthy idle
+cycle exits without creating work; a missing or broader credential, changed
+work bytes, stale lineage or classification disagreement fails closed.
+
+The CLI-ready Python boundaries are
+`materialize_active_contract_mapping_artifact` and
+`verify_active_contract_mapping_artifact`. The actual bounded gate is:
+
+```bash
+SYSTEMATIC_FX_RUN_CME_ROLL_CONTEXT=1 \
+  uv run pytest tests/integration/test_cme_active_contract_real.py -q -s
+```
+
 ```bash
 # Exact allowlist → content-addressed source/quote/feature/label/build bytes.
 uv run systematic-fx research m0b materialize-real-slice
@@ -256,10 +401,11 @@ uv run systematic-fx research m0b materialize-real-slice
 uv run systematic-fx research m0b verify-real-slice \
   --build artifacts/research/m0b_real_slice_v1/build-<sha256>.json
 
-# Fresh disposable PostgreSQL 1..29 plus lifecycle and negative gates.
+# Fresh disposable PostgreSQL 1..30 plus lifecycle and negative gates.
 SYSTEMATIC_FX_RUN_M0B_PG_GATE=1 \
   uv run pytest tests/integration/test_m0b_control_plane_postgres.py \
-  tests/integration/test_m0b_holdout_provisioning_postgres.py -q -s
+  tests/integration/test_m0b_holdout_provisioning_postgres.py \
+  tests/integration/test_m0b_worker_capability_postgres.py -q -s
 ```
 
 ### Sealed-holdout deployment boundary
@@ -286,12 +432,24 @@ after a separate immutable authorization. Until that external permission test
 passes, reports must retain `UNTOUCHED_ACCESS_DENIED` and no holdout claim may
 be made beyond the process boundary.
 
-The checked-in verifier deliberately rejects direct DML on the M0b ledger as
-well as every reachable `SECURITY DEFINER` capability. The verified research
-credential is therefore a denial proof today, not yet a production-worker
-credential. Before such a worker exists, add a separately audited
-least-privilege mutation service or an explicitly allowlisted capability API
-and extend the same actual-login attack gate; do not grant broad table DML.
+The holdout verifier rejects direct DML and executable privilege escalation for
+the Discovery-only research credential. A separate M0b worker verifier accepts
+exactly four migration-0030 `SECURITY DEFINER` capabilities while still
+rejecting direct ledger DML and all sealed access. This is a tested
+least-privilege mutation boundary, not authorization to open holdout data,
+promote beyond REGISTER, or run without precommitted worker input.
+The worker cannot read the lease table's bearer-token column; each lease is
+also bound to the authenticated LOGIN. CandidateWork v2 and the final complete
+checkpoint bind the exact executable barrier, evaluation policy, result hash,
+byte size, integer metrics, and DB-derived classification before terminalization.
+
+After provisioning a distinct worker LOGIN, verify that exact boundary with:
+
+```bash
+SYSTEMATIC_FX_M0B_WORKER_DATABASE_URL='postgresql://...' \
+SYSTEMATIC_FX_M0B_WORKER_DATABASE_USER='systematic_fx_m0b_worker_login' \
+  uv run systematic-fx db verify-m0b-worker-access --json
+```
 
 The repository now includes `deploy/postgres/provision_m0b_holdout.sql` and
 `scripts/verify_m0b_holdout_isolation.py`. Provisioning creates separate
@@ -521,7 +679,7 @@ These are intentionally different milestones:
 | Boundary | Current status | Meaning |
 |---|---|---|
 | Locked Python/scientific runtime | PASS | Python 3.12.13 and locked extras import correctly |
-| Private PostgreSQL bootstrap | PASS | PostgreSQL 18.4 migrations `0001`-`0002` cover separate `systematic_fx` research and `systematic_fx_test` integration databases |
+| Private PostgreSQL bootstrap | PASS | Fresh disposable gates apply the contiguous `0001`-`0030` chain; the persistent workstation database intentionally remains at `0028` |
 | Full footer catalog | PASS | All 1,434 footers satisfy the current raw contract |
 | Full source SHA-256 manifest | PASS | All 1,434 files hashed; unchanged checkpoint rerun reproduced the manifest |
 | Source control-plane registration | PASS | Dataset `VALIDATING`; all 1,434 sources `HASHED` |
@@ -531,7 +689,7 @@ These are intentionally different milestones:
 | A-priori hypothesis registration | PASS for governance only | 60 experiments; pattern ledger 0; trial ledger 0 |
 | Non-research pilot lineage | PASS for structure/lineage only | Two derived partitions registered with `research_eligible=false` |
 | Reference, roll, split, cost, and execution gates | PENDING | Definition/status/calendar and numeric cost/execution inputs remain unresolved |
-| Automated tests and doctor | PASS | 148 tests plus 27 subtests; doctor has 0 required failures and 0 warnings |
+| Automated tests and doctor | PASS | The full unit suite and named M0b/CME/PostgreSQL gates pass; doctor has 0 required failures and 0 warnings |
 | Full research-data eligibility | PENDING | Remaining gates in `DATA_SCHEMA.md` are incomplete |
 
 Environment readiness authorizes work on the remaining data pipeline. It does

@@ -64,7 +64,7 @@ def test_bar_research_run_supports_exact_p4_paired_migration_chain() -> None:
     migration_by_version = {item.version: item for item in migrations}
 
     assert tuple(item.version for item in migrations) == SUPPORTED_MIGRATIONS
-    assert SUPPORTED_MIGRATIONS == tuple(range(1, 30))
+    assert SUPPORTED_MIGRATIONS == tuple(range(1, 31))
     assert migration_by_version[24].checksum == (
         "4aa845757f1a220c8d5595d4db6053f6374d99d067ab7e20c3e40ea22d610010"
     )
@@ -78,8 +78,9 @@ def test_bar_research_run_supports_exact_p4_paired_migration_chain() -> None:
     assert migration_by_version[27].checksum == (
         "f0f69db031dc555b260da1fceef5f1fb4087f25717f1472ae4b006e77182cdb8"
     )
-    assert migrations[-1].name == "m0b_governed_control_plane"
-    assert len(migrations[-1].checksum) == 64
+    assert migration_by_version[29].name == "m0b_governed_control_plane"
+    assert migration_by_version[30].name == "m0b_numeric_admission_worker_api"
+    assert len(migration_by_version[30].checksum) == 64
 
 
 def _loaded_dataset(dates: tuple[date, ...]) -> LoadedBarDatasetManifest:

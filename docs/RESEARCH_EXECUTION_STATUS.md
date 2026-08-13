@@ -1,7 +1,7 @@
 # Phase 1 Research Execution Status
 
 - Started: 2026-08-03
-- Updated: 2026-08-12
+- Updated: 2026-08-13
 - Campaigns: `phase1_discovery_v1`, `phase1a_conservative_screening_v1`, and
   `bar_pattern_discovery_v1`; the completed state-model lineage is
   `bar_state_conditional_v2` -> `v2a` -> `v2b`
@@ -33,9 +33,12 @@ failures, exact schema-only amendment, and completed result are recorded in
 No walk-forward or holdout access is authorized for this branch.
 
 M0a is now a complete finite-budget engineering walking skeleton on a
-deterministic fixture. M0b adds a bounded real-MBP-10 mechanics bridge and the
-unapplied migration `0029` for a future governed search-data epoch. The actual
-bridge materializes successfully, but every label is deliberately
+deterministic fixture. M0b adds a bounded real-MBP-10 mechanics bridge,
+immutable first-passage shards, atomic CandidateWork registration, a bounded
+crash-resumable worker cycle, and checked-in migrations `0029`/`0030` for a
+governed search-data epoch. Those migrations are exercised only on disposable
+test databases and remain unapplied to the workstation database.
+The actual bridge materializes successfully, but every label is deliberately
 non-entry-eligible: scheduled CME hours are verified only for the narrow
 2022-08-30..09-03 reference window, unscheduled trading status is not covered,
 and the staged Z2 transition context is not a previous-day-volume active
@@ -528,12 +531,14 @@ summary cells, screening decision, and predecessor-audit lineage are all
 recorded. The system does not discard a variable or failed result merely to
 reduce the compact outcome artifact.
 
-## 13. Operator Sequence
+## 13. Historical Phase 1A Operator Sequence
 
-Apply all migrations through
-`0023_bar_pattern_raw_dataset_lineage_fix.sql`, then execute the
-modes in order. Every command requires `SYSTEMATIC_FX_DATABASE_URL` or an
-explicit `--database-url`.
+This section records the sequence used by the historical Phase 1A run. At that
+time it applied migrations through
+`0023_bar_pattern_raw_dataset_lineage_fix.sql`, then executed the modes in
+order. A fresh current environment must apply the full contiguous chain
+documented in [`migrations/README.md`](../migrations/README.md). Every command
+requires `SYSTEMATIC_FX_DATABASE_URL` or an explicit `--database-url`.
 
 The completed p1_05 RunSpec used the exact contiguous migration history
 `0001`-`0021`. Migration `0021` removed an ambiguous PL/pgSQL record/table alias

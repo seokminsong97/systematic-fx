@@ -8,7 +8,9 @@ BEGIN
     SELECT rolname INTO insecure_role FROM pg_roles
      WHERE rolname IN ('systematic_fx_holdout_owner',
                        'systematic_fx_research_daemon',
-                       'systematic_fx_holdout_executor')
+                       'systematic_fx_holdout_executor',
+                       'systematic_fx_m0b_worker_api_owner',
+                       'systematic_fx_m0b_worker')
        AND (rolcanlogin OR rolsuper OR rolcreatedb OR rolcreaterole OR rolinherit
             OR rolreplication OR rolbypassrls)
      ORDER BY rolname LIMIT 1;
@@ -28,8 +30,120 @@ BEGIN
         CREATE ROLE systematic_fx_holdout_executor NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE
             NOINHERIT NOREPLICATION NOBYPASSRLS;
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_roles
+                    WHERE rolname = 'systematic_fx_m0b_worker_api_owner') THEN
+        CREATE ROLE systematic_fx_m0b_worker_api_owner NOLOGIN NOSUPERUSER NOCREATEDB
+            NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'systematic_fx_m0b_worker') THEN
+        CREATE ROLE systematic_fx_m0b_worker NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE
+            NOINHERIT NOREPLICATION NOBYPASSRLS;
+    END IF;
 END
 $roles$;
+
+DO $worker_database_boundary$
+BEGIN
+    EXECUTE format(
+        'REVOKE CREATE ON DATABASE %I FROM systematic_fx_m0b_worker',
+        current_database());
+END
+$worker_database_boundary$;
+
+DO $worker_api$
+DECLARE capability record;
+BEGIN
+    IF to_regclass('systematic_fx.m0b_worker_leases') IS NULL
+       OR to_regclass('systematic_fx.m0b_admission_decisions') IS NULL THEN
+        RAISE EXCEPTION 'M0b worker capability migration 0030 is not installed';
+    END IF;
+    FOR capability IN
+        SELECT * FROM (VALUES
+            ('m0b_worker_claim_next(text,text,text,integer)'),
+            ('m0b_worker_checkpoint(bigint,bigint,text,integer,text,text,jsonb)'),
+            ('m0b_worker_terminalize(bigint,bigint,text,text,bigint,jsonb)'),
+            ('m0b_worker_fail(bigint,bigint,text,text,boolean)')
+        ) AS item(signature)
+    LOOP
+        IF to_regprocedure('systematic_fx.' || capability.signature) IS NULL THEN
+            RAISE EXCEPTION 'required M0b worker capability is absent: %',
+                capability.signature;
+        END IF;
+        EXECUTE format(
+            'ALTER FUNCTION systematic_fx.%s OWNER TO systematic_fx_m0b_worker_api_owner',
+            capability.signature);
+        EXECUTE format('REVOKE ALL ON FUNCTION systematic_fx.%s FROM PUBLIC',
+                       capability.signature);
+        EXECUTE format(
+            'REVOKE ALL ON FUNCTION systematic_fx.%s FROM systematic_fx_research_daemon, systematic_fx_holdout_executor',
+            capability.signature);
+        EXECUTE format(
+            'GRANT EXECUTE ON FUNCTION systematic_fx.%s TO systematic_fx_m0b_worker',
+            capability.signature);
+    END LOOP;
+END
+$worker_api$;
+
+GRANT USAGE ON SCHEMA systematic_fx TO systematic_fx_m0b_worker;
+GRANT USAGE ON SCHEMA systematic_fx TO systematic_fx_m0b_worker_api_owner;
+GRANT EXECUTE ON FUNCTION systematic_fx.m0b_worker_authorized(),
+    systematic_fx.m0b_numeric_admission_rules_valid(jsonb),
+    systematic_fx.m0b_numeric_metrics_valid(jsonb),
+    systematic_fx.m0b_numeric_metrics_admitted(jsonb,jsonb),
+    systematic_fx.m0b_worker_checkpoint_state_valid(jsonb,jsonb),
+    systematic_fx.canonical_jsonb_sha256(jsonb)
+    TO systematic_fx_m0b_worker_api_owner;
+GRANT SELECT ON systematic_fx.campaigns, systematic_fx.m0b_epochs,
+    systematic_fx.m0b_candidates, systematic_fx.research_run_attempts,
+    systematic_fx.m0b_worker_leases, systematic_fx.m0b_admission_decisions,
+    systematic_fx.artifacts, systematic_fx.m0b_artifact_links,
+    systematic_fx.m0b_checkpoints TO systematic_fx_m0b_worker_api_owner;
+GRANT SELECT ON systematic_fx.research_run_specs, systematic_fx.experiments,
+    systematic_fx.experiment_trials, systematic_fx.phase1a_outcome_replay_manifests,
+    systematic_fx.bar_state_artifact_links, systematic_fx.publication_outbox
+    TO systematic_fx_m0b_worker_api_owner;
+-- PostgreSQL requires UPDATE privilege for the row-locking clauses used by
+-- the governance triggers, even though these dependency rows are never
+-- changed by the four worker API bodies.
+GRANT UPDATE ON systematic_fx.campaigns, systematic_fx.m0b_epochs,
+    systematic_fx.research_run_specs, systematic_fx.experiments
+    TO systematic_fx_m0b_worker_api_owner;
+GRANT INSERT, UPDATE ON systematic_fx.research_run_attempts,
+    systematic_fx.m0b_candidates, systematic_fx.m0b_worker_leases
+    TO systematic_fx_m0b_worker_api_owner;
+GRANT INSERT ON systematic_fx.m0b_checkpoints,
+    systematic_fx.m0b_admission_decisions, systematic_fx.artifacts,
+    systematic_fx.m0b_artifact_links TO systematic_fx_m0b_worker_api_owner;
+GRANT INSERT, UPDATE ON systematic_fx.publication_outbox
+    TO systematic_fx_m0b_worker_api_owner;
+GRANT USAGE, SELECT ON SEQUENCE
+    systematic_fx.research_run_attempts_research_run_attempt_id_seq,
+    systematic_fx.m0b_checkpoints_m0b_checkpoint_id_seq,
+    systematic_fx.m0b_admission_decisions_m0b_admission_decision_id_seq,
+    systematic_fx.artifacts_artifact_id_seq,
+    systematic_fx.m0b_artifact_links_m0b_artifact_link_id_seq
+    TO systematic_fx_m0b_worker_api_owner;
+
+REVOKE ALL ON ALL TABLES IN SCHEMA systematic_fx FROM systematic_fx_m0b_worker;
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA systematic_fx FROM systematic_fx_m0b_worker;
+REVOKE ALL ON ALL FUNCTIONS IN SCHEMA systematic_fx FROM systematic_fx_m0b_worker;
+REVOKE CREATE ON SCHEMA systematic_fx FROM systematic_fx_m0b_worker;
+GRANT SELECT ON systematic_fx.campaigns, systematic_fx.m0b_epochs,
+    systematic_fx.m0b_candidates, systematic_fx.research_run_attempts,
+    systematic_fx.m0b_admission_decisions, systematic_fx.artifacts,
+    systematic_fx.m0b_artifact_links, systematic_fx.m0b_checkpoints
+    TO systematic_fx_m0b_worker;
+
+-- The blanket function revoke above is intentional; restore only the exact
+-- four mutation capabilities after every idempotent provisioning pass.
+GRANT EXECUTE ON FUNCTION systematic_fx.m0b_worker_claim_next(text,text,text,integer)
+    TO systematic_fx_m0b_worker;
+GRANT EXECUTE ON FUNCTION systematic_fx.m0b_worker_checkpoint(
+    bigint,bigint,text,integer,text,text,jsonb) TO systematic_fx_m0b_worker;
+GRANT EXECUTE ON FUNCTION systematic_fx.m0b_worker_terminalize(
+    bigint,bigint,text,text,bigint,jsonb) TO systematic_fx_m0b_worker;
+GRANT EXECUTE ON FUNCTION systematic_fx.m0b_worker_fail(
+    bigint,bigint,text,text,boolean) TO systematic_fx_m0b_worker;
 
 DO $sealed_objects$
 DECLARE
@@ -156,6 +270,13 @@ REVOKE ALL ON ALL SEQUENCES IN SCHEMA systematic_fx_sealed
     FROM systematic_fx_research_daemon;
 REVOKE ALL ON ALL FUNCTIONS IN SCHEMA systematic_fx_sealed
     FROM systematic_fx_research_daemon;
+REVOKE ALL ON SCHEMA systematic_fx_sealed FROM systematic_fx_m0b_worker;
+REVOKE ALL ON ALL TABLES IN SCHEMA systematic_fx_sealed
+    FROM systematic_fx_m0b_worker;
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA systematic_fx_sealed
+    FROM systematic_fx_m0b_worker;
+REVOKE ALL ON ALL FUNCTIONS IN SCHEMA systematic_fx_sealed
+    FROM systematic_fx_m0b_worker;
 REVOKE ALL ON systematic_fx.datasets, systematic_fx.source_files,
     systematic_fx.instruments, systematic_fx.campaigns,
     systematic_fx.campaign_splits, systematic_fx.campaign_days,
@@ -164,7 +285,8 @@ REVOKE ALL ON systematic_fx.datasets, systematic_fx.source_files,
     systematic_fx.experiments, systematic_fx.m0b_epochs,
     systematic_fx.artifacts, systematic_fx.research_run_specs,
     systematic_fx.research_run_attempts, systematic_fx.m0b_candidates,
-    systematic_fx.m0b_checkpoints, systematic_fx.m0b_artifact_links
+    systematic_fx.m0b_checkpoints, systematic_fx.m0b_artifact_links,
+    systematic_fx.m0b_admission_decisions, systematic_fx.m0b_worker_leases
     FROM systematic_fx_research_daemon;
 REVOKE ALL ON SCHEMA systematic_fx_sealed FROM systematic_fx_holdout_executor;
 REVOKE ALL ON ALL TABLES IN SCHEMA systematic_fx_sealed
@@ -215,6 +337,27 @@ BEGIN
                       'systematic_fx_holdout_owner', 'MEMBER')
        OR pg_has_role('systematic_fx_holdout_executor',
                       'systematic_fx_holdout_owner', 'MEMBER')
+       OR pg_has_role('systematic_fx_m0b_worker',
+                      'systematic_fx_research_daemon', 'MEMBER')
+       OR pg_has_role('systematic_fx_research_daemon',
+                      'systematic_fx_m0b_worker', 'MEMBER')
+       OR pg_has_role('systematic_fx_m0b_worker',
+                      'systematic_fx_holdout_executor', 'MEMBER')
+       OR pg_has_role('systematic_fx_m0b_worker',
+                      'systematic_fx_holdout_owner', 'MEMBER')
+       OR pg_has_role('systematic_fx_m0b_worker',
+                      'systematic_fx_m0b_worker_api_owner', 'MEMBER')
+       OR EXISTS (
+            SELECT 1 FROM pg_roles AS target
+             WHERE target.rolname <> 'systematic_fx_m0b_worker'
+               AND pg_has_role('systematic_fx_m0b_worker', target.rolname, 'MEMBER')
+       )
+       OR EXISTS (
+            SELECT 1 FROM pg_roles AS target
+             WHERE target.rolname <> 'systematic_fx_m0b_worker_api_owner'
+               AND pg_has_role('systematic_fx_m0b_worker_api_owner',
+                               target.rolname, 'MEMBER')
+       )
        OR EXISTS (
             SELECT 1 FROM pg_roles AS target
              WHERE target.rolname NOT IN ('systematic_fx_research_daemon',

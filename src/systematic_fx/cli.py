@@ -887,6 +887,236 @@ def _m0b_real_slice_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def _m0b_active_contract_command(args: argparse.Namespace) -> int:
+    from systematic_fx.data.cme_active_contract import (
+        ActiveContractEvidenceError,
+        load_active_contract_volume_manifest,
+        materialize_active_contract_mapping_artifact,
+    )
+    from systematic_fx.data.cme_schedule import (
+        CmeScheduleEvidenceError,
+        load_cme_schedule_archive,
+        verify_schedule_upstream_source,
+    )
+
+    settings = Settings.from_env()
+    try:
+        if (args.schedule_archive is None) != (args.schedule_source is None):
+            raise ActiveContractEvidenceError(
+                "schedule archive and archived source must be supplied together"
+            )
+        schedule = None
+        if args.schedule_archive is not None:
+            schedule = load_cme_schedule_archive(
+                args.schedule_archive,
+                allow_test_fixture=args.allow_test_fixture,
+            )
+            schedule = verify_schedule_upstream_source(schedule, args.schedule_source)
+        manifest = load_active_contract_volume_manifest(
+            args.manifest,
+            schedule_archive=schedule,
+            allow_bounded_weekday_fallback=args.allow_bounded_weekday_fallback,
+        )
+        artifact = materialize_active_contract_mapping_artifact(
+            manifest,
+            data_root=args.data_root or settings.data_root,
+            verify_source_hashes=True,
+        )
+    except (
+        ActiveContractEvidenceError,
+        CmeScheduleEvidenceError,
+        FileNotFoundError,
+        OSError,
+    ) as error:
+        print(error, file=sys.stderr)
+        return 2
+    _m0a_emit(
+        {
+            **artifact.as_dict(),
+            "content_sha256": artifact.content_sha256,
+            "status": "POINT_IN_TIME_ACTIVE_MAPPING_VERIFIED_NOT_ENTRY_AUTHORIZATION",
+        },
+        emit_json=args.json,
+    )
+    return 0
+
+
+def _m0b_schedule_archive_command(args: argparse.Namespace) -> int:
+    from systematic_fx.data.cme_schedule import (
+        CmeScheduleEvidenceError,
+        load_cme_schedule_archive,
+        verify_schedule_upstream_source,
+    )
+
+    try:
+        archive = load_cme_schedule_archive(
+            args.archive,
+            allow_test_fixture=args.allow_test_fixture,
+        )
+        archive = verify_schedule_upstream_source(archive, args.source)
+    except (CmeScheduleEvidenceError, FileNotFoundError, OSError) as error:
+        print(error, file=sys.stderr)
+        return 2
+    _m0a_emit(
+        {
+            "archive_sha256": archive.sha256,
+            "covered_end_exclusive": archive.covered_end_exclusive,
+            "covered_start": archive.covered_start,
+            "evidence_kind": archive.evidence_kind,
+            "product_root": archive.product_root,
+            "session_revision_count": len(archive.sessions),
+            "source_id": archive.source_id,
+            "source_sha256": archive.source_sha256,
+            "status": "SCHEDULE_ARCHIVE_VERIFIED_NOT_TRADING_STATUS",
+            "venue": archive.venue,
+            "version": archive.version,
+        },
+        emit_json=args.json,
+    )
+    return 0
+
+
+def _m0b_status_evidence_command(args: argparse.Namespace) -> int:
+    from systematic_fx.data.cme_status import (
+        CmeStatusEvidenceError,
+        load_cme_trading_status_evidence,
+        verify_status_upstream_source,
+    )
+
+    try:
+        evidence = load_cme_trading_status_evidence(
+            args.evidence,
+            allow_test_fixture=args.allow_test_fixture,
+        )
+        evidence = verify_status_upstream_source(evidence, args.source)
+        decision = None
+        if args.event_ts_ns is not None:
+            decision = evidence.status_at(
+                args.event_ts_ns,
+                venue="CME_GLOBEX",
+                product_root="6E",
+            )
+    except (CmeStatusEvidenceError, FileNotFoundError, OSError) as error:
+        print(error, file=sys.stderr)
+        return 2
+    _m0a_emit(
+        {
+            "covered_end_ts_ns": evidence.covered_end_ts_ns,
+            "covered_start_ts_ns": evidence.covered_start_ts_ns,
+            "decision": None if decision is None else decision.as_dict(),
+            "evidence_kind": evidence.evidence_kind,
+            "evidence_sha256": evidence.sha256,
+            "maximum_observation_age_seconds": evidence.maximum_observation_age_seconds,
+            "observation_count": len(evidence.observations),
+            "product_root": evidence.product_root,
+            "source_id": evidence.source_id,
+            "source_sha256": evidence.source_sha256,
+            "status": "POINT_IN_TIME_STATUS_EVIDENCE_VERIFIED",
+            "venue": evidence.venue,
+            "version": evidence.version,
+        },
+        emit_json=args.json,
+    )
+    return 0
+
+
+def _m0b_first_passage_command(args: argparse.Namespace) -> int:
+    from systematic_fx.research.m0b.first_passage_store import (
+        FirstPassageStoreError,
+        build_first_passage_store,
+        load_first_passage_store,
+    )
+    from systematic_fx.research.m0b.materialize import load_materialized_real_slice
+    from systematic_fx.research.m0b.model import RealSliceError
+    from systematic_fx.research.m0b.store_config import load_first_passage_store_config
+
+    try:
+        config = load_first_passage_store_config(args.store_config)
+        if args.m0b_action == "build-first-passage-store":
+            build = load_materialized_real_slice(args.build)
+            source_root = args.staged_root or args.build.parent
+            store = build_first_passage_store(
+                config.store_spec,
+                build,
+                staged_root=source_root,
+                output_root=args.store_root,
+            )
+            manifest_path = args.store_root / f"first-passage-store-{store.sha256}.json"
+        else:
+            store = load_first_passage_store(args.store, verify_shards=True)
+            manifest_path = args.store
+        config.verify_store(store)
+    except (FirstPassageStoreError, RealSliceError, FileNotFoundError, OSError) as error:
+        print(error, file=sys.stderr)
+        return 2
+    _m0a_emit(
+        {
+            **store.as_dict(),
+            "manifest_path": manifest_path,
+            "store_sha256": store.sha256,
+            "status": "SEARCH_ONLY_FIRST_PASSAGE_STORE_VERIFIED",
+        },
+        emit_json=args.json,
+    )
+    return 0
+
+
+def _m0b_worker_cycle_command(args: argparse.Namespace) -> int:
+    import psycopg
+
+    from systematic_fx.db.m0b_worker_access import (
+        M0bWorkerAccessError,
+        verify_m0b_worker_access,
+    )
+    from systematic_fx.db.m0b_worker_registry import M0bWorkerRegistryError
+    from systematic_fx.research.m0b.runner import M0bRunnerError, run_claimed_worker_cycle
+
+    database_url = args.database_url or os.environ.get("SYSTEMATIC_FX_M0B_WORKER_DATABASE_URL")
+    expected_session_user = args.expected_session_user or os.environ.get(
+        "SYSTEMATIC_FX_M0B_WORKER_DATABASE_USER"
+    )
+    if not database_url or not expected_session_user:
+        print("M0b worker database URL and expected session user are required", file=sys.stderr)
+        return 2
+    try:
+        access = verify_m0b_worker_access(
+            database_url,
+            expected_session_user=expected_session_user,
+        )
+        result = run_claimed_worker_cycle(
+            database_url,
+            epoch_key=args.epoch_key,
+            worker_id=args.worker_id,
+            worker_root=args.worker_root,
+        )
+    except (
+        M0bRunnerError,
+        M0bWorkerAccessError,
+        M0bWorkerRegistryError,
+        OSError,
+        psycopg.Error,
+        ValueError,
+    ) as error:
+        _m0a_emit(
+            {"error": str(error), "status": "FAILED_CLOSED"},
+            emit_json=args.json,
+        )
+        return 2
+    _m0a_emit(
+        {
+            "access_status": access.status,
+            "candidate_sha256": result.candidate_sha256,
+            "error": result.error,
+            "research_run_attempt_id": result.research_run_attempt_id,
+            "result": result.result,
+            "status": result.status,
+            "work_spec_sha256": result.work_spec_sha256,
+        },
+        emit_json=args.json,
+    )
+    return 1 if result.status == "FAILED" else 0
+
+
 def _verify_holdout_isolation_command(args: argparse.Namespace) -> int:
     import psycopg
 
@@ -915,6 +1145,33 @@ def _verify_holdout_isolation_command(args: argparse.Namespace) -> int:
             {"status": "NOT_PROVISIONED", "error": str(error)},
             emit_json=args.json,
         )
+        return 2
+    _m0a_emit(report, emit_json=args.json)
+    return 0
+
+
+def _verify_m0b_worker_access_command(args: argparse.Namespace) -> int:
+    import psycopg
+
+    from systematic_fx.db.m0b_worker_access import (
+        M0bWorkerAccessError,
+        verify_m0b_worker_access,
+    )
+
+    database_url = args.database_url or os.environ.get("SYSTEMATIC_FX_M0B_WORKER_DATABASE_URL")
+    expected_session_user = args.expected_session_user or os.environ.get(
+        "SYSTEMATIC_FX_M0B_WORKER_DATABASE_USER"
+    )
+    if not database_url or not expected_session_user:
+        print("M0b worker database URL and expected session user are required", file=sys.stderr)
+        return 2
+    try:
+        report = verify_m0b_worker_access(
+            database_url,
+            expected_session_user=expected_session_user,
+        )
+    except (M0bWorkerAccessError, psycopg.Error) as error:
+        _m0a_emit({"status": "NOT_PROVISIONED", "error": str(error)}, emit_json=args.json)
         return 2
     _m0a_emit(report, emit_json=args.json)
     return 0
@@ -1675,6 +1932,100 @@ def build_parser() -> argparse.ArgumentParser:
     m0b_verify.add_argument("--build", type=Path, required=True)
     m0b_verify.set_defaults(handler=_m0b_real_slice_command)
 
+    m0b_active = m0b_commands.add_parser(
+        "verify-active-contract-mapping",
+        help="recompute the exact prior-session-volume mapping from its raw allowlist",
+    )
+    m0b_active.add_argument(
+        "--manifest",
+        type=Path,
+        default=Path("configs/data/cme_6e_active_contract_roll_context_v1.toml"),
+    )
+    m0b_active.add_argument("--data-root", type=Path)
+    m0b_active.add_argument("--schedule-archive", type=Path)
+    m0b_active.add_argument("--schedule-source", type=Path)
+    m0b_active.add_argument(
+        "--allow-test-fixture",
+        action="store_true",
+        help="explicitly permit deterministic schedule fixture evidence",
+    )
+    m0b_active.add_argument(
+        "--allow-bounded-weekday-fallback",
+        action="store_true",
+        help="permit the exact holiday-free bounded roll-context manifest without an archive",
+    )
+    m0b_active.add_argument("--json", action="store_true", help="emit JSON")
+    m0b_active.set_defaults(handler=_m0b_active_contract_command)
+
+    m0b_schedule = m0b_commands.add_parser(
+        "verify-schedule-archive",
+        help="verify immutable CME schedule revisions and their archived source bytes",
+    )
+    m0b_schedule.add_argument("--archive", type=Path, required=True)
+    m0b_schedule.add_argument("--source", type=Path, required=True)
+    m0b_schedule.add_argument(
+        "--allow-test-fixture",
+        action="store_true",
+        help="explicitly permit deterministic fixture evidence",
+    )
+    m0b_schedule.add_argument("--json", action="store_true", help="emit JSON")
+    m0b_schedule.set_defaults(handler=_m0b_schedule_archive_command)
+
+    m0b_status = m0b_commands.add_parser(
+        "verify-status-evidence",
+        help="verify point-in-time CME status evidence without inferring it from hours",
+    )
+    m0b_status.add_argument("--evidence", type=Path, required=True)
+    m0b_status.add_argument("--source", type=Path, required=True)
+    m0b_status.add_argument("--event-ts-ns", type=_nonnegative_int)
+    m0b_status.add_argument(
+        "--allow-test-fixture",
+        action="store_true",
+        help="explicitly permit deterministic fixture evidence",
+    )
+    m0b_status.add_argument("--json", action="store_true", help="emit JSON")
+    m0b_status.set_defaults(handler=_m0b_status_evidence_command)
+
+    m0b_store_build = m0b_commands.add_parser(
+        "build-first-passage-store",
+        help="shard one exact quote-aware label artifact at complete event boundaries",
+    )
+    m0b_store_build.add_argument(
+        "--store-config",
+        type=Path,
+        default=Path("configs/research/m0b_first_passage_store_v1.toml"),
+    )
+    m0b_store_build.add_argument("--build", type=Path, required=True)
+    m0b_store_build.add_argument("--staged-root", type=Path)
+    m0b_store_build.add_argument("--store-root", type=Path, required=True)
+    m0b_store_build.add_argument("--json", action="store_true", help="emit JSON")
+    m0b_store_build.set_defaults(handler=_m0b_first_passage_command)
+
+    m0b_store_verify = m0b_commands.add_parser(
+        "verify-first-passage-store",
+        help="verify an immutable store manifest and every content-addressed shard",
+    )
+    m0b_store_verify.add_argument(
+        "--store-config",
+        type=Path,
+        default=Path("configs/research/m0b_first_passage_store_v1.toml"),
+    )
+    m0b_store_verify.add_argument("--store", type=Path, required=True)
+    m0b_store_verify.add_argument("--json", action="store_true", help="emit JSON")
+    m0b_store_verify.set_defaults(handler=_m0b_first_passage_command)
+
+    m0b_worker_cycle = m0b_commands.add_parser(
+        "worker-cycle",
+        help="claim and execute at most one immutable pre-registered M0b work item",
+    )
+    m0b_worker_cycle.add_argument("--epoch-key", required=True)
+    m0b_worker_cycle.add_argument("--worker-id", required=True)
+    m0b_worker_cycle.add_argument("--worker-root", type=Path, required=True)
+    m0b_worker_cycle.add_argument("--database-url")
+    m0b_worker_cycle.add_argument("--expected-session-user")
+    m0b_worker_cycle.add_argument("--json", action="store_true", help="emit JSON")
+    m0b_worker_cycle.set_defaults(handler=_m0b_worker_cycle_command)
+
     exposure_parser = research_commands.add_parser(
         "exposure",
         help="record one immutable AI-visible query or non-research pipeline pilot",
@@ -1702,6 +2053,15 @@ def build_parser() -> argparse.ArgumentParser:
     holdout_verify_parser.add_argument("--expected-session-user")
     holdout_verify_parser.add_argument("--json", action="store_true", help="emit JSON")
     holdout_verify_parser.set_defaults(handler=_verify_holdout_isolation_command)
+
+    worker_verify_parser = db_commands.add_parser(
+        "verify-m0b-worker-access",
+        help="prove the least-privilege M0b worker LOGIN boundary",
+    )
+    worker_verify_parser.add_argument("--database-url")
+    worker_verify_parser.add_argument("--expected-session-user")
+    worker_verify_parser.add_argument("--json", action="store_true", help="emit JSON")
+    worker_verify_parser.set_defaults(handler=_verify_m0b_worker_access_command)
 
     local_parser = db_commands.add_parser(
         "local",

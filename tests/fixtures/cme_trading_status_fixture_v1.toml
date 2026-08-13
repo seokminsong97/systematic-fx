@@ -1,0 +1,29 @@
+[evidence]
+schema = "systematic_fx.cme_trading_status_evidence.v1"
+version = "deterministic_status_fixture_v1"
+evidence_kind = "DETERMINISTIC_TEST_FIXTURE"
+venue = "CME_GLOBEX"
+product_root = "6E"
+source_id = "TEST_ONLY_NOT_CME_EVIDENCE"
+source_sha256 = "8add5afc95315f484eff1910ed2a3aeb11dc2cb5643929ed6f025244dcdbac25"
+covered_start_ts_ns = 1662033600000000000
+covered_end_ts_ns = 1662048000000000000
+maximum_observation_age_seconds = 900
+
+[[observations]]
+effective_ts_ns = 1662037200000000000
+observed_ts_ns = 1662037201000000000
+source_sequence = 1
+status = "OPEN"
+
+[[observations]]
+effective_ts_ns = 1662040800000000000
+observed_ts_ns = 1662040801000000000
+source_sequence = 2
+status = "HALTED"
+
+[[observations]]
+effective_ts_ns = 1662044400000000000
+observed_ts_ns = 1662044401000000000
+source_sequence = 3
+status = "OPEN"

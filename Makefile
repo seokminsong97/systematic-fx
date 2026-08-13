@@ -10,7 +10,7 @@ QC_MANIFEST = data/derived/manifests/mbp10_structural_qc_v1.jsonl
 QC_MUTATION_MANIFEST = data/derived/manifests/mbp10_clean_trade_none_book_mutations_v1.jsonl
 QC_PROGRESS_EVERY ?= 250
 
-.PHONY: setup db-init db-start db-stop db-status db-bootstrap db-bootstrap-test db-up catalog hash data-register qc qc-inspect qc-register smoke pilot doctor test lint format notebook research-ready m0b-real-slice m0b-pg-gate m0b-holdout-verify
+.PHONY: setup db-init db-start db-stop db-status db-bootstrap db-bootstrap-test db-up catalog hash data-register qc qc-inspect qc-register smoke pilot doctor test lint format notebook research-ready m0b-real-slice m0b-active-contract m0b-schedule-fixture m0b-status-fixture m0b-first-passage m0b-worker-cycle m0b-pg-gate m0b-holdout-verify m0b-worker-verify
 
 setup:
 	$(UV) sync --all-extras --locked
@@ -81,10 +81,41 @@ research-ready: setup data-register smoke test doctor
 m0b-real-slice:
 	$(UV_RUN) systematic-fx research m0b materialize-real-slice
 
+m0b-active-contract:
+	$(UV_RUN) systematic-fx research m0b verify-active-contract-mapping \
+		--allow-bounded-weekday-fallback
+
+m0b-schedule-fixture:
+	$(UV_RUN) systematic-fx research m0b verify-schedule-archive \
+		--archive tests/fixtures/cme_schedule_archive_fixture_v1.toml \
+		--source tests/fixtures/cme_schedule_upstream_fixture_v1.txt \
+		--allow-test-fixture
+
+m0b-status-fixture:
+	$(UV_RUN) systematic-fx research m0b verify-status-evidence \
+		--evidence tests/fixtures/cme_trading_status_fixture_v1.toml \
+		--source tests/fixtures/cme_trading_status_upstream_fixture_v1.txt \
+		--allow-test-fixture
+
+m0b-first-passage:
+	$(UV_RUN) systematic-fx research m0b build-first-passage-store \
+		--build artifacts/research/m0b_real_slice_v1/build-17f4ccdcb839c70bfdd95c9d00a2b37ca6d31fff89c34439a2adcaac4c32cf5f.json \
+		--store-root artifacts/research/m0b_first_passage_store_v1
+
+m0b-worker-cycle:
+	$(UV_RUN) systematic-fx research m0b worker-cycle \
+		--epoch-key "$(M0B_EPOCH_KEY)" \
+		--worker-id "$${M0B_WORKER_ID:-m0b-worker-1}" \
+		--worker-root artifacts/research/m0b_worker
+
 m0b-pg-gate:
 	SYSTEMATIC_FX_RUN_M0B_PG_GATE=1 $(UV_RUN) pytest \
 		tests/integration/test_m0b_control_plane_postgres.py \
-		tests/integration/test_m0b_holdout_provisioning_postgres.py -q -s
+		tests/integration/test_m0b_holdout_provisioning_postgres.py \
+		tests/integration/test_m0b_worker_capability_postgres.py -q -s
 
 m0b-holdout-verify:
 	$(UV_RUN) systematic-fx db verify-holdout-isolation --json
+
+m0b-worker-verify:
+	$(UV_RUN) systematic-fx db verify-m0b-worker-access --json

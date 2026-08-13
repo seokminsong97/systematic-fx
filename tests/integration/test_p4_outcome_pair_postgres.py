@@ -966,9 +966,9 @@ def verify_fresh_migration_chain(base: dict[str, str], admin_url: str) -> None:
     try:
         first = apply_migrations(database_url)
         repeated = apply_migrations(database_url)
-        if first.applied != tuple(range(1, 30)) or first.skipped:
+        if first.applied != tuple(range(1, 31)) or first.skipped:
             raise AssertionError(f"fresh P4 migration chain drift: {first}")
-        if repeated.applied or repeated.skipped != tuple(range(1, 30)):
+        if repeated.applied or repeated.skipped != tuple(range(1, 31)):
             raise AssertionError(f"repeated P4 migration chain drift: {repeated}")
         with psycopg.connect(database_url) as connection:
             versions = tuple(
@@ -977,9 +977,9 @@ def verify_fresh_migration_chain(base: dict[str, str], admin_url: str) -> None:
                     "SELECT version FROM systematic_fx.schema_migrations ORDER BY version"
                 ).fetchall()
             )
-        if versions != tuple(range(1, 30)):
+        if versions != tuple(range(1, 31)):
             raise AssertionError(f"stored P4 migration versions drift: {versions}")
-        print("MIGRATIONS fresh=1..29 repeated=all-skipped")
+        print("MIGRATIONS fresh=1..30 repeated=all-skipped")
     finally:
         with psycopg.connect(admin_url, autocommit=True) as connection:
             connection.execute(sql.SQL("DROP DATABASE {}").format(sql.Identifier(database_name)))

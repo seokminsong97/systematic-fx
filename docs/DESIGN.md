@@ -143,20 +143,61 @@ candidate registration, lifecycle regression, unfinished epoch failure, and
 post-terminal mutation; this prevents a generic ledger row from bypassing the
 M0b authority boundary.
 No M0b table or procedure represents holdout opening, Paper/Live eligibility,
-or order authority. The current M0b PostgreSQL path is a control-plane API and
-disposable lifecycle gate, not yet a production daemon runner: candidate
-RunSpec and budget-row registration must use the atomic
-`register_m0b_candidate` boundary, and a separately provisioned unprivileged
-login must pass the deployment verifier before a governed real epoch may run.
-That verifier currently proves a denial-only credential and intentionally
-rejects direct M0b ledger DML and all reachable `SECURITY DEFINER` routines; a
-future worker needs a separately audited, allowlisted mutation API.
+or order authority. Candidate RunSpec, the immutable CandidateWork artifact
+identity and the budget row must register atomically through
+`register_m0b_candidate`.
+Migration `0030` adds four narrowly scoped `SECURITY DEFINER` capabilities for
+claim, checkpoint, terminal result and failure/retry; its actual-login verifier
+accepts only that allowlist and rejects direct ledger DML. CandidateWork v2
+binds the canonical candidate's volatility bracket to its exact rational label
+identity, and binds the evaluation policy plus cost/execution/split hashes.
+Lease tokens are hidden from worker reads and bound to the authenticated LOGIN;
+a terminal result must equal the latest complete checkpoint's hash, size,
+metrics, and DB-derived classification. The bounded
+`research m0b worker-cycle` launcher resolves and fully verifies the claimed
+CandidateWork hash, signal and first-passage store before advancing at most one
+pre-registered candidate. Its owner-only durable lease token, heartbeat,
+expired-attempt recovery and exact terminal/failure replay make the cycle
+restart safe without granting candidate generation or promotion authority.
+This is an operational finite worker boundary, not authorization for a real
+performance epoch or an assertion that a production service is deployed.
 
 The scheduled CME reference and trading-status evidence are distinct inputs.
 A scheduled-open interval proves only that a known close is not crossed; it
 does not prove the market was continuously tradable. Consequently a real M0b
 label stays ineligible whenever status coverage is absent, even if its
 quote-aware first-passage outcome can be computed for pipeline diagnostics.
+Status evidence is evaluated as-of the event timestamp: an observation whose
+publication timestamp is still in the future, has exceeded its frozen maximum
+age, or falls outside the exact CME Globex 6E scope fails closed. A verified
+OPEN snapshot authorizes only the entry-time status fact; subsequent status
+transitions belong to chronological execution replay.
+Full entry eligibility additionally requires both schedule and status archive
+files to reopen with their separately frozen upstream-source hashes; a caller-
+constructed evidence object or recurring-hours fallback cannot authorize entry.
+
+The production calendar surface is likewise an immutable schedule archive,
+not an extrapolation of recurring weekly hours. Each session revision carries
+its publication timestamp, exact open/close and break intervals, source/file
+identity, and bounded coverage. An as-of query may consume only a revision
+published by that timestamp. Missing dates, overlapping intervals, or an
+absent official archive fail closed; the narrow M0b mechanics reference is not
+treated as multi-year holiday or emergency-closure evidence.
+
+Schedule revisions are selected point-in-time (`published_ts <= event_ts`) and
+entry eligibility requires the archive as-of time to equal the event time. The
+same archive resolves the previous completed session for volume-based active
+contract selection. Weekday subtraction is therefore only a bounded,
+holiday-free fallback and cannot authorize a production epoch; scheduled
+availability and operational status remain independent proofs.
+
+Active-contract selection is a separate point-in-time fact. The policy sums
+trade volume over the entire previous completed CME trading session across its
+UTC source partitions and exposes the result only after that session closes.
+It may honestly select a contract already inside its roll guard; the entry
+eligibility layer then blocks the new trade. This separation prevents a risk
+rule from silently rewriting historical active-contract evidence and preserves
+the invariant that an accepted trade keeps its entry `instrument_id` to exit.
 
 ### Historical replay invariant
 

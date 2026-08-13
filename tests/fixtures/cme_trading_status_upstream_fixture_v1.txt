@@ -1,0 +1,2 @@
+Deterministic test-only CME trading-status upstream fixture.
+This file is not CME evidence and may never authorize production entry.

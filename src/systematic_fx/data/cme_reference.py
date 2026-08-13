@@ -14,6 +14,9 @@ from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from systematic_fx.data.cme_schedule import CmeScheduleArchive, CmeScheduleEvidenceError
+from systematic_fx.data.cme_status import CmeStatusEvidenceError, CmeTradingStatusEvidence
+
 _NS = 1_000_000_000
 _SYMBOL = re.compile(r"^6E[FGHJKMNQUVXZ][0-9]{1,2}$")
 
@@ -101,6 +104,8 @@ class ScheduledEntryEligibility:
     trading_date: date | None
     next_scheduled_close_ts_ns: int | None
     status_coverage: bool
+    status_evidence_sha256: str | None = None
+    status_observed_ts_ns: int | None = None
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -109,6 +114,8 @@ class ScheduledEntryEligibility:
             "reason": self.reason,
             "session_id": self.session_id,
             "status_coverage": self.status_coverage,
+            "status_evidence_sha256": self.status_evidence_sha256,
+            "status_observed_ts_ns": self.status_observed_ts_ns,
             "trading_date": self.trading_date.isoformat() if self.trading_date else None,
         }
 
@@ -227,9 +234,44 @@ class Cme6EReference:
         raw_symbol: str,
         event_ts_ns: int,
         max_hold_seconds: int,
+        *,
+        schedule_archive: CmeScheduleArchive | None = None,
     ) -> ScheduledEntryEligibility:
         if max_hold_seconds <= 0:
             raise CmeReferenceError("max_hold_seconds must be positive")
+        if schedule_archive is not None:
+            if (
+                not isinstance(schedule_archive, CmeScheduleArchive)
+                or schedule_archive.venue != "CME_GLOBEX"
+                or schedule_archive.product_root != "6E"
+            ):
+                raise CmeReferenceError("schedule archive is not canonical CME Globex 6E")
+            window = schedule_archive.entry_window_as_of(
+                event_ts_ns,
+                max_hold_seconds,
+                as_of_ts_ns=event_ts_ns,
+            )
+            if window.session is None:
+                return ScheduledEntryEligibility(False, window.reason, None, None, None, False)
+            archived_session = window.session
+            contract = self.contract(raw_symbol, as_of_date=archived_session.trading_date)
+            end_ts = event_ts_ns + max_hold_seconds * _NS
+            if event_ts_ns >= contract.roll_guard_start_ts_ns:
+                reason = "ROLL_GUARD"
+            elif end_ts > contract.roll_guard_start_ts_ns:
+                reason = "CROSSES_ROLL_GUARD"
+            elif not window.eligible:
+                reason = window.reason
+            else:
+                reason = "SCHEDULE_ONLY_STATUS_UNVERIFIED"
+            return ScheduledEntryEligibility(
+                eligible=False,
+                reason=reason,
+                session_id=f"CME_GLOBEX_6E:{archived_session.trading_date.isoformat()}",
+                trading_date=archived_session.trading_date,
+                next_scheduled_close_ts_ns=archived_session.close_ts_ns,
+                status_coverage=False,
+            )
         matching: TradingSession | None = None
         day = self.covered_start
         while day < self.covered_end_exclusive:
@@ -262,6 +304,165 @@ class Cme6EReference:
             status_coverage=False,
         )
 
+    def entry_eligibility(
+        self,
+        raw_symbol: str,
+        event_ts_ns: int,
+        max_hold_seconds: int,
+        *,
+        status_evidence: CmeTradingStatusEvidence | None = None,
+        schedule_archive: CmeScheduleArchive | None = None,
+        allow_test_evidence: bool = False,
+    ) -> ScheduledEntryEligibility:
+        """Combine the immutable schedule with point-in-time status evidence.
+
+        No status provider means no eligible entry.  A verified OPEN snapshot
+        proves only entry-time operability; future halt transitions must be
+        consumed by execution replay and are never anticipated here.
+        """
+
+        scheduled = self.scheduled_entry_eligibility(
+            raw_symbol,
+            event_ts_ns,
+            max_hold_seconds,
+            schedule_archive=schedule_archive,
+        )
+        if schedule_archive is None:
+            return ScheduledEntryEligibility(
+                False,
+                "SCHEDULE_ARCHIVE_REQUIRED_FOR_ENTRY",
+                scheduled.session_id,
+                scheduled.trading_date,
+                scheduled.next_scheduled_close_ts_ns,
+                False,
+            )
+        try:
+            schedule_archive.verify_unchanged()
+        except (CmeScheduleEvidenceError, OSError):
+            return ScheduledEntryEligibility(
+                False,
+                "SCHEDULE_ARCHIVE_IDENTITY_UNVERIFIED",
+                scheduled.session_id,
+                scheduled.trading_date,
+                scheduled.next_scheduled_close_ts_ns,
+                False,
+            )
+        if schedule_archive.is_test_fixture and not allow_test_evidence:
+            return ScheduledEntryEligibility(
+                False,
+                "SCHEDULE_TEST_FIXTURE_NOT_ADMISSIBLE",
+                scheduled.session_id,
+                scheduled.trading_date,
+                scheduled.next_scheduled_close_ts_ns,
+                False,
+            )
+        if scheduled.reason != "SCHEDULE_ONLY_STATUS_UNVERIFIED":
+            return scheduled
+        if status_evidence is None:
+            return scheduled
+        if type(status_evidence) is not CmeTradingStatusEvidence:
+            return ScheduledEntryEligibility(
+                False,
+                "STATUS_EVIDENCE_INTERFACE_INVALID",
+                scheduled.session_id,
+                scheduled.trading_date,
+                scheduled.next_scheduled_close_ts_ns,
+                False,
+            )
+        try:
+            status_evidence.verify_unchanged()
+        except (CmeStatusEvidenceError, OSError):
+            return ScheduledEntryEligibility(
+                False,
+                "STATUS_EVIDENCE_IDENTITY_UNVERIFIED",
+                scheduled.session_id,
+                scheduled.trading_date,
+                scheduled.next_scheduled_close_ts_ns,
+                False,
+            )
+        if status_evidence.is_test_fixture and not allow_test_evidence:
+            return ScheduledEntryEligibility(
+                False,
+                "STATUS_TEST_FIXTURE_NOT_ADMISSIBLE",
+                scheduled.session_id,
+                scheduled.trading_date,
+                scheduled.next_scheduled_close_ts_ns,
+                False,
+            )
+        status_at = getattr(status_evidence, "status_at", None)
+        if not callable(status_at):
+            return ScheduledEntryEligibility(
+                False,
+                "STATUS_EVIDENCE_INTERFACE_INVALID",
+                scheduled.session_id,
+                scheduled.trading_date,
+                scheduled.next_scheduled_close_ts_ns,
+                False,
+            )
+        try:
+            decision = status_at(
+                event_ts_ns,
+                venue="CME_GLOBEX",
+                product_root="6E",
+            )
+        except (OSError, RuntimeError, TypeError, ValueError):
+            return ScheduledEntryEligibility(
+                False,
+                "STATUS_EVIDENCE_UNAVAILABLE",
+                scheduled.session_id,
+                scheduled.trading_date,
+                scheduled.next_scheduled_close_ts_ns,
+                False,
+            )
+        covered = getattr(decision, "coverage_verified", None) is True
+        is_open = getattr(decision, "is_open", None) is True
+        reason = str(getattr(decision, "reason", "STATUS_EVIDENCE_UNVERIFIED"))
+        evidence_sha256 = getattr(decision, "evidence_sha256", None)
+        observed_ts_ns = getattr(decision, "observed_ts_ns", None)
+        status = getattr(decision, "status", None)
+        status_value = getattr(status, "value", status)
+        status_valid = status_value in {"OPEN", "HALTED", "CLOSED", "UNKNOWN"}
+        identity_valid = (
+            isinstance(evidence_sha256, str)
+            and evidence_sha256 == status_evidence.sha256
+            and len(evidence_sha256) == 64
+            and all(character in "0123456789abcdef" for character in evidence_sha256)
+            and isinstance(observed_ts_ns, int)
+            and not isinstance(observed_ts_ns, bool)
+            and observed_ts_ns <= event_ts_ns
+            and status_valid
+        )
+        if covered and (not identity_valid or is_open != (status_value == "OPEN")):
+            return ScheduledEntryEligibility(
+                False,
+                "STATUS_EVIDENCE_IDENTITY_INVALID",
+                scheduled.session_id,
+                scheduled.trading_date,
+                scheduled.next_scheduled_close_ts_ns,
+                False,
+            )
+        if not covered or not is_open:
+            return ScheduledEntryEligibility(
+                False,
+                reason,
+                scheduled.session_id,
+                scheduled.trading_date,
+                scheduled.next_scheduled_close_ts_ns,
+                covered,
+                evidence_sha256,
+                observed_ts_ns,
+            )
+        return ScheduledEntryEligibility(
+            True,
+            "STATUS_OPEN_VERIFIED",
+            scheduled.session_id,
+            scheduled.trading_date,
+            scheduled.next_scheduled_close_ts_ns,
+            True,
+            evidence_sha256,
+            observed_ts_ns,
+        )
+
 
 def select_active_contract_for_trading_date(
     reference: Cme6EReference,
@@ -287,8 +488,10 @@ def select_active_contract_for_trading_date(
             raise CmeReferenceError("invalid active-contract candidate")
         contract = reference.contract(item.raw_symbol, as_of_date=trading_date)
         resolved_contracts[item.instrument_id] = contract
-        if contract.roll_guard_start_ts_ns <= reference.session_for(trading_date).open_ts_ns:
-            raise CmeReferenceError("candidate is inside its delivery roll guard")
+        # Selection is a point-in-time market fact, not entry authorization.
+        # The winning contract may already be inside its delivery roll guard;
+        # scheduled_entry_eligibility must then reject a new position while the
+        # mapping remains an honest record of the previous session's volume.
     ranked = tuple(
         sorted(
             candidates,

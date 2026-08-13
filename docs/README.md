@@ -18,7 +18,8 @@
   deterministic Discovery-only daemon walking skeleton (commands and holdout
   boundary are documented in `RESEARCH_ENVIRONMENT.md`)
 - `configs/data/cme_6e_reference_v1.toml` plus `research/m0b`: bounded scheduled
-  CME/contract reference and real MBP-10 materialization bridge; it remains
+  CME/contract reference, real MBP-10 materialization, immutable first-passage
+  shards, and crash-resumable search worker; the checked-in real slice remains
   non-entry-eligible while point-in-time status coverage is absent
 
 ## Phase Designs

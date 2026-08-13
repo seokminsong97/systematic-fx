@@ -1,0 +1,25 @@
+[config]
+artifact_schema = "systematic_fx.m0b_first_passage_store_config.v1"
+semantic_sha256 = "78b9322ee81457f7af85f23a48974b26b9add4f09b68699ed463c7f2c24e432f"
+
+[source]
+slice_id = "m0b-cme-6e-roll-slice-v1"
+real_slice_build_sha256 = "17f4ccdcb839c70bfdd95c9d00a2b37ca6d31fff89c34439a2adcaac4c32cf5f"
+label_artifact_sha256 = "6c1f2df18eecaea8ec398b0ac44c4b2728333c15e23f1a1bbce7d38b6b145fb4"
+feature_artifact_sha256 = "90cc332da98672d641233e23b66d8b7cc5b60d943c1b2479df8522b130ecba62"
+label_row_count = 7776
+label_version = "m0b_real_quote_first_passage_v1"
+search_only = true
+sealed_holdout_untouched = true
+
+[sharding]
+store_schema = "systematic_fx.m0b_first_passage_store.v1"
+store_version = "m0b_first_passage_store_v1"
+# 20 complete 54-label event grids per target shard. An event grid may exceed
+# a target but is never split across a checkpoint boundary.
+shard_row_target = 1080
+max_rows = 7776
+
+[expected]
+store_spec_sha256 = "bc3a1cb4ececf7a4960900778b576b09782f971cd98b0015e91599e81affa4fb"
+store_sha256 = "18670ad2e98e5a18fb3ad7c18f2768e60c9ca2560e6a3dd7ac0e7dc2fe6f5ab4"

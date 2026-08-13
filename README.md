@@ -82,15 +82,19 @@ SYSTEMATIC_FX_RUN_M0B_REAL_SLICE=1 \
 
 SYSTEMATIC_FX_RUN_M0B_PG_GATE=1 \
   uv run pytest tests/integration/test_m0b_control_plane_postgres.py \
-  tests/integration/test_m0b_holdout_provisioning_postgres.py -q -s
+  tests/integration/test_m0b_holdout_provisioning_postgres.py \
+  tests/integration/test_m0b_worker_capability_postgres.py -q -s
 ```
 
 Every real label is intentionally non-entry-eligible: the bounded CME calendar
 proves scheduled hours but not unscheduled trading status, and the September 1
 Z2 sample is contract-transition context rather than a previous-day-volume
-active-contract selection. Migration `0029` supplies the finite PostgreSQL
-search control plane for later governed epochs; no production M0b worker is
-claimed yet. The separate holdout provisioning SQL and verifier live under
+active-contract selection. Migrations `0029`/`0030` supply the finite
+PostgreSQL control plane, immutable CandidateWork binding and a bounded
+least-privilege worker cycle; they are tested on disposable databases and are
+not applied to the workstation database. No real M0b performance epoch or
+deployed autonomous worker service is claimed. The separate holdout
+provisioning SQL and verifier live under
 `deploy/postgres/` and `scripts/`; the current workstation remains
 `NOT_PROVISIONED` until an actual unprivileged daemon login and separate sealed
 storage credential pass the denied-read gate. `materialize-real-slice` is

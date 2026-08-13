@@ -21,7 +21,7 @@ migration contains its own `BEGIN`/`COMMIT`, so a failed file leaves neither a
 partial schema nor a migration record.
 
 Governed research pipelines require the exact contiguous migration history
-from `0001` through `0029`.
+from `0001` through `0030`.
 
 Integration tests require an explicitly disposable or repository-private
 database. The test target is never inferred from the application URL:
@@ -210,3 +210,23 @@ attempts, hash-chain checkpoints, and single-owner result artifacts must agree.
 Successful attempts and `SCREENED_OUT`/`REGISTERED` candidates terminalize
 atomically, NULL controls cannot register, and governed artifacts/campaign
 identity are append-preserved.
+
+`0030_m0b_numeric_admission_worker_api.sql` replaces the M0b admission marker
+with exact integer thresholds and stores one append-only DB-derived decision
+per result artifact. Its four leased worker capabilities can claim only
+pre-registered candidates whose immutable CandidateWork artifact is bound to
+the epoch, RunSpec, source build, features, labels, signals, and first-passage
+store. They append bounded content-addressed checkpoints, recover expired
+leases within the frozen retry cap, derive at most `REGISTERED` from immutable
+integer search metrics, or record replay-safe failure. A separate NOLOGIN API
+owner exposes only those four capabilities; the actual worker role has an exact
+read allowlist and no direct table/sequence mutation, epoch/campaign mutation,
+holdout, promotion, or candidate-generation authority.
+
+CandidateWork v2 binds the candidate's exact rational volatility barrier and
+evaluation-policy hash to the canonical candidate, RunSpec, cost, execution,
+split, code, and source lineage. Lease bearer values are hidden from worker
+logins and bound to the authenticated login. A terminal result must match the
+latest complete checkpoint byte-for-byte in hash, size, metrics, and DB-derived
+classification; complete checkpoints cannot be failed, superseded, or consumed
+by stale recovery.

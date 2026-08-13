@@ -219,6 +219,8 @@ def verify_research_holdout_isolation(
                 "m0b_candidates",
                 "m0b_checkpoints",
                 "m0b_artifact_links",
+                "m0b_admission_decisions",
+                "m0b_worker_leases",
             )
             forbidden_write_rows = connection.execute(
                 """

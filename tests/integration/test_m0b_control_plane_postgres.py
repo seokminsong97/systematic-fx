@@ -3,8 +3,10 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import tempfile
 from collections.abc import Callable, Mapping
 from copy import deepcopy
+from fractions import Fraction
 from pathlib import Path
 from typing import Any
 
@@ -18,12 +20,194 @@ from psycopg.types.json import Jsonb
 from systematic_fx.config.settings import Settings
 from systematic_fx.db.m0b_registry import register_m0b_candidate
 from systematic_fx.db.migrations import apply_migrations
-from systematic_fx.research.hypotheses import canonical_sha256
+from systematic_fx.research.hypotheses import canonical_json_bytes, canonical_sha256
+from systematic_fx.research.m0b.first_passage_store import (
+    FirstPassageShard,
+    FirstPassageStore,
+)
+from systematic_fx.research.m0b.worker import (
+    CandidateWorkArtifact,
+    CandidateWorkSpec,
+    NumericAdmissionRules,
+    VolatilityBarrierSpec,
+    load_candidate_work_artifact,
+    publish_candidate_work_manifest,
+    publish_signal_artifact,
+)
 from systematic_fx.research.run_spec import RunSpec
 
 
 def _digest(label: str) -> str:
     return hashlib.sha256(label.encode("utf-8")).hexdigest()
+
+
+def _default_work_barrier() -> VolatilityBarrierSpec:
+    return VolatilityBarrierSpec(
+        barrier_id="tp1of1_sl3of4_h3600",
+        k_tp_num=1,
+        k_tp_den=1,
+        k_sl_num=3,
+        k_sl_den=4,
+        max_hold_seconds=3600,
+    )
+
+
+def _default_evaluation_policy() -> dict[str, object]:
+    return {
+        "artifact_schema": "systematic_fx.m0b_worker_evaluation_policy.v1",
+        "checkpoint_shard_interval": 1,
+        "cooldown_ns": 0,
+        "max_signals": 3,
+        "max_trades": 3,
+        "search_fold_count": 1,
+        "stress_extra_cost_ticks": 1,
+    }
+
+
+def _control_label_payload(feature_sha256: str) -> bytes:
+    rows = []
+    for event_ts_ns, session_id, barrier in (
+        (100, "D1", _default_work_barrier()),
+        (
+            200,
+            "D2",
+            VolatilityBarrierSpec(
+                barrier_id="tp3of4_sl1of2_h1800",
+                k_tp_num=3,
+                k_tp_den=4,
+                k_sl_num=1,
+                k_sl_den=2,
+                max_hold_seconds=1800,
+            ),
+        ),
+    ):
+        rows.append(
+            {
+                "artifact_schema": "systematic_fx.m0b_quote_label.v1",
+                "barrier_id": barrier.barrier_id,
+                "direction": "LONG",
+                "event_ts_ns": event_ts_ns,
+                "instrument_id": 1,
+                "k_sl_den": barrier.k_sl_den,
+                "k_sl_num": barrier.k_sl_num,
+                "k_tp_den": barrier.k_tp_den,
+                "k_tp_num": barrier.k_tp_num,
+                "label_version": "m0b_quote_labels_v1",
+                "max_hold_seconds": barrier.max_hold_seconds,
+                "parent_feature_manifest_sha256": feature_sha256,
+                "session_id": session_id,
+            }
+        )
+    return b"".join(canonical_json_bytes(row) + b"\n" for row in rows)
+
+
+def _publish_control_bytes(path: Path, payload: bytes) -> None:
+    if path.exists() or path.is_symlink():
+        assert path.is_file() and not path.is_symlink()
+        assert path.read_bytes() == payload
+        assert not path.stat().st_mode & 0o222
+        return
+    path.write_bytes(payload)
+    path.chmod(0o444)
+
+
+def _candidate_work_artifact(
+    fixture: Mapping[str, object],
+    *,
+    artifact_root: Path,
+    candidate_sha256: str,
+    candidate_kind: str,
+    direction: str,
+    seed: int,
+    barrier: VolatilityBarrierSpec | None = None,
+) -> CandidateWorkArtifact:
+    """Build detached canonical work bytes for registration-only PG gates."""
+
+    identity = fixture["identity"]
+    assert isinstance(identity, Mapping)
+    root = artifact_root
+    root.mkdir(mode=0o700, parents=True, exist_ok=True)
+    label_payload = _control_label_payload(str(identity["feature_sha256"]))
+    label_sha256 = hashlib.sha256(label_payload).hexdigest()
+    assert label_sha256 == identity["label_sha256"]
+    shard_sha256 = label_sha256
+    shard_uri = f"first-passage-shard-000001-{shard_sha256}.jsonl"
+    _publish_control_bytes(root / shard_uri, label_payload)
+    shard = FirstPassageShard(
+        ordinal=1,
+        row_count=2,
+        byte_size=len(label_payload),
+        content_sha256=shard_sha256,
+        relative_uri=shard_uri,
+        first_event_key=(100, 1, "D1"),
+        last_event_key=(200, 1, "D2"),
+    )
+    store = FirstPassageStore(
+        spec_sha256=_digest(f"m0b:control:store-spec:{identity['dataset_sha256']}:{label_sha256}"),
+        source_label_sha256=label_sha256,
+        source_feature_sha256=str(identity["feature_sha256"]),
+        source_build_sha256=str(identity["dataset_sha256"]),
+        label_version=str(identity["label_version"]),
+        row_count=2,
+        shard_row_target=2,
+        shards=(shard,),
+    )
+    store_payload = canonical_json_bytes(store.as_dict())
+    _publish_control_bytes(
+        root / f"first-passage-store-{store.sha256}.json",
+        store_payload,
+    )
+    signal = publish_signal_artifact(
+        root,
+        candidate_sha256=candidate_sha256,
+        feature_sha256=str(identity["feature_sha256"]),
+        rows=[
+            {
+                "artifact_schema": "systematic_fx.m0b_candidate_signal.v1",
+                "candidate_sha256": candidate_sha256,
+                "event_ts_ns": 100,
+                "feature_sha256": identity["feature_sha256"],
+                "instrument_id": 1,
+                "search_fold": 0,
+                "session_id": "D1",
+            }
+        ],
+        max_signals=3,
+        search_fold_count=1,
+    )
+    rules = NumericAdmissionRules(
+        min_raw_events=3,
+        min_flat_trades=2,
+        min_sequential_trades=2,
+        min_active_days=1,
+        min_tp_probability_ppm=500_000,
+        require_positive_net_ev=True,
+        min_positive_search_folds=1,
+        max_stressed_cost_ev_floor_ticks=0,
+    )
+    work = CandidateWorkSpec(
+        epoch_sha256=str(fixture["epoch_sha256"]),
+        candidate_sha256=candidate_sha256,
+        first_passage_store_sha256=store.sha256,
+        signals=signal,
+        candidate_kind=candidate_kind,
+        direction=direction,
+        barrier=barrier or _default_work_barrier(),
+        cooldown_ns=0,
+        stress_extra_cost_ticks=1,
+        search_fold_count=1,
+        max_signals=3,
+        max_trades=3,
+        checkpoint_shard_interval=1,
+        deterministic_seed=seed,
+        code_snapshot_sha256=str(identity["code_snapshot_sha256"]),
+        cost_sha256=str(identity["cost_sha256"]),
+        execution_sha256=str(identity["execution_sha256"]),
+        split_sha256=str(identity["split_sha256"]),
+        admission_rules=rules,
+    )
+    work_uri = publish_candidate_work_manifest(root, work)
+    return load_candidate_work_artifact(root / work_uri)
 
 
 def _insert_artifact(
@@ -55,7 +239,13 @@ def _insert_artifact(
     return int(row["artifact_id"])
 
 
-def _epoch_document(*, epoch_key: str, identity: Mapping[str, str]) -> dict[str, object]:
+def _epoch_document(
+    *,
+    epoch_key: str,
+    identity: Mapping[str, str],
+    real_candidate_budget: int = 1,
+    null_candidate_budget: int = 2,
+) -> dict[str, object]:
     return {
         "artifact_schema": "systematic_fx.m0b_epoch.v1",
         "epoch_key": epoch_key,
@@ -98,8 +288,22 @@ def _epoch_document(*, epoch_key: str, identity: Mapping[str, str]) -> dict[str,
         "dependency_lock_sha256": identity["dependency_lock_sha256"],
         "authority": "SEARCH_ONLY_NOT_HOLDOUT_NOT_FORWARD",
         "strategy_families": ["pullback_continuation_v1"],
-        "admission_rules": {"maximum_authority": "REGISTER"},
-        "budgets": {"real": 1, "null": 2},
+        "admission_rules": {
+            "contract_version": "m0b_numeric_admission_v1",
+            "maximum_authority": "REGISTER",
+            "min_raw_events": 3,
+            "min_flat_trades": 2,
+            "min_sequential_trades": 2,
+            "min_active_days": 1,
+            "min_tp_probability_ppm": 500_000,
+            "require_positive_net_ev": True,
+            "min_positive_search_folds": 1,
+            "max_stressed_cost_ev_floor_ticks": 0,
+        },
+        "budgets": {
+            "real": real_candidate_budget,
+            "null": null_candidate_budget,
+        },
         "retry": {"max_attempts_per_candidate": 3},
         "search_space": {
             "parameter_ranges": {
@@ -139,6 +343,8 @@ def _insert_epoch(
     epoch_key: str,
     canonical_epoch: Mapping[str, object],
     identity: Mapping[str, str],
+    real_candidate_budget: int = 1,
+    null_candidate_budget: int = 2,
 ) -> int:
     row = connection.execute(
         """
@@ -163,7 +369,8 @@ def _insert_epoch(
              %(feature_sha256)s, %(label_version)s, %(label_sha256)s,
              %(cost_version)s, %(cost_sha256)s, %(execution_version)s,
              %(execution_sha256)s, %(engine_version)s, %(code_commit)s,
-             %(code_snapshot_sha256)s, %(dependency_lock_sha256)s, 1, 2, 3)
+             %(code_snapshot_sha256)s, %(dependency_lock_sha256)s,
+             %(real_candidate_budget)s, %(null_candidate_budget)s, 3)
         RETURNING m0b_epoch_id
         """,
         {
@@ -175,6 +382,8 @@ def _insert_epoch(
             "manifest_artifact_id": manifest_artifact_id,
             "manifest_sha256": manifest_sha256,
             "manifest_byte_size": manifest_byte_size,
+            "real_candidate_budget": real_candidate_budget,
+            "null_candidate_budget": null_candidate_budget,
         },
     ).fetchone()
     assert row is not None
@@ -192,7 +401,23 @@ def _run_spec(
     family: str = "pullback_continuation_v1",
     parent_fingerprint: str | None = None,
     source_manifest_hashes: Mapping[str, str] | None = None,
+    direction: str = "LONG",
+    work_spec_sha256: str | None = None,
+    work_artifact: CandidateWorkArtifact | None = None,
 ) -> RunSpec:
+    resolved_work_sha256 = (
+        work_artifact.content_sha256 if work_artifact is not None else work_spec_sha256
+    ) or _digest(f"m0b:synthetic-work:{candidate_sha256}:{seed}:{parent_fingerprint}")
+    barrier = (
+        work_artifact.work.barrier.as_dict()
+        if work_artifact is not None
+        else _default_work_barrier().as_dict()
+    )
+    evaluation_policy = (
+        work_artifact.work.evaluation_policy
+        if work_artifact is not None
+        else _default_evaluation_policy()
+    )
     parameters = {
         "data_role": "SEARCH",
         "split_role": "DISCOVERY",
@@ -200,6 +425,9 @@ def _run_spec(
         "m0b_dataset_sha256": identity["dataset_sha256"],
         "m0b_contract_reference_sha256": identity["contract_reference_sha256"],
         "m0b_candidate_sha256": candidate_sha256,
+        "m0b_barrier_sha256": canonical_sha256(barrier),
+        "m0b_evaluation_policy_sha256": canonical_sha256(evaluation_policy),
+        "m0b_work_spec_sha256": resolved_work_sha256,
     }
     if parent_fingerprint is not None:
         parameters["parent_run_fingerprint"] = parent_fingerprint
@@ -230,10 +458,10 @@ def _run_spec(
         dependency_lock_sha256=identity["dependency_lock_sha256"],
         runtime_environment={"gate": "disposable-postgresql", "version": 1},
         random_seed=seed,
-        direction="BOTH",
+        direction=direction,
         signal_policy={"family": family},
         entry_policy={"latency": "next_eligible_quote_plus_one_adverse_tick"},
-        barrier_policy={"kind": "volatility_normalized"},
+        barrier_policy=barrier,
         terminal_policy={"session_policy": "NO_CROSS_CLOSED_MARKET"},
         parameters=parameters,
     )
@@ -309,19 +537,114 @@ def _insert_candidate(
     candidate_sha256: str,
     canonical_candidate: Mapping[str, object],
     ordinal: int = 1,
+    work_barrier: Mapping[str, object] | None = None,
 ) -> int:
+    binding = connection.execute(
+        """
+        SELECT epoch.epoch_sha256, epoch.dataset_sha256, epoch.feature_sha256,
+               epoch.label_sha256, epoch.code_snapshot_sha256,
+               epoch.cost_sha256, epoch.execution_sha256, epoch.split_sha256,
+               systematic_fx.canonical_jsonb_sha256(
+                   epoch.canonical_epoch -> 'admission_rules') AS rules_sha256,
+               run_spec.canonical_spec #>> '{parameters,m0b_work_spec_sha256}'
+                   AS work_spec_sha256,
+               run_spec.deterministic_seed::text AS deterministic_seed,
+               run_spec.direction
+          FROM systematic_fx.m0b_epochs epoch
+          JOIN systematic_fx.research_run_specs run_spec
+            ON run_spec.research_run_spec_id = %s
+         WHERE epoch.m0b_epoch_id = %s
+        """,
+        (research_run_spec_id, epoch_id),
+    ).fetchone()
+    assert binding is not None
+    work_sha256 = str(binding["work_spec_sha256"])
+    candidate_barrier = canonical_candidate["barrier"]
+    assert isinstance(candidate_barrier, Mapping)
+    k_tp = Fraction(str(candidate_barrier["k_tp"]))
+    k_sl = Fraction(str(candidate_barrier["k_sl"]))
+    max_hold_seconds = int(candidate_barrier["max_hold_minutes"]) * 60
+    barrier = (
+        dict(work_barrier)
+        if work_barrier is not None
+        else {
+            "artifact_schema": "systematic_fx.m0b_volatility_barrier.v1",
+            "barrier_id": (
+                f"tp{k_tp.numerator}of{k_tp.denominator}_"
+                f"sl{k_sl.numerator}of{k_sl.denominator}_h{max_hold_seconds}"
+            ),
+            "k_sl_den": k_sl.denominator,
+            "k_sl_num": k_sl.numerator,
+            "k_tp_den": k_tp.denominator,
+            "k_tp_num": k_tp.numerator,
+            "max_hold_seconds": max_hold_seconds,
+        }
+    )
+    evaluation_policy = {
+        "artifact_schema": "systematic_fx.m0b_worker_evaluation_policy.v1",
+        "checkpoint_shard_interval": 1,
+        "cooldown_ns": 0,
+        "max_signals": 3,
+        "max_trades": 3,
+        "search_fold_count": 1,
+        "stress_extra_cost_ticks": 1,
+    }
+    work_metadata = {
+        "admission_rules_sha256": binding["rules_sha256"],
+        "barrier": barrier,
+        "barrier_sha256": canonical_sha256(barrier),
+        "candidate_kind": candidate_kind,
+        "candidate_sha256": candidate_sha256,
+        "code_snapshot_sha256": binding["code_snapshot_sha256"],
+        "cost_sha256": binding["cost_sha256"],
+        "data_role": "SEARCH",
+        "deterministic_seed": int(binding["deterministic_seed"]),
+        "direction": canonical_candidate.get("direction"),
+        "epoch_sha256": binding["epoch_sha256"],
+        "evaluation_policy": evaluation_policy,
+        "evaluation_policy_sha256": canonical_sha256(evaluation_policy),
+        "execution_sha256": binding["execution_sha256"],
+        "first_passage_store_sha256": _digest(f"direct:store:{candidate_sha256}"),
+        "identity_schema": "systematic_fx.m0b.candidate_work.v2",
+        "signal_artifact_sha256": _digest(f"direct:signal:{candidate_sha256}"),
+        "source_build_sha256": binding["dataset_sha256"],
+        "source_feature_sha256": binding["feature_sha256"],
+        "source_label_sha256": binding["label_sha256"],
+        "split_sha256": binding["split_sha256"],
+        "work_spec_sha256": work_sha256,
+    }
+    artifact = connection.execute(
+        """
+        INSERT INTO systematic_fx.artifacts
+            (artifact_key, artifact_type, uri, sha256, byte_size, media_type, metadata)
+        VALUES (%s, 'M0B_CANDIDATE_WORK', %s, %s, 137, 'application/json', %s)
+        RETURNING artifact_id
+        """,
+        (
+            f"m0b-candidate-work:{binding['epoch_sha256']}:{candidate_sha256}:{work_sha256}",
+            (
+                f"m0b-work://search/{binding['epoch_sha256']}/{candidate_sha256}/"
+                f"sha256={work_sha256}.json"
+            ),
+            work_sha256,
+            Jsonb(work_metadata),
+        ),
+    ).fetchone()
+    assert artifact is not None
     row = connection.execute(
         """
         INSERT INTO systematic_fx.m0b_candidates
             (m0b_epoch_id, parent_candidate_id, research_run_spec_id,
-             candidate_kind, ordinal, candidate_sha256, canonical_candidate)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+             work_artifact_id, candidate_kind, ordinal, candidate_sha256,
+             canonical_candidate)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING m0b_candidate_id
         """,
         (
             epoch_id,
             parent_candidate_id,
             research_run_spec_id,
+            artifact["artifact_id"],
             candidate_kind,
             ordinal,
             candidate_sha256,
@@ -332,14 +655,52 @@ def _insert_candidate(
     return int(row["m0b_candidate_id"])
 
 
-def _checkpoint_cursor(*, candidate_id: int, attempt_id: int) -> dict[str, object]:
+def _checkpoint_cursor(
+    *, candidate_id: int, attempt_id: int, work_spec_sha256: str
+) -> dict[str, object]:
     return {
         "artifact_schema": "systematic_fx.m0b_checkpoint.v1",
         "m0b_candidate_id": candidate_id,
         "research_run_attempt_id": attempt_id,
         "checkpoint_sequence": 1,
         "predecessor_sha256": None,
-        "state": {"events_processed": 12, "stage": "SCREEN"},
+        "state": {
+            "accepted_tp_count": 0,
+            "active_session_ids": [],
+            "complete": False,
+            "fold_net_pnl_ticks": [0],
+            "fold_trade_counts": [0],
+            "ineligible_signal_count": 0,
+            "matching_label_count": 0,
+            "missing_label_count": 0,
+            "next_available_ts_ns": None,
+            "next_shard_ordinal": 2,
+            "next_signal_index": 0,
+            "overlap_signal_count": 0,
+            "raw_event_count": 0,
+            "raw_net_pnl_ticks": 0,
+            "raw_tp_count": 0,
+            "result_artifact": None,
+            "sequential_net_pnl_ticks": 0,
+            "sequential_stressed_net_pnl_ticks": 0,
+            "sequential_trade_count": 0,
+            "state_schema": "systematic_fx.m0b_worker_state.v1",
+            "trade_shards": [
+                {
+                    "byte_size": 1,
+                    "content_sha256": _digest(f"m0b:control:trade:{candidate_id}:{attempt_id}"),
+                    "first_store_shard": 1,
+                    "last_store_shard": 1,
+                    "ordinal": 1,
+                    "relative_uri": (
+                        "candidate-trades-000001-"
+                        f"{_digest(f'm0b:control:trade:{candidate_id}:{attempt_id}')}.json"
+                    ),
+                    "row_count": 0,
+                }
+            ],
+            "work_spec_sha256": work_spec_sha256,
+        },
     }
 
 
@@ -380,6 +741,10 @@ def _expect_rejection(
 
 def _create_fixture(
     connection: psycopg.Connection[dict[str, Any]],
+    *,
+    identity_overrides: Mapping[str, str] | None = None,
+    real_candidate_budget: int = 1,
+    null_candidate_budget: int = 2,
 ) -> dict[str, object]:
     identity = {
         "dataset_version": "m0b_real_slice_v1",
@@ -393,7 +758,7 @@ def _create_fixture(
         "feature_version": "m0b_features_v1",
         "feature_sha256": _digest("m0b:feature"),
         "label_version": "m0b_quote_labels_v1",
-        "label_sha256": _digest("m0b:label"),
+        "label_sha256": hashlib.sha256(_control_label_payload(_digest("m0b:feature"))).hexdigest(),
         "cost_version": "m0b_cost_v1",
         "cost_sha256": _digest("m0b:cost"),
         "execution_version": "m0b_conservative_execution_v1",
@@ -403,10 +768,20 @@ def _create_fixture(
         "code_snapshot_sha256": _digest("m0b:code-snapshot"),
         "dependency_lock_sha256": _digest("m0b:dependency-lock"),
     }
+    if identity_overrides is not None:
+        unknown = set(identity_overrides) - set(identity)
+        if unknown:
+            raise AssertionError(f"unknown M0b identity overrides: {sorted(unknown)}")
+        identity.update(identity_overrides)
     campaign_key = "m0b_pg_gate_v1"
     experiment_key = "m0b_pg_gate_pullback_v1"
     epoch_key = "m0b-pg-gate-epoch-v1"
-    epoch_document = _epoch_document(epoch_key=epoch_key, identity=identity)
+    epoch_document = _epoch_document(
+        epoch_key=epoch_key,
+        identity=identity,
+        real_candidate_budget=real_candidate_budget,
+        null_candidate_budget=null_candidate_budget,
+    )
     epoch_sha256 = canonical_sha256(epoch_document)
     manifest_sha256 = _digest("m0b:epoch-manifest")
 
@@ -442,7 +817,7 @@ def _create_fixture(
                  trial_budget, finalist_budget, frozen_at)
             VALUES (%s, %s, 'M0b disposable PostgreSQL gate', 'FROZEN',
                     DATE '2022-08-30', DATE '2022-09-02', DATE '2022-09-01',
-                    %s, %s, %s, %s, %s, %s, %s, %s, 3, 1,
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, 1,
                     statement_timestamp())
             RETURNING campaign_id
             """,
@@ -457,6 +832,7 @@ def _create_fixture(
                 identity["code_commit"],
                 _digest("m0b:campaign-config"),
                 Jsonb({"data_role": "SEARCH", "policy": identity["split_version"]}),
+                real_candidate_budget + null_candidate_budget,
             ),
         ).fetchone()
         assert campaign is not None
@@ -479,7 +855,7 @@ def _create_fixture(
                  code_commit, config_sha256, frozen_at)
             VALUES (%s, %s, 'pullback_continuation_v1', 'FROZEN',
                     'Point-in-time pullback continuation screen', 'BOTH', 'RULE_BASED',
-                    0.00005, 6.25, %s, %s, %s, %s, 3, %s, %s, %s,
+                    0.00005, 6.25, %s, %s, %s, %s, %s, %s, %s, %s,
                     statement_timestamp())
             RETURNING experiment_id
             """,
@@ -487,9 +863,15 @@ def _create_fixture(
                 experiment_key,
                 campaign_id,
                 Jsonb({"feature_version": identity["feature_version"]}),
-                Jsonb({"real_budget": 1, "null_budget": 2}),
+                Jsonb(
+                    {
+                        "real_budget": real_candidate_budget,
+                        "null_budget": null_candidate_budget,
+                    }
+                ),
                 Jsonb({"model": "conservative"}),
                 Jsonb({"passive_tp": "trade_through"}),
+                real_candidate_budget + null_candidate_budget,
                 experiment_registration_id,
                 identity["code_commit"],
                 _digest("m0b:experiment-config"),
@@ -516,6 +898,8 @@ def _create_fixture(
             epoch_key=epoch_key,
             canonical_epoch=epoch_document,
             identity=identity,
+            real_candidate_budget=real_candidate_budget,
+            null_candidate_budget=null_candidate_budget,
         )
     return {
         "identity": identity,
@@ -963,7 +1347,22 @@ def _start_candidate_attempt(
         """,
         (attempt_id,),
     )
-    cursor = _checkpoint_cursor(candidate_id=candidate_id, attempt_id=attempt_id)
+    work_spec_sha256 = connection.execute(
+        """
+        SELECT artifact.sha256
+          FROM systematic_fx.m0b_candidates candidate
+          JOIN systematic_fx.artifacts artifact
+            ON artifact.artifact_id = candidate.work_artifact_id
+         WHERE candidate.m0b_candidate_id = %s
+        """,
+        (candidate_id,),
+    ).fetchone()
+    assert work_spec_sha256 is not None
+    cursor = _checkpoint_cursor(
+        candidate_id=candidate_id,
+        attempt_id=attempt_id,
+        work_spec_sha256=str(work_spec_sha256["sha256"]),
+    )
     connection.execute(
         """
         INSERT INTO systematic_fx.m0b_checkpoints
@@ -1000,6 +1399,34 @@ def _finish_candidate(
         (candidate_id,),
     ).fetchone()
     assert lineage is not None
+    terminal_metrics: dict[str, object] = {
+        "raw_events": 8 if terminal_status == "REGISTERED" else 1,
+        "flat_trades": 5 if terminal_status == "REGISTERED" else 1,
+        "sequential_trades": 4 if terminal_status == "REGISTERED" else 1,
+        "active_days": 2 if terminal_status == "REGISTERED" else 1,
+        "tp_probability_ppm": 750_000 if terminal_status == "REGISTERED" else 0,
+        "positive_search_folds": 2 if terminal_status == "REGISTERED" else 0,
+        "net_pnl_ticks": 12 if terminal_status == "REGISTERED" else -3,
+        "stressed_net_pnl_ticks": 4 if terminal_status == "REGISTERED" else -5,
+    }
+    terminal_metrics_sha256 = canonical_sha256(terminal_metrics)
+    connection.execute(
+        """
+        INSERT INTO systematic_fx.m0b_admission_decisions
+            (m0b_candidate_id, research_run_attempt_id, result_artifact_id,
+             admission_rules_sha256, metrics, metrics_sha256, classification)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """,
+        (
+            candidate_id,
+            attempt_id,
+            result_artifact_id,
+            lineage["admission_rules_sha256"],
+            Jsonb(terminal_metrics),
+            terminal_metrics_sha256,
+            terminal_status,
+        ),
+    )
     result_summary: dict[str, object] = {
         "identity_schema": "systematic_fx.m0b.result_summary.v1",
         "epoch_sha256": lineage["epoch_sha256"],
@@ -1009,6 +1436,7 @@ def _finish_candidate(
         "data_role": "SEARCH",
         "classification": terminal_status,
         "admission_rules_sha256": lineage["admission_rules_sha256"],
+        "terminal_metrics_sha256": terminal_metrics_sha256,
     }
     if result_summary_mutation is not None:
         result_summary.update(result_summary_mutation)
@@ -1061,7 +1489,7 @@ def _finish_candidate(
         )
 
 
-def _exercise_lifecycle(database_url: str) -> None:
+def _exercise_lifecycle(database_url: str, *, artifact_root: Path) -> None:
     with psycopg.connect(database_url, autocommit=True, row_factory=dict_row) as connection:
         fixture = _create_fixture(connection)
         _assert_draft_epoch_rejected(connection, fixture)
@@ -1077,7 +1505,7 @@ def _exercise_lifecycle(database_url: str) -> None:
             "family_id": "pullback_continuation_v1",
             "ordinal": 1,
             "random_seed": 7,
-            "direction": "BOTH",
+            "direction": "LONG",
             "cost": {
                 "version": identity["cost_version"],
                 "sha256": identity["cost_sha256"],
@@ -1090,6 +1518,14 @@ def _exercise_lifecycle(database_url: str) -> None:
             "barrier": {"k_tp": "1.00", "k_sl": "0.75", "max_hold_minutes": 60},
         }
         real_sha256 = canonical_sha256(real_candidate)
+        real_work = _candidate_work_artifact(
+            fixture,
+            artifact_root=artifact_root,
+            candidate_sha256=real_sha256,
+            candidate_kind="REAL",
+            direction="LONG",
+            seed=7,
+        )
         real_spec = _run_spec(
             campaign_key=str(fixture["campaign_key"]),
             experiment_key=str(fixture["experiment_key"]),
@@ -1097,6 +1533,59 @@ def _exercise_lifecycle(database_url: str) -> None:
             candidate_sha256=real_sha256,
             identity=identity,
             seed=7,
+            work_spec_sha256=real_work.content_sha256,
+            work_artifact=real_work,
+        )
+        wrong_barrier = VolatilityBarrierSpec(
+            barrier_id="tp3of4_sl1of2_h1800",
+            k_tp_num=3,
+            k_tp_den=4,
+            k_sl_num=1,
+            k_sl_den=2,
+            max_hold_seconds=1800,
+        )
+        wrong_barrier_work = _candidate_work_artifact(
+            fixture,
+            artifact_root=artifact_root,
+            candidate_sha256=real_sha256,
+            candidate_kind="REAL",
+            direction="LONG",
+            seed=7,
+            barrier=wrong_barrier,
+        )
+        wrong_barrier_spec = _run_spec(
+            campaign_key=str(fixture["campaign_key"]),
+            experiment_key=str(fixture["experiment_key"]),
+            epoch_sha256=str(fixture["epoch_sha256"]),
+            candidate_sha256=real_sha256,
+            identity=identity,
+            seed=7,
+            work_artifact=wrong_barrier_work,
+        )
+
+        def insert_mismatched_work_barrier() -> int:
+            run_spec_id = _insert_run_spec_direct(
+                connection,
+                run_spec=wrong_barrier_spec,
+                campaign_id=int(fixture["campaign_id"]),
+                experiment_id=int(fixture["experiment_id"]),
+            )
+            return _insert_candidate(
+                connection,
+                epoch_id=int(fixture["epoch_id"]),
+                parent_candidate_id=None,
+                research_run_spec_id=run_spec_id,
+                candidate_kind="REAL",
+                candidate_sha256=real_sha256,
+                canonical_candidate=real_candidate,
+                work_barrier=wrong_barrier.as_dict(),
+            )
+
+        _expect_rejection(
+            connection,
+            label="CandidateWork cannot switch the registered candidate barrier",
+            operation=insert_mismatched_work_barrier,
+            message_fragment="CandidateWork artifact identity differs",
         )
         real_registration = register_m0b_candidate(
             database_url,
@@ -1105,6 +1594,7 @@ def _exercise_lifecycle(database_url: str) -> None:
             candidate_kind="REAL",
             ordinal=1,
             canonical_candidate=real_candidate,
+            work_artifact=real_work,
         )
         repeated_real_registration = register_m0b_candidate(
             database_url,
@@ -1113,6 +1603,7 @@ def _exercise_lifecycle(database_url: str) -> None:
             candidate_kind="REAL",
             ordinal=1,
             canonical_candidate=real_candidate,
+            work_artifact=real_work,
         )
         assert repeated_real_registration.m0b_candidate_id == real_registration.m0b_candidate_id
         assert (
@@ -1414,7 +1905,7 @@ def _exercise_lifecycle(database_url: str) -> None:
             "control": "CIRCULAR_TIME_SHIFT",
             "ordinal": 1,
             "random_seed": 11,
-            "direction": "BOTH",
+            "direction": "LONG",
             "cost": {
                 "version": identity["cost_version"],
                 "sha256": identity["cost_sha256"],
@@ -1429,6 +1920,14 @@ def _exercise_lifecycle(database_url: str) -> None:
             "null_control": "CIRCULAR_TIME_SHIFT",
         }
         null_sha256 = canonical_sha256(null_candidate)
+        null_work = _candidate_work_artifact(
+            fixture,
+            artifact_root=artifact_root,
+            candidate_sha256=null_sha256,
+            candidate_kind="NULL",
+            direction="LONG",
+            seed=11,
+        )
         null_spec = _run_spec(
             campaign_key=str(fixture["campaign_key"]),
             experiment_key=str(fixture["experiment_key"]),
@@ -1437,6 +1936,8 @@ def _exercise_lifecycle(database_url: str) -> None:
             identity=identity,
             seed=11,
             parent_fingerprint=real_spec.fingerprint,
+            work_spec_sha256=null_work.content_sha256,
+            work_artifact=null_work,
         )
 
         invalid_null_candidate = deepcopy(null_candidate)
@@ -1484,6 +1985,7 @@ def _exercise_lifecycle(database_url: str) -> None:
             ordinal=1,
             canonical_candidate=null_candidate,
             parent_candidate_sha256=real_sha256,
+            work_artifact=null_work,
         )
         null_id = null_registration.m0b_candidate_id
 
@@ -1504,6 +2006,14 @@ def _exercise_lifecycle(database_url: str) -> None:
         matched_null_candidate["control"] = "MATCHED_RANDOM_ENTRY"
         matched_null_candidate["null_control"] = "MATCHED_RANDOM_ENTRY"
         matched_null_sha256 = canonical_sha256(matched_null_candidate)
+        matched_null_work = _candidate_work_artifact(
+            fixture,
+            artifact_root=artifact_root,
+            candidate_sha256=matched_null_sha256,
+            candidate_kind="NULL",
+            direction="LONG",
+            seed=7,
+        )
         matched_null_spec = _run_spec(
             campaign_key=str(fixture["campaign_key"]),
             experiment_key=str(fixture["experiment_key"]),
@@ -1512,6 +2022,8 @@ def _exercise_lifecycle(database_url: str) -> None:
             identity=identity,
             seed=7,
             parent_fingerprint=real_spec.fingerprint,
+            work_spec_sha256=matched_null_work.content_sha256,
+            work_artifact=matched_null_work,
         )
 
         with connection.transaction():
@@ -1786,10 +2298,18 @@ def _exercise_lifecycle(database_url: str) -> None:
             ),
             message_fragment="terminal M0b candidates",
         )
-        stale_cursor = _checkpoint_cursor(candidate_id=real_id, attempt_id=real_attempt_id)
+        stale_cursor = _checkpoint_cursor(
+            candidate_id=real_id,
+            attempt_id=real_attempt_id,
+            work_spec_sha256=real_work.content_sha256,
+        )
         stale_cursor["checkpoint_sequence"] = 2
         stale_cursor["predecessor_sha256"] = canonical_sha256(
-            _checkpoint_cursor(candidate_id=real_id, attempt_id=real_attempt_id)
+            _checkpoint_cursor(
+                candidate_id=real_id,
+                attempt_id=real_attempt_id,
+                work_spec_sha256=real_work.content_sha256,
+            )
         )
         _expect_rejection(
             connection,
@@ -1904,6 +2424,7 @@ def _exercise_lifecycle(database_url: str) -> None:
             ordinal=2,
             canonical_candidate=matched_null_candidate,
             parent_candidate_sha256=real_sha256,
+            work_artifact=matched_null_work,
         )
         matched_null_id = matched_null_registration.m0b_candidate_id
         with connection.transaction():
@@ -2040,8 +2561,8 @@ def _main() -> None:
         created = True
         first = apply_migrations(database_url)
         repeated = apply_migrations(database_url)
-        assert first.applied == tuple(range(1, 30)) and first.skipped == ()
-        assert repeated.applied == () and repeated.skipped == tuple(range(1, 30))
+        assert first.applied == tuple(range(1, 31)) and first.skipped == ()
+        assert repeated.applied == () and repeated.skipped == tuple(range(1, 31))
         with psycopg.connect(database_url) as connection:
             versions = tuple(
                 row[0]
@@ -2049,9 +2570,16 @@ def _main() -> None:
                     "SELECT version FROM systematic_fx.schema_migrations ORDER BY version"
                 ).fetchall()
             )
-        assert versions == tuple(range(1, 30))
-        print("M0B MIGRATIONS fresh=1..29 repeated=all-skipped")
-        _exercise_lifecycle(database_url)
+        assert versions == tuple(range(1, 31))
+        print("M0B MIGRATIONS fresh=1..30 repeated=all-skipped")
+        with tempfile.TemporaryDirectory(
+            prefix="systematic-fx-m0b-control-artifacts-",
+            dir="/private/tmp",
+        ) as artifact_directory:
+            _exercise_lifecycle(
+                database_url,
+                artifact_root=Path(artifact_directory),
+            )
     finally:
         if created:
             with psycopg.connect(admin_url, autocommit=True) as connection:
