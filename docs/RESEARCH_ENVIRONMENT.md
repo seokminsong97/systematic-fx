@@ -665,6 +665,27 @@ process and byte-compares the ledger and every artifact. The authority remains
 holdout isolation, trade bars are not bid/ask execution proof, and the result
 has no paper, live, promotion, or M0b registration authority.
 
+After the initial 12-member Search result was visible, a separate retrospective
+exhaustive run froze and evaluated the other 506 Discovery support-eligible V2
+rules in 43 fixed batches. All 43 masks were frozen before the first new
+1-second outcome read. Per-batch artifacts contain raw summaries only; one BH
+correction and the economic gates were applied after combining the exact prior
+12 raw summaries with all 506 new results. The resulting 518-member family had
+378 Search-evaluable rules, 140 null/sample-ineligible rules, zero BH
+rejections, zero economic-gate passes, and zero finalists. Walk-forward,
+embargo, and holdout 5-minute/1-second bar payloads and rows remained unopened.
+
+```bash
+uv run --locked --offline python -B -m scripts.run_ai_pattern_exhaustive_search verify --json
+```
+
+A completed or idempotent `run` is a resumability check, not release
+verification. Only the public `verify` action recomputes every recorded mask
+and raw Search result from the allowlisted data. The exhaustive run is
+retrospective exploratory Search evidence under the same unsealed-local
+authority; it is not a fresh preregistration, independent validation, or proof
+that no other market pattern exists.
+
 ### Non-research pilot and governed registration
 
 ```bash

@@ -823,3 +823,74 @@ were no Search finalists, no walk-forward, embargo, or holdout rows were
 opened. The result is an `UNSEALED_LOCAL_BAR_SCREENING_HOLDOUT` diagnostic,
 not a sealed holdout, strict backtest, executable fill proof, or promotion
 decision.
+
+## 18. Retrospective 518-Member Batch 3 Search Completed With Zero Finalists
+
+On 2026-08-14 local time, after the original 12-member Search results had
+already been observed, a separately governed retrospective exploratory
+expansion completed the remaining 506 Discovery support-eligible Batch 3 V2
+rules. This is outcome-informed Search-data analysis, not a fresh
+preregistration, independent out-of-sample validation, sealed holdout, or
+retroactive replacement of the original 12-member design.
+
+Evaluator source commit
+`b4d2323f9fef3261d1127266e2ce627b27bece11` and the following data-only
+precommit with semantic SHA-256
+`627e8019116662e112b2461e9a82217eadbd325b8d3f0c88974b5232d13c01ba`
+froze the 518-pattern family, remaining-506 order, and all 43 batches before
+opening any new Search 1-second outcome path. All 43 mask artifacts and the
+`ALL_MASKS_FROZEN` barrier preceded the first new 1-second read.
+
+The original 12 raw Search summaries and eligibility evidence were reused
+exactly and were not reevaluated. Their historical 12-member BH decisions were
+ignored. One new BH correction was computed only after all 506 remaining
+members completed, over the uniform 518-pattern family.
+
+```text
+remaining members completed:              506 / 506
+remaining Search-evaluable members:        366 / 506
+remaining null/sample-ineligible members:  140 / 506
+combined Search-evaluable members:         378 / 518
+BH rejections:                               0 / 518
+economic-gate passes among evaluable:        0 / 378
+Search finalists:                            0 / 518
+fully loaded net ticks, evaluable range: -120,414 to -7,353
+```
+
+The 140 null/sample-ineligible rules were not economic losers: 85 had
+`CIRCULAR_GROUP_ROTATION_NOT_DISTINCT` and 55 had
+`INSUFFICIENT_CAUSAL_MATCHED_POOL`. The frozen missing/error policy assigned
+them raw p-value 1. All 378 Search-evaluable rules had negative fully loaded
+net ticks. The terminal status is `NO_EXHAUSTIVE_SEARCH_FINALISTS`.
+
+The exact lifecycle is:
+
+```text
+PRECOMMITTED
+BATCH_MASKS_FROZEN x 43
+ALL_MASKS_FROZEN
+BATCH_COMPLETED x 43
+SEARCH_FAMILY_COMPLETED
+COMPLETED
+```
+
+Canonical SHA-256 identities are:
+
+```text
+518-pattern family: e269800244d62c346497dbbcdfdda540eb361f7273027f387fbc2efe27db4d59
+batch manifest:     022af03de649f829b5ae44f58c840bea05440bda36d7eeca9d5fc6d33fb0f322
+plan:               25a629fa70229ea5dc414527464276209cb3b8ddcdf0d1f8a0a2e22b9a26a147
+request:            965c768c9214931507453706f305ab00bd3896e2eb6da3b4c0da67791d0aae6b
+family result:      72aa76f61da71e87bf0198ffe6d60d2d6ebd6e7c35372c093459313b313fefc1
+terminal report:    023d27ed5da796ea21bcf88d95e53b6d2e47312d7fdce2afe40f082ff58e170f
+```
+
+A fresh locked/offline public verifier recomputed every recorded Search mask
+and all 43 raw result batches, replayed the single 518-member family decision,
+and byte-compared the ledger and immutable artifacts. No walk-forward,
+embargo, or holdout 5-minute/1-second bar payload or row was opened; shared
+manifest and split metadata were read. The authority remains retrospective
+`UNSEALED_LOCAL_BAR_SCREENING_HOLDOUT`. This result is limited to the finite V2
+symbolic rule language and fixed local bar, execution, cost, and null-control
+contract. It does not establish that no market pattern exists and has no
+paper, live, promotion, or M0b registration authority.

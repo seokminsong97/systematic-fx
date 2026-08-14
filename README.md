@@ -130,18 +130,28 @@ the full Python package tree, `pyproject.toml`, and `uv.lock` to committed blob
 bytes before context access. Its durable batch SHA-256 is
 `dfef5bad188f79af8fa63a6e74f8c9609df34778a9a050278f3740766d24ee4e`.
 The proposal artifacts remain autonomous hypothesis-generation evidence rather
-than alpha evidence. A separately precommitted, unsealed local trade-bar screen
-has now evaluated all 12 Batch 3 hypotheses under fixed costs, two outcome-blind
-null controls, exact daily sign tests, and family-wide BH correction. Every
-hypothesis failed the Search economic and statistical gates, so the terminal
-status is `NO_SEARCH_FINALISTS_HOLDOUT_NOT_OPENED`; no walk-forward, embargo, or
-holdout bytes were opened. This is not a strict backtest or an M0b epoch. The
+than alpha evidence. The initial separately precommitted, unsealed local
+trade-bar screen evaluated the selected 12 Batch 3 hypotheses under fixed
+costs, two outcome-blind null controls, exact daily sign tests, and family-wide
+BH correction and selected zero Search finalists.
+
+After those results had already been observed, a separately governed
+retrospective expansion completed the other 506 Discovery support-eligible V2
+rules. Of the combined 518-rule family, 378 were Search-evaluable and all had
+negative fully loaded net ticks; 140 were null/sample-ineligible rather than
+economic losers. One 518-member BH correction produced zero rejections, zero
+economic-gate passes, and zero finalists. A fresh locked/offline public verifier
+recomputed all 43 new mask/result batches and reproduced the immutable family
+and report bytes. No later-stage walk-forward, embargo, or holdout 5-minute or
+1-second bar payload or row was opened. This retrospective Search expansion is
+not a fresh preregistration, strict backtest, sealed holdout, or M0b epoch. The
 current M0b quote slice still has zero entry-eligible labels and remains blocked
 until official schedule/status/active-contract evidence makes that transition
 honest.
 
 ```bash
 uv run --locked --offline python -B -m scripts.run_ai_pattern_holdout verify --json
+uv run --locked --offline python -B -m scripts.run_ai_pattern_exhaustive_search verify --json
 ```
 
 Environment readiness is not research-data eligibility. All 1,434 source files
