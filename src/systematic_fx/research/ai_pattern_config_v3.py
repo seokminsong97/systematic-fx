@@ -46,30 +46,11 @@ AI_PATTERN_V2_BATCH_SHA256: Final = (
 )
 V3_CORRECTION_REASON: Final = "EXECUTABLE_COMMIT_PROVENANCE_CORRECTION"
 
-# Every local Python module that can influence context reconstruction, catalog
-# generation, selection, publication, or the operational CLI is committed and
-# byte-compared before market-derived context is opened.
-V3_IMPLEMENTATION_PATHS: Final = (
+# Every Python module in the package is committed and byte-compared before
+# market-derived context is opened.  Using the full package tree closes over
+# lazy CLI imports and future transitive imports without a hand-maintained list.
+V3_IMPLEMENTATION_SINGLE_FILES: Final = (
     "pyproject.toml",
-    "src/systematic_fx/backtest/barriers.py",
-    "src/systematic_fx/cli.py",
-    "src/systematic_fx/data/contract_selection.py",
-    "src/systematic_fx/data/contracts.py",
-    "src/systematic_fx/data/instruments.py",
-    "src/systematic_fx/features/bars.py",
-    "src/systematic_fx/research/ai_discovery_context.py",
-    "src/systematic_fx/research/ai_pattern_config_v2.py",
-    "src/systematic_fx/research/ai_pattern_config_v3.py",
-    "src/systematic_fx/research/ai_pattern_discovery.py",
-    "src/systematic_fx/research/ai_pattern_discovery_v2.py",
-    "src/systematic_fx/research/ai_pattern_run_v2.py",
-    "src/systematic_fx/research/ai_pattern_run_v3.py",
-    "src/systematic_fx/research/bar_artifacts.py",
-    "src/systematic_fx/research/bar_config.py",
-    "src/systematic_fx/research/bar_pipeline.py",
-    "src/systematic_fx/research/hypotheses.py",
-    "src/systematic_fx/research/provenance.py",
-    "src/systematic_fx/validation/bar_splits.py",
     "uv.lock",
 )
 
@@ -115,9 +96,24 @@ def _object(value: object, *, label: str, keys: set[str]) -> dict[str, object]:
     return value
 
 
+def _current_implementation_paths(project_root: Path) -> tuple[str, ...]:
+    package_root = project_root / "src/systematic_fx"
+    if package_root.is_symlink() or not package_root.is_dir():
+        raise AIPatternConfigV3Error("AI proposer package source is missing or symbolic")
+    discovered: list[str] = list(V3_IMPLEMENTATION_SINGLE_FILES)
+    for path in package_root.rglob("*.py"):
+        if path.is_symlink() or not path.is_file() or "__pycache__" in path.parts:
+            raise AIPatternConfigV3Error("AI proposer package contains unsafe source")
+        discovered.append(path.relative_to(project_root).as_posix())
+    ordered = tuple(sorted(discovered))
+    if len(ordered) != len(set(ordered)):
+        raise AIPatternConfigV3Error("AI proposer implementation contains duplicate paths")
+    return ordered
+
+
 def _implementation_document(project_root: Path) -> dict[str, object]:
     modules: list[dict[str, object]] = []
-    for relative in V3_IMPLEMENTATION_PATHS:
+    for relative in _current_implementation_paths(project_root):
         path = project_root / relative
         if path.is_symlink() or not path.is_file():
             raise AIPatternConfigV3Error("AI proposer implementation source is missing or symbolic")
@@ -166,7 +162,28 @@ def verify_committed_implementation_v3(project_root: Path, code_commit: str) -> 
         or _git(project_root, "cat-file", "-t", code_commit).strip() != b"commit"
     ):
         raise AIPatternConfigV3Error("AI proposal code commit is not a full committed object")
-    for relative in V3_IMPLEMENTATION_PATHS:
+    current_paths = _current_implementation_paths(project_root)
+    committed_package_paths = tuple(
+        sorted(
+            line
+            for line in _git(
+                project_root,
+                "ls-tree",
+                "-r",
+                "--name-only",
+                code_commit,
+                "--",
+                "src/systematic_fx",
+            )
+            .decode("utf-8")
+            .splitlines()
+            if line.endswith(".py") and "__pycache__" not in Path(line).parts
+        )
+    )
+    expected_paths = tuple(sorted((*V3_IMPLEMENTATION_SINGLE_FILES, *committed_package_paths)))
+    if current_paths != expected_paths:
+        raise AIPatternConfigV3Error("AI proposal runtime file set differs from its commit")
+    for relative in current_paths:
         committed = _git(project_root, "show", f"{code_commit}:{relative}")
         current = (project_root / relative).read_bytes()
         if committed != current:
@@ -411,7 +428,7 @@ __all__ = [
     "AI_PATTERN_V2_BATCH_SHA256",
     "AI_PATTERN_V2_GOVERNED_REQUEST_SHA256",
     "V3_CORRECTION_REASON",
-    "V3_IMPLEMENTATION_PATHS",
+    "V3_IMPLEMENTATION_SINGLE_FILES",
     "AIPatternConfigV3Error",
     "AIPatternDiscoveryConfigV3",
     "load_ai_pattern_discovery_config_v3",
