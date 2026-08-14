@@ -1,0 +1,152 @@
+authority = "UNSEALED_LOCAL_BAR_SCREENING_HOLDOUT"
+code_commit = "950f680c98bc22b6e78e210d1ed9e75892181dc4"
+config_id = "ai_pattern_holdout_v1"
+dependency_lock_sha256 = "d5192590f9c80d3c2f23f65323d4963ee3fb9aa209301770651f4376c491bd1b"
+evaluator_implementation_sha256 = "fc9367d840803e3802eb4a20785387ea427b031c6aef46db3d79bd906321bd1b"
+precommitted_at_utc = "2026-08-14T06:13:57Z"
+schema_version = "systematic_fx.ai_pattern_holdout_config.v1"
+
+[batch]
+governed_request_sha256 = "17df16a432cd544c1ffde7fd43add6e20272c90d1e8358487ddf5f804b59303c"
+proposal_batch_sha256 = "dfef5bad188f79af8fa63a6e74f8c9609df34778a9a050278f3740766d24ee4e"
+proposal_count = 12
+proposal_report_sha256 = "c69c9273fcb53bceec03f15e96f952adc1f2e32c81ffacfb6a679ff99e6c4278"
+
+[bootstrap]
+enabled = false
+reason = "DISABLED_IN_V1"
+
+[dataset]
+dataset_handoff_sha256 = "26b1bb96f7323cae13bbe5d670c12f3e85615bbb9aab56932ce6523e67af7b00"
+dataset_manifest_relative_path = "data/derived/bar_patterns/trade_bar_dataset_manifest/identity_sha256=b0ecab04cdd3626d3c488f9108c8e9184f5dd610f51950ab7e7f74a5b7524297/sha256=e2c066ce4c8a97c4059dd2499f881300f905f4bab589240f87532d5cc49599dc.json"
+dataset_manifest_sha256 = "e2c066ce4c8a97c4059dd2499f881300f905f4bab589240f87532d5cc49599dc"
+embargo_access = "PROHIBITED"
+source_manifest_sha256 = "14db710d8a522a83d495faeac1c05c9a0169f80f088dfbeb7a66b38f14b6e3de"
+split_plan_sha256 = "5594725f6769a706018d414a5b27e3903f1d7d1cc22c98e93b6e973ead1af043"
+
+[execution]
+allocated_fixed_cost_ticks = 5
+entry_adverse_ticks = 2
+entry_policy = "NEXT_CONTIGUOUS_SAME_CONTRACT_SIGNAL_SEGMENT_OUTCOME_SPAN_5M_OPEN"
+fully_loaded_round_trip_cost_ticks = 10
+holding_horizon_seconds = 3600
+maximum_concurrent_positions_per_pattern = 1
+maximum_drawdown_basis = "CHRONOLOGICAL_SEQUENTIAL_FULLY_LOADED_TRADE_NET_TICKS_FROM_ZERO"
+path_timeframe_seconds = 1
+profit_target_ticks = 32
+profit_target_trade_through_ticks = 1
+scenario_id = "MODERATE_COMBINED"
+signal_timeframe_seconds = 300
+stop_loss_minimum_adverse_ticks = 4
+stop_loss_ticks = 24
+terminal_adverse_ticks = 2
+terminal_policy = "LAST_OBSERVED_1S_CLOSE_BY_HORIZON_OR_SPAN_END"
+tie_policy = "SAME_SECOND_STOP_FIRST"
+variable_cost_ticks = 5
+
+[holdout_gates]
+active_entry_days_minimum = 40
+contract_count_minimum = 2
+economic_net_ticks_strictly_positive = true
+fills_minimum = 80
+holm_family = "ALL_PREREGISTERED_WF_FINALISTS_MISSING_OR_ERROR_P_EQUALS_ONE"
+holm_one_sided_alpha_denominator = 20
+holm_one_sided_alpha_numerator = 1
+maximum_finalists = 3
+net_over_maximum_drawdown_minimum_denominator = 1
+net_over_maximum_drawdown_minimum_numerator = 1
+null_deltas_strictly_positive = true
+profit_factor_minimum_denominator = 20
+profit_factor_minimum_numerator = 23
+sixty_day_calendar_halves_both_net_positive = true
+sixty_day_halves_assignment = "SIGNAL_DECISION_DATE_FIRST_60_AND_LAST_60"
+terminal_fail_rule = "NO_CANDIDATE_PASSES_AND_AT_LEAST_ONE_EVALUABLE_CANDIDATE_HAS_HARD_ECONOMIC_OR_STATISTICAL_FAILURE"
+terminal_inconclusive_rule = "NO_CANDIDATE_PASSES_AND_ALL_PREREGISTERED_CANDIDATES_ARE_NULL_OR_SAMPLE_INELIGIBLE"
+terminal_pass_rule = "AT_LEAST_ONE_PREREGISTERED_WF_FINALIST_PASSES_ALL_GATES"
+
+[lifecycle]
+all_post_precommit_failures_append_failed = true
+data_or_censor_integrity_exception = "FAILED_LEDGER_NO_TERMINAL_RESULT"
+holdout_access = "ONLY_AFTER_HOLDOUT_AUTHORIZED"
+holdout_masks_before_one_second_outcomes = true
+search_masks_before_one_second_outcomes = true
+stage_artifacts = "ATOMIC_CANONICAL_JSON_MODE_0444"
+walk_forward_all_folds_before_results = true
+walk_forward_masks_before_one_second_outcomes = true
+walk_forward_one_second_memory_bound = "ONE_OUTCOME_SPAN_OR_ONE_FOLD"
+
+[multiplicity]
+discovery_family = "ALL_12_BATCH3_PROPOSALS"
+discovery_method = "BENJAMINI_HOCHBERG"
+holdout_method = "HOLM_STEP_DOWN"
+one_sided_alpha_denominator = 20
+one_sided_alpha_numerator = 1
+p_star = "MAX_OF_REAL_GT_ZERO_REAL_GT_SHIFT_REAL_GT_MATCHED_DAILY_SIGN_TESTS"
+sign_test_daily_vector = "EXIT_ACTIVE_DATE_ALL_STAGE_DATA_DATES_INCLUDING_OUTCOME_TAIL_EXPLICIT_ZERO"
+stage_group_assignment = "SIGNAL_DECISION_DATE"
+walk_forward_family = "ALL_DISCOVERY_FINALISTS"
+walk_forward_method = "BENJAMINI_HOCHBERG"
+zero_daily_differences = "OMITTED_FROM_EXACT_SIGN_TEST"
+
+[nulls]
+hash_algorithm = "SHA256_CANONICAL_JSON_V1"
+hash_fields = ["master_seed", "proposal_sha256", "stage", "fold", "source_date", "null_kind"]
+master_seed = 20260813
+matched_fallback_order = ["SAME_DATE_CONTRACT_OUTCOME_SPAN_SIGNAL_SEGMENT_30M_UTC_BUCKET_CAUSAL_STRATUM", "SAME_DATE_CONTRACT_OUTCOME_SPAN_SIGNAL_SEGMENT_ADJACENT_PLUS_MINUS_1_30M_UTC_BUCKET_RETAIN_CAUSAL_STRATUM", "SAME_DATE_CONTRACT_OUTCOME_SPAN_SIGNAL_SEGMENT_DROP_BUCKET_AND_CAUSAL_STRATUM", "SAMPLE_INELIGIBLE"]
+matched_missing_history_policy = "SEPARATE_CAUSAL_MISSING_PRIOR_20_HISTORY_STRATUM"
+matched_primary_strata = ["SOURCE_DATE", "CONTRACT", "OUTCOME_SPAN", "SIGNAL_SEGMENT_ID", "30M_UTC_BUCKET", "CAUSAL_PRIOR_20_BAR_RANGE_QUARTILE_OR_MISSING_PRIOR_20_HISTORY"]
+matched_sampling = "WITHOUT_REPLACEMENT_LOWEST_SHA256_SCORE"
+null_kinds = ["DATE_SPAN_CIRCULAR_SHIFT", "CAUSAL_MATCHED_ENTRY"]
+shift_offset = "1_PLUS_SHA256_MODULO_GROUP_SIZE_MINUS_ONE"
+shift_scope = ["SOURCE_DATE", "CONTRACT", "OUTCOME_SPAN", "SIGNAL_SEGMENT_ID"]
+
+[search_gates]
+active_exit_days_minimum = 40
+bh_q_denominator = 20
+bh_q_numerator = 1
+economic_net_ticks_strictly_positive = true
+fills_minimum = 80
+maximum_finalists = 4
+median_signals_per_day_maximum = 10
+minimum_positive_reporting_blocks = 3
+null_deltas_strictly_positive = true
+profit_factor_minimum_denominator = 20
+profit_factor_minimum_numerator = 21
+ranking = ["P_STAR_ASC", "WORST_BLOCK_EV_DESC", "TOTAL_EV_DESC", "PROFIT_FACTOR_DESC", "PROPOSAL_SHA256_ASC"]
+raw_signal_support_basis = "ALL_COMPLETED_5M_RULE_MATCHES_BEFORE_ENTRY_ELIGIBILITY"
+raw_signals_each_reporting_block_minimum = 25
+raw_signals_minimum = 160
+reporting_block_fills_minimum = 15
+signal_days_minimum = 40
+worst_reporting_block_ev_ticks_minimum = -2
+
+[status]
+database_mutation = false
+final_authority = "UNSEALED_LOCAL_BAR_SCREENING_HOLDOUT"
+network_access = false
+paper_live_or_promotion_authority = false
+physical_holdout_isolation = false
+strict_backtest_claim = false
+strict_sealed_holdout_claim = false
+
+[walk_forward_gates]
+active_entry_days_each_fold_minimum = 20
+active_entry_days_minimum = 150
+aggregate_economic_net_ticks_strictly_positive = true
+aggregate_profit_factor_minimum_denominator = 5
+aggregate_profit_factor_minimum_numerator = 6
+bh_q_denominator = 20
+bh_q_numerator = 1
+contract_count_minimum = 5
+fills_each_fold_minimum = 40
+fills_minimum = 300
+maximum_finalists = 3
+minimum_positive_folds = 4
+net_over_maximum_drawdown_minimum_denominator = 2
+net_over_maximum_drawdown_minimum_numerator = 3
+null_deltas_strictly_positive = true
+ranking = ["P_STAR_ASC", "WORST_FOLD_EV_DESC", "TOTAL_EV_DESC", "PROFIT_FACTOR_DESC", "PROPOSAL_SHA256_ASC"]
+worst_fold_profit_factor_floor_denominator = 4
+worst_fold_profit_factor_floor_numerator = 3
+worst_losing_fold_over_median_positive_profit_maximum_denominator = 2
+worst_losing_fold_over_median_positive_profit_maximum_numerator = 3
