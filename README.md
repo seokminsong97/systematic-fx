@@ -129,11 +129,20 @@ Batch 3 preserves the same finite catalog and selection policy while binding
 the full Python package tree, `pyproject.toml`, and `uv.lock` to committed blob
 bytes before context access. Its durable batch SHA-256 is
 `dfef5bad188f79af8fa63a6e74f8c9609df34778a9a050278f3740766d24ee4e`.
-This is autonomous hypothesis generation, not performance or alpha evidence:
-the status remains `HYPOTHESES_GENERATED_AWAITING_ELIGIBLE_DATA`. The current
-M0b quote slice has zero entry-eligible labels, so Batch 3 will not be evaluated
-or registered as an M0b epoch until official schedule/status/active-contract
-evidence makes that transition honest.
+The proposal artifacts remain autonomous hypothesis-generation evidence rather
+than alpha evidence. A separately precommitted, unsealed local trade-bar screen
+has now evaluated all 12 Batch 3 hypotheses under fixed costs, two outcome-blind
+null controls, exact daily sign tests, and family-wide BH correction. Every
+hypothesis failed the Search economic and statistical gates, so the terminal
+status is `NO_SEARCH_FINALISTS_HOLDOUT_NOT_OPENED`; no walk-forward, embargo, or
+holdout bytes were opened. This is not a strict backtest or an M0b epoch. The
+current M0b quote slice still has zero entry-eligible labels and remains blocked
+until official schedule/status/active-contract evidence makes that transition
+honest.
+
+```bash
+uv run --locked --offline python -B -m scripts.run_ai_pattern_holdout verify --json
+```
 
 Environment readiness is not research-data eligibility. All 1,434 source files
 are fully hashed and registered as `HASHED` in PostgreSQL, but the dataset

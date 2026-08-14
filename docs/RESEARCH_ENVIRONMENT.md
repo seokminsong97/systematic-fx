@@ -645,11 +645,25 @@ runtime modules. Batch 3 closes that provenance gap by byte-comparing the full
 Markdown is a convenience view only; canonical JSON and the ledger are the
 evidence.
 
-The completed batch status is
-`HYPOTHESES_GENERATED_AWAITING_ELIGIBLE_DATA`. It is a research start at the
-hypothesis-generation stage, not a performance run. The M0b worker remains
-idle for these proposals until research-eligible schedule/status/active-
-contract coverage and a separately frozen label/null/evaluation epoch exist.
+The immutable proposal batch itself retains status
+`HYPOTHESES_GENERATED_AWAITING_ELIGIBLE_DATA`. A separate, data-only precommit
+later bound the committed evaluator, Batch 3 identities, execution costs,
+Search/WF/holdout gates, multiplicity family, and two null controls before any
+1-second outcome path was opened. Its one-shot run evaluated all 12 proposals
+on the Discovery/Search interval and selected zero Search finalists. The
+terminal status is therefore `NO_SEARCH_FINALISTS_HOLDOUT_NOT_OPENED`; all five
+walk-forward folds, embargo partitions, and holdout partitions remained
+unopened.
+
+```bash
+uv run --locked --offline python -B -m scripts.run_ai_pattern_holdout verify --json
+```
+
+The verifier reconstructs the Search masks and 1-second outcomes in a fresh
+process and byte-compares the ledger and every artifact. The authority remains
+`UNSEALED_LOCAL_BAR_SCREENING_HOLDOUT`: local same-user storage is not physical
+holdout isolation, trade bars are not bid/ask execution proof, and the result
+has no paper, live, promotion, or M0b registration authority.
 
 ### Non-research pilot and governed registration
 

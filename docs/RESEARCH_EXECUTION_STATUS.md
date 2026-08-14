@@ -760,3 +760,66 @@ Read-only CLI replay reproduced all four artifacts. The persistent workstation
 database remained at migrations `(28, 28)`. Batch 3 remains proposal-only with
 status `HYPOTHESES_GENERATED_AWAITING_ELIGIBLE_DATA`; it is not alpha, PnL,
 significance, or promotion evidence.
+
+## 17. Batch 3 Trade-Bar Search Completed With Zero Finalists
+
+On 2026-08-13 local time, the Batch 3 performance contract was frozen in two
+separate commits before opening any 1-second outcome path. Evaluator source
+commit `950f680c98bc22b6e78e210d1ed9e75892181dc4` binds the full Python package,
+the four evaluator scripts, `pyproject.toml`, and `uv.lock`; the following
+data-only precommit has semantic SHA-256
+`035497ab4879409ff2fa118138e3f304a07a9e96fb45f1778da7521e4ecd71ef`.
+It fixes MODERATE_COMBINED execution, 10 ticks of fully loaded round-trip cost,
+two outcome-blind null controls, exact daily sign tests, the 12-member Search
+BH family, five-fold WF gates, and one-shot holdout Holm gates.
+
+All 12 Discovery/Search masks and both controls were frozen before reading the
+Search 1-second paths. The 12 hypotheses produced 634 to 2,182 sequential
+fills across 241 to 405 active exit days and seven contracts, so the result is
+not a sample-size or pipeline failure. Nevertheless, every fully loaded result
+was negative:
+
+```text
+Search finalists:                  0 / 12
+fully loaded net ticks range:      -34,577 to -10,236
+fully loaded EV ticks/trade range: -16.16 to -13.77
+profit factor range:               0.096 to 0.319
+BH rejections:                     0 / 12
+conservative p-star:               1.0 for all 12
+```
+
+Every candidate failed positive-block, worst-block-EV, positive-net, and
+profit-factor gates. Eleven also failed the requirement to beat both null
+controls; the remaining wick-reversal candidate beat its two already-negative
+null totals but still failed all economic and statistical gates. The terminal
+state is therefore `NO_SEARCH_FINALISTS_HOLDOUT_NOT_OPENED`, not an
+inconclusive data state.
+
+The append-only lifecycle is exactly:
+
+```text
+PRECOMMITTED
+SEARCH_MASKS_FROZEN
+SEARCH_COMPLETED
+WALK_FORWARD_SKIPPED
+HOLDOUT_SKIPPED
+COMPLETED
+```
+
+Canonical evidence SHA-256 identities are:
+
+```text
+request:         9bf2b2f52b35dfe7c2b09feaa52e1d05e524e7ffb941a7d0d5da64e7238b2ed0
+Search masks:    eaef0c46adf1b3620bed80ad9720d3014375d0bc6da31c4dfeb47368cbbe5a99
+Search result:   c950f07dbd690180f5119d57d841026b989f4ac3b0ffae0474d7444febdd7be5
+WF skip:         b7804ecb3ae7a3241a5e0c46d3ac291b37b3fdf3e847b2c3055a662061eb41af
+holdout skip:    46e02e1a282b4b8c8c605e7f03167688313fb757e3f445202d26e421e6ebd3ff
+terminal report: 67a47ae707241cbfee7d29a4ce8ae71e7490a203f4be5b075d7afec54e98975c
+```
+
+A fresh locked/offline public verifier independently reconstructed the exact
+Search masks, outcomes, statistics, ledger, and artifact bytes. Because there
+were no Search finalists, no walk-forward, embargo, or holdout rows were
+opened. The result is an `UNSEALED_LOCAL_BAR_SCREENING_HOLDOUT` diagnostic,
+not a sealed holdout, strict backtest, executable fill proof, or promotion
+decision.
