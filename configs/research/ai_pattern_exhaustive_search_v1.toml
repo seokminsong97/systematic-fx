@@ -1,0 +1,145 @@
+authority = "UNSEALED_LOCAL_BAR_SCREENING_HOLDOUT"
+code_commit = "b4d2323f9fef3261d1127266e2ce627b27bece11"
+config_id = "ai_pattern_exhaustive_search_v1"
+dependency_lock_sha256 = "d5192590f9c80d3c2f23f65323d4963ee3fb9aa209301770651f4376c491bd1b"
+evaluator_implementation_sha256 = "0e71b807279c1ab3a11b9caf86543d5017a54acba383fddb3e0dbeba4811ad67"
+precommitted_at_utc = "2026-08-14T07:43:49Z"
+schema_version = "systematic_fx.ai_pattern_exhaustive_search_config.v1"
+
+[batch3]
+context_sha256 = "842539b17aa6a17b29ea125cc324f98d324ae1f5931cee47fa238dc2f6310637"
+governed_request_sha256 = "17df16a432cd544c1ffde7fd43add6e20272c90d1e8358487ddf5f804b59303c"
+proposal_batch_sha256 = "dfef5bad188f79af8fa63a6e74f8c9609df34778a9a050278f3740766d24ee4e"
+
+[batching]
+batch_count = 43
+batch_size = 12
+final_batch_size = 2
+full_batch_count = 42
+order = "PATTERN_SHA256_ASC_WITH_ELIGIBILITY_RANK_RETAINED_AS_EVIDENCE"
+result_reporting = "ONE_CANONICAL_SUMMARY_AFTER_EACH_COMPLETED_BATCH"
+
+[catalog]
+batch_manifest_sha256 = "022af03de649f829b5ae44f58c840bea05440bda36d7eeca9d5fc6d33fb0f322"
+candidate_catalog_count = 560
+candidate_catalog_sha256 = "01653f2faacd50b62552e649152ce3baf965aa45ca70fdaae6871d0ab75b0f71"
+family_count = 518
+family_pattern_sha256 = "e269800244d62c346497dbbcdfdda540eb361f7273027f387fbc2efe27db4d59"
+initial_evaluated_count = 12
+minimum_session_count = 80
+minimum_stability_ppm = 0
+minimum_support_rows = 500
+remaining_assessment_catalog_sha256 = "088c35d2b6781b74e058aa1eef4be8a87a7818e3a5b42d1bd000fb3883d36c3b"
+remaining_count = 506
+remaining_pattern_sha_list_sha256 = "f34c5b2e6189136e758cc6f441622d6b2e417046f580b42a75bf367432aa77d3"
+selected_pattern_order_sha256 = "ad128cef2cb2ee5797cc85d987d3cf2145566ac397059fdef2e46f02551a95d0"
+selected_proposal_order_sha256 = "b33301df855fb4528044446cdf3e1f42b1f4007872bbc02fb68ed59387852956"
+
+[dataset]
+dataset_handoff_sha256 = "26b1bb96f7323cae13bbe5d670c12f3e85615bbb9aab56932ce6523e67af7b00"
+dataset_manifest_relative_path = "data/derived/bar_patterns/trade_bar_dataset_manifest/identity_sha256=b0ecab04cdd3626d3c488f9108c8e9184f5dd610f51950ab7e7f74a5b7524297/sha256=e2c066ce4c8a97c4059dd2499f881300f905f4bab589240f87532d5cc49599dc.json"
+dataset_manifest_sha256 = "e2c066ce4c8a97c4059dd2499f881300f905f4bab589240f87532d5cc49599dc"
+embargo_access = "PROHIBITED"
+source_manifest_sha256 = "14db710d8a522a83d495faeac1c05c9a0169f80f088dfbeb7a66b38f14b6e3de"
+split_plan_sha256 = "5594725f6769a706018d414a5b27e3903f1d7d1cc22c98e93b6e973ead1af043"
+
+[execution]
+allocated_fixed_cost_ticks = 5
+entry_adverse_ticks = 2
+entry_policy = "NEXT_CONTIGUOUS_SAME_CONTRACT_SIGNAL_SEGMENT_OUTCOME_SPAN_5M_OPEN"
+fully_loaded_round_trip_cost_ticks = 10
+holding_horizon_seconds = 3600
+maximum_concurrent_positions_per_pattern = 1
+maximum_drawdown_basis = "CHRONOLOGICAL_SEQUENTIAL_FULLY_LOADED_TRADE_NET_TICKS_FROM_ZERO"
+path_timeframe_seconds = 1
+profit_target_ticks = 32
+profit_target_trade_through_ticks = 1
+scenario_id = "MODERATE_COMBINED"
+signal_timeframe_seconds = 300
+stop_loss_minimum_adverse_ticks = 4
+stop_loss_ticks = 24
+terminal_adverse_ticks = 2
+terminal_policy = "LAST_OBSERVED_1S_CLOSE_BY_HORIZON_OR_SPAN_END"
+tie_policy = "SAME_SECOND_STOP_FIRST"
+variable_cost_ticks = 5
+
+[initial_search]
+config_semantic_sha256 = "035497ab4879409ff2fa118138e3f304a07a9e96fb45f1778da7521e4ecd71ef"
+governed_request_sha256 = "17df16a432cd544c1ffde7fd43add6e20272c90d1e8358487ddf5f804b59303c"
+masks_sha256 = "eaef0c46adf1b3620bed80ad9720d3014375d0bc6da31c4dfeb47368cbbe5a99"
+member_count = 12
+result_sha256 = "c950f07dbd690180f5119d57d841026b989f4ac3b0ffae0474d7444febdd7be5"
+reuse_policy = "REUSE_EXACT_SUMMARIES_NO_REEVALUATION"
+
+[lifecycle]
+all_43_masks_frozen_before_first_new_one_second_loader = true
+batch_masks_before_one_second_outcomes = true
+completed_batch_resume_policy = "VERIFY_IMMUTABLE_ARTIFACT_AND_CONTINUE_NEXT"
+crash_reconciliation = "ADOPT_EXACT_UNLEDGERED_CONTENT_ADDRESSED_ARTIFACT"
+family_correction_timing = "ONLY_AFTER_ALL_43_REMAINING_BATCHES_COMPLETE"
+precommit_before_outcomes = true
+stage_artifacts = "ATOMIC_CANONICAL_JSON_MODE_0444"
+
+[multiplicity]
+family = "ALL_518_SUPPORT_ELIGIBLE_BATCH3_RULES"
+maximum_finalists = 4
+method = "BENJAMINI_HOCHBERG"
+missing_or_error_p_value = 1
+one_sided_q_denominator = 20
+one_sided_q_numerator = 1
+p_star = "MAX_OF_REAL_GT_ZERO_REAL_GT_SHIFT_REAL_GT_MATCHED_DAILY_SIGN_TESTS"
+zero_daily_differences = "OMITTED_FROM_EXACT_SIGN_TEST"
+
+[nulls]
+hash_algorithm = "SHA256_CANONICAL_JSON_V1"
+hash_fields = ["master_seed", "proposal_sha256", "stage", "fold", "source_date", "null_kind"]
+master_seed = 20260813
+matched_fallback_order = ["SAME_DATE_CONTRACT_OUTCOME_SPAN_SIGNAL_SEGMENT_30M_UTC_BUCKET_CAUSAL_STRATUM", "SAME_DATE_CONTRACT_OUTCOME_SPAN_SIGNAL_SEGMENT_ADJACENT_PLUS_MINUS_1_30M_UTC_BUCKET_RETAIN_CAUSAL_STRATUM", "SAME_DATE_CONTRACT_OUTCOME_SPAN_SIGNAL_SEGMENT_DROP_BUCKET_AND_CAUSAL_STRATUM", "SAMPLE_INELIGIBLE"]
+matched_missing_history_policy = "SEPARATE_CAUSAL_MISSING_PRIOR_20_HISTORY_STRATUM"
+matched_primary_strata = ["SOURCE_DATE", "CONTRACT", "OUTCOME_SPAN", "SIGNAL_SEGMENT_ID", "30M_UTC_BUCKET", "CAUSAL_PRIOR_20_BAR_RANGE_QUARTILE_OR_MISSING_PRIOR_20_HISTORY"]
+matched_sampling = "WITHOUT_REPLACEMENT_LOWEST_SHA256_SCORE"
+null_kinds = ["DATE_SPAN_CIRCULAR_SHIFT", "CAUSAL_MATCHED_ENTRY"]
+shift_offset = "1_PLUS_SHA256_MODULO_GROUP_SIZE_MINUS_ONE"
+shift_scope = ["SOURCE_DATE", "CONTRACT", "OUTCOME_SPAN", "SIGNAL_SEGMENT_ID"]
+
+[scope]
+design_timing = "RETROSPECTIVE_EXPANSION_AFTER_INITIAL_12_SEARCH_RESULTS_OBSERVED"
+embargo_access = "PROHIBITED"
+fresh_preregistered_or_oos_claim = false
+holdout_access = "PROHIBITED_UNTIL_EXHAUSTIVE_SEARCH_FINAL_ARTIFACT"
+search_only = true
+walk_forward_access = "PROHIBITED_UNTIL_EXHAUSTIVE_SEARCH_FINAL_ARTIFACT"
+
+[search_gates]
+active_exit_days_minimum = 40
+bh_q_denominator = 20
+bh_q_numerator = 1
+economic_net_ticks_strictly_positive = true
+fills_minimum = 80
+maximum_finalists = 4
+median_signals_per_day_maximum = 10
+minimum_positive_reporting_blocks = 3
+null_deltas_strictly_positive = true
+profit_factor_minimum_denominator = 20
+profit_factor_minimum_numerator = 21
+ranking = ["P_STAR_ASC", "WORST_BLOCK_EV_DESC", "TOTAL_EV_DESC", "PROFIT_FACTOR_DESC", "PROPOSAL_SHA256_ASC"]
+raw_signal_support_basis = "ALL_COMPLETED_5M_RULE_MATCHES_BEFORE_ENTRY_ELIGIBILITY"
+raw_signals_each_reporting_block_minimum = 25
+raw_signals_minimum = 160
+reporting_block_fills_minimum = 15
+signal_days_minimum = 40
+worst_reporting_block_ev_ticks_minimum = -2
+
+[source_lineage]
+dataset_handoff_sha256 = "26b1bb96f7323cae13bbe5d670c12f3e85615bbb9aab56932ce6523e67af7b00"
+dataset_manifest_sha256 = "e2c066ce4c8a97c4059dd2499f881300f905f4bab589240f87532d5cc49599dc"
+source_manifest_sha256 = "14db710d8a522a83d495faeac1c05c9a0169f80f088dfbeb7a66b38f14b6e3de"
+split_plan_sha256 = "5594725f6769a706018d414a5b27e3903f1d7d1cc22c98e93b6e973ead1af043"
+
+[status]
+database_mutation = false
+network_access = false
+paper_live_or_promotion_authority = false
+physical_holdout_isolation = false
+strict_backtest_claim = false
+strict_sealed_holdout_claim = false
