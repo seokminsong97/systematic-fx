@@ -1121,6 +1121,7 @@ def _ai_pattern_discovery_command(args: argparse.Namespace) -> int:
     from systematic_fx.research.ai_discovery_context import AIDiscoveryContextError
     from systematic_fx.research.ai_pattern_config import AIPatternConfigError
     from systematic_fx.research.ai_pattern_config_v2 import AIPatternConfigV2Error
+    from systematic_fx.research.ai_pattern_config_v3 import AIPatternConfigV3Error
     from systematic_fx.research.ai_pattern_discovery import PatternDiscoveryError
     from systematic_fx.research.ai_pattern_run import (
         AIPatternRunError,
@@ -1128,32 +1129,43 @@ def _ai_pattern_discovery_command(args: argparse.Namespace) -> int:
     )
     from systematic_fx.research.ai_pattern_run_v2 import (
         AIPatternRunV2Error,
-        publish_ai_pattern_markdown_report_v2,
-        run_ai_pattern_research_v2,
         verify_ai_pattern_research_v2,
+    )
+    from systematic_fx.research.ai_pattern_run_v3 import (
+        AIPatternRunV3Error,
+        publish_ai_pattern_markdown_report_v3,
+        run_ai_pattern_research_v3,
+        verify_ai_pattern_research_v3,
     )
 
     try:
         project_root = Path.cwd()
         if args.ai_pattern_action == "run":
-            run = run_ai_pattern_research_v2(project_root)
-            report_path = publish_ai_pattern_markdown_report_v2(project_root, run)
+            run = run_ai_pattern_research_v3(project_root)
+            report_path = publish_ai_pattern_markdown_report_v3(project_root, run)
         elif args.batch == 1:
             run = verify_ai_pattern_research(project_root)
             report_path = project_root / "reports/generated/ai_pattern_discovery_batch_1.md"
             if not report_path.is_file():
                 report_path = None
-        else:
+        elif args.batch == 2:
             run = verify_ai_pattern_research_v2(project_root)
             report_path = project_root / "reports/generated/ai_pattern_discovery_batch_2.md"
+            if not report_path.is_file():
+                report_path = None
+        else:
+            run = verify_ai_pattern_research_v3(project_root)
+            report_path = project_root / "reports/generated/ai_pattern_discovery_batch_3.md"
             if not report_path.is_file():
                 report_path = None
     except (
         AIDiscoveryContextError,
         AIPatternConfigError,
         AIPatternConfigV2Error,
+        AIPatternConfigV3Error,
         AIPatternRunError,
         AIPatternRunV2Error,
+        AIPatternRunV3Error,
         FileNotFoundError,
         OSError,
         PatternDiscoveryError,
@@ -2087,7 +2099,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ai_pattern_run = ai_pattern_commands.add_parser(
         "run",
-        help="precommit, mine, and freeze the corrected direction-consistent Batch 2",
+        help="precommit, mine, and freeze commit-reconstructible Batch 3",
     )
     ai_pattern_run.add_argument("--json", action="store_true", help="emit JSON")
     ai_pattern_run.set_defaults(handler=_ai_pattern_discovery_command)
@@ -2097,10 +2109,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ai_pattern_verify.add_argument(
         "--batch",
-        choices=(1, 2),
+        choices=(1, 2, 3),
         type=int,
-        default=2,
-        help="immutable proposal batch to replay (default: 2)",
+        default=3,
+        help="immutable proposal batch to replay (default: 3)",
     )
     ai_pattern_verify.add_argument("--json", action="store_true", help="emit JSON")
     ai_pattern_verify.set_defaults(handler=_ai_pattern_discovery_command)
