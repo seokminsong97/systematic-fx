@@ -114,20 +114,24 @@ direction-consistent catalog and a 12-proposal output budget, then freezes every
 request, compact context, result, and report in an append-only hash chain.
 
 ```bash
-uv run systematic-fx research ai-pattern run --json                  # Batch 2 once
-uv run systematic-fx research ai-pattern verify --json               # Batch 2 replay
+uv run systematic-fx research ai-pattern run --json                  # Batch 3 once
+uv run systematic-fx research ai-pattern verify --json               # Batch 3 replay
+uv run systematic-fx research ai-pattern verify --batch 2 --json     # history
 uv run systematic-fx research ai-pattern verify --batch 1 --json     # history
 ```
 
 An independent audit found 60 directionless LONG/SHORT duplicates in the first
 620-rule catalog, including one selected rule. Batch 1 remains immutable but is
 superseded and cannot advance. Batch 2 rejected those 60 rules before opening
-the context, evaluated all 560 corrected rules, and froze 12 hypotheses. Its
-durable batch SHA-256 is
-`2a9a0642b841c57308f55061046dac9686ac76ace4257b7c01bca4c20537ef18`.
+the context, evaluated all 560 corrected rules, and froze 12 hypotheses, but a
+final audit found that its pinned commit predated the v2 executable modules.
+Batch 3 preserves the same finite catalog and selection policy while binding
+the full Python package tree, `pyproject.toml`, and `uv.lock` to committed blob
+bytes before context access. Its durable batch SHA-256 is
+`dfef5bad188f79af8fa63a6e74f8c9609df34778a9a050278f3740766d24ee4e`.
 This is autonomous hypothesis generation, not performance or alpha evidence:
 the status remains `HYPOTHESES_GENERATED_AWAITING_ELIGIBLE_DATA`. The current
-M0b quote slice has zero entry-eligible labels, so Batch 2 will not be evaluated
+M0b quote slice has zero entry-eligible labels, so Batch 3 will not be evaluated
 or registered as an M0b epoch until official schedule/status/active-contract
 evidence makes that transition honest.
 

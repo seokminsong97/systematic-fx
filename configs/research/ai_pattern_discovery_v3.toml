@@ -1,0 +1,61 @@
+schema_version = "systematic_fx.ai_pattern_discovery_config.v3"
+config_id = "ai_pattern_discovery_v3"
+request_key = "ai_pattern_discovery_2026_08_13_v3"
+authority = "PROPOSE_CANDIDATES_ONLY"
+base_proposer_mode = "DETERMINISTIC_OUTCOME_BLIND_V1"
+base_provider_id = "SYSTEMATIC_FX_LOCAL"
+base_model_id = "OUTCOME_BLIND_SUPPORT_STABILITY_DIVERSITY"
+base_model_version = "v1"
+directional_proposer_mode = "DETERMINISTIC_OUTCOME_BLIND_DIRECTIONAL_V2"
+precommitted_at_utc = "2026-08-13T17:00:00Z"
+deterministic_seed = 20260813
+candidate_evaluation_budget = 560
+candidate_catalog_sha256 = "01653f2faacd50b62552e649152ce3baf965aa45ca70fdaae6871d0ab75b0f71"
+semantic_policy_sha256 = "c2db18a152dda596d547a8bd9879f57c70f8b06212191164e5a7a2043b7ffa45"
+directional_prompt_sha256 = "e39f633fd1b33ec113ed068e7abdecd31e4d5ad8a58da2b42ead2cc59c17ecec"
+code_commit = "686070e3f22891aa41ed75e432ca9c461ad14a1d"
+proposer_implementation_sha256 = "2a433b6e1ff7c7a0bb432add338d732d8a673539e988c4b7a560b9f4294d1e88"
+dependency_lock_sha256 = "d5192590f9c80d3c2f23f65323d4963ee3fb9aa209301770651f4376c491bd1b"
+
+[correction]
+supersedes_governed_request_sha256 = "686989bba64c3af79acc206280bf5f543fc66bd482ec56523254c20f93049392"
+supersedes_batch_sha256 = "2a9a0642b841c57308f55061046dac9686ac76ace4257b7c01bca4c20537ef18"
+reason = "EXECUTABLE_COMMIT_PROVENANCE_CORRECTION"
+
+[source]
+context_sha256 = "a7219ac7c2a27f16cdbdfae58a9fe17c4d69372d315444987cc3605c4ff633a4"
+context_identity_sha256 = "12de34f325b5788330401e10275cad8e06471d589f561b003387d220c25806cd"
+feature_version = "completed_5m_bar_morphology_v1"
+discovery_split_sha256 = "5594725f6769a706018d414a5b27e3903f1d7d1cc22c98e93b6e973ead1af043"
+source_interval_start = "2022-01-03"
+source_interval_end = "2023-07-10"
+visible_active_days = 489
+decision_active_days = 469
+source_bar_rows = 111297
+decision_bar_rows = 106605
+expected_context_bins = 84207
+
+[budgets]
+max_source_rows = 120000
+max_context_bins = 120000
+proposal_budget = 12
+max_predicates_per_rule = 3
+max_model_calls = 0
+max_input_tokens = 0
+max_output_tokens = 0
+max_response_bytes = 0
+
+[selection]
+minimum_support_rows = 500
+minimum_session_count = 80
+minimum_stability_ppm = 0
+maximum_pairwise_overlap_ppm = 950000
+ranking_inputs = ["SUPPORT", "SESSION_STABILITY", "SIGNAL_DIVERSITY"]
+
+[status]
+terminal_status = "HYPOTHESES_GENERATED_AWAITING_ELIGIBLE_DATA"
+performance_evaluated = false
+m0b_epoch_registered = false
+persistent_database_mutated = false
+walk_forward_touched = false
+sealed_holdout_touched = false

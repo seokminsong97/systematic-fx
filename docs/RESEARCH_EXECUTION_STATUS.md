@@ -726,3 +726,37 @@ and the direction-consistent batch SHA-256 is
 Independent CLI replay reproduced the exact bytes. The persistent workstation
 database remained at migrations `(28, 28)` after Batch 2 as well. Its status is
 still `HYPOTHESES_GENERATED_AWAITING_ELIGIBLE_DATA`, not performance evidence.
+
+A final independent provenance audit then found one non-scientific but governed
+execution blocker: Batch 2 pinned commit `b6c525e3...`, which did not yet contain
+the three v2 executable modules. Its catalog, context, scoring, artifacts, and
+ledger all replay exactly, but that commit alone cannot reconstruct the executed
+source. Batch 2 is therefore preserved and superseded rather than rewritten.
+
+Batch 3 was precommitted only after the complete runtime had been committed. It
+requires every current `src/systematic_fx/**/*.py` file, `pyproject.toml`, and
+`uv.lock` to have the same path set and exact bytes as commit
+`686070e3f22891aa41ed75e432ca9c461ad14a1d` before opening the Discovery context.
+It then replayed the same frozen 560-rule catalog and selected the same 12
+direction-consistent occurrence hypotheses.
+
+```text
+finite candidates evaluated:   560
+support-eligible candidates:   518
+diversity rejections:          15
+directionless rules rejected:  60
+proposals frozen:              12
+```
+
+The Batch 3 governed request SHA-256 is
+`17df16a432cd544c1ffde7fd43add6e20272c90d1e8358487ddf5f804b59303c`;
+the request-bound reduced context SHA-256 is
+`842539b17aa6a17b29ea125cc324f98d324ae1f5931cee47fa238dc2f6310637`;
+the commit-reconstructible batch SHA-256 is
+`dfef5bad188f79af8fa63a6e74f8c9609df34778a9a050278f3740766d24ee4e`;
+and the immutable report SHA-256 is
+`c69c9273fcb53bceec03f15e96f952adc1f2e32c81ffacfb6a679ff99e6c4278`.
+Read-only CLI replay reproduced all four artifacts. The persistent workstation
+database remained at migrations `(28, 28)`. Batch 3 remains proposal-only with
+status `HYPOTHESES_GENERATED_AWAITING_ELIGIBLE_DATA`; it is not alpha, PnL,
+significance, or promotion evidence.

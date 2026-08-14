@@ -19,7 +19,7 @@ def test_cli_runs_corrected_batch_and_can_verify_both_immutable_batches() -> Non
     parser = cli.build_parser()
     run = parser.parse_args(["research", "ai-pattern", "run", "--json"])
     verify_v1 = parser.parse_args(["research", "ai-pattern", "verify", "--batch", "1"])
-    verify_v2 = parser.parse_args(["research", "ai-pattern", "verify"])
+    verify_v2 = parser.parse_args(["research", "ai-pattern", "verify", "--batch", "2"])
 
     assert run.ai_pattern_action == "run"
     assert not hasattr(run, "database_url")
