@@ -1120,28 +1120,40 @@ def _m0b_worker_cycle_command(args: argparse.Namespace) -> int:
 def _ai_pattern_discovery_command(args: argparse.Namespace) -> int:
     from systematic_fx.research.ai_discovery_context import AIDiscoveryContextError
     from systematic_fx.research.ai_pattern_config import AIPatternConfigError
+    from systematic_fx.research.ai_pattern_config_v2 import AIPatternConfigV2Error
     from systematic_fx.research.ai_pattern_discovery import PatternDiscoveryError
     from systematic_fx.research.ai_pattern_run import (
         AIPatternRunError,
-        publish_ai_pattern_markdown_report,
-        run_ai_pattern_research,
         verify_ai_pattern_research,
+    )
+    from systematic_fx.research.ai_pattern_run_v2 import (
+        AIPatternRunV2Error,
+        publish_ai_pattern_markdown_report_v2,
+        run_ai_pattern_research_v2,
+        verify_ai_pattern_research_v2,
     )
 
     try:
         project_root = Path.cwd()
         if args.ai_pattern_action == "run":
-            run = run_ai_pattern_research(project_root)
-            report_path = publish_ai_pattern_markdown_report(project_root, run)
-        else:
+            run = run_ai_pattern_research_v2(project_root)
+            report_path = publish_ai_pattern_markdown_report_v2(project_root, run)
+        elif args.batch == 1:
             run = verify_ai_pattern_research(project_root)
             report_path = project_root / "reports/generated/ai_pattern_discovery_batch_1.md"
+            if not report_path.is_file():
+                report_path = None
+        else:
+            run = verify_ai_pattern_research_v2(project_root)
+            report_path = project_root / "reports/generated/ai_pattern_discovery_batch_2.md"
             if not report_path.is_file():
                 report_path = None
     except (
         AIDiscoveryContextError,
         AIPatternConfigError,
+        AIPatternConfigV2Error,
         AIPatternRunError,
+        AIPatternRunV2Error,
         FileNotFoundError,
         OSError,
         PatternDiscoveryError,
@@ -2067,7 +2079,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     ai_pattern_parser = research_commands.add_parser(
         "ai-pattern",
-        help="autonomously mine or replay the one finite outcome-blind Discovery proposal batch",
+        help="autonomously mine or replay finite outcome-blind Discovery proposal batches",
     )
     ai_pattern_commands = ai_pattern_parser.add_subparsers(
         dest="ai_pattern_action",
@@ -2075,13 +2087,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ai_pattern_run = ai_pattern_commands.add_parser(
         "run",
-        help="precommit, mine, and freeze exactly twelve proposal-only hypotheses",
+        help="precommit, mine, and freeze the corrected direction-consistent Batch 2",
     )
     ai_pattern_run.add_argument("--json", action="store_true", help="emit JSON")
     ai_pattern_run.set_defaults(handler=_ai_pattern_discovery_command)
     ai_pattern_verify = ai_pattern_commands.add_parser(
         "verify",
         help="reopen every input/artifact and deterministically reproduce the frozen batch",
+    )
+    ai_pattern_verify.add_argument(
+        "--batch",
+        choices=(1, 2),
+        type=int,
+        default=2,
+        help="immutable proposal batch to replay (default: 2)",
     )
     ai_pattern_verify.add_argument("--json", action="store_true", help="emit JSON")
     ai_pattern_verify.set_defaults(handler=_ai_pattern_discovery_command)

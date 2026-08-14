@@ -106,26 +106,30 @@ configuration, command, PostgreSQL lifecycle, and recovery details.
 
 ## Autonomous AI pattern discovery
 
-The first bounded autonomous proposal run is now implemented and started. A
-feature-only symbolic AI examined the visible Discovery prefix—489 active days
-and 106,605 completed 5-minute decision bars—without labels, outcomes, PnL,
-walk-forward, or sealed holdout access. Its manifest precommits an exact
-620-rule catalog and a 12-proposal output budget, then freezes every request,
-compact context, result, and report in an append-only hash chain.
+Bounded autonomous pattern discovery is implemented and running. A feature-only
+symbolic AI examined the visible Discovery prefix—489 active days and 106,605
+completed 5-minute decision bars—without labels, outcomes, PnL, walk-forward,
+or sealed holdout access. Its current manifest precommits an exact 560-rule
+direction-consistent catalog and a 12-proposal output budget, then freezes every
+request, compact context, result, and report in an append-only hash chain.
 
 ```bash
-uv run systematic-fx research ai-pattern run --json     # one finite run only
-uv run systematic-fx research ai-pattern verify --json  # read-only exact replay
+uv run systematic-fx research ai-pattern run --json                  # Batch 2 once
+uv run systematic-fx research ai-pattern verify --json               # Batch 2 replay
+uv run systematic-fx research ai-pattern verify --batch 1 --json     # history
 ```
 
-Batch 1 proposed 12 morphology rules from 620 candidates. Its durable batch
-SHA-256 is
-`46a038bc7af2aa4947389674d015f730d60d0f7ae25dadee25e661cf02153df6`.
+An independent audit found 60 directionless LONG/SHORT duplicates in the first
+620-rule catalog, including one selected rule. Batch 1 remains immutable but is
+superseded and cannot advance. Batch 2 rejected those 60 rules before opening
+the context, evaluated all 560 corrected rules, and froze 12 hypotheses. Its
+durable batch SHA-256 is
+`2a9a0642b841c57308f55061046dac9686ac76ace4257b7c01bca4c20537ef18`.
 This is autonomous hypothesis generation, not performance or alpha evidence:
 the status remains `HYPOTHESES_GENERATED_AWAITING_ELIGIBLE_DATA`. The current
-M0b quote slice intentionally has zero entry-eligible labels, so the proposals
-will not be evaluated or registered as an M0b epoch until official
-schedule/status/active-contract evidence makes that transition honest.
+M0b quote slice has zero entry-eligible labels, so Batch 2 will not be evaluated
+or registered as an M0b epoch until official schedule/status/active-contract
+evidence makes that transition honest.
 
 Environment readiness is not research-data eligibility. All 1,434 source files
 are fully hashed and registered as `HASHED` in PostgreSQL, but the dataset

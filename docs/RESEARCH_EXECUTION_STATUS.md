@@ -659,7 +659,7 @@ is limited to the exact V2B representation, thresholds, execution rules, costs,
 and Discovery interval; it is not a claim that every possible market-state
 representation is uninformative.
 
-## 16. Autonomous AI Pattern Proposal Batch 1 Started
+## 16. Autonomous AI Pattern Proposal Research Started
 
 On 2026-08-13 the first outcome-blind autonomous proposal batch completed over
 the visible bar Discovery prefix. The model is a constrained symbolic AI, not
@@ -697,3 +697,32 @@ strategy evidence. No M0b epoch was registered because the current real quote
 slice still has zero entry-eligible labels. This batch may advance only after a
 new governed transition binds research-eligible schedule, status, active
 contract, label, cost, null-control, and evaluation evidence.
+
+An independent audit then found that 60 v1 range-expansion candidates declared
+LONG or SHORT without any signed directional predicate; one such candidate was
+selected at rank 11. Batch 1 is preserved exactly for audit but is superseded
+and prohibited from performance evaluation.
+
+The corrected Batch 2 request was separately precommitted before reopening any
+Discovery context. It froze the semantic policy and rejected-candidate hash,
+removed all 60 directionless candidates, evaluated all 560 remaining rules,
+and selected exactly 12. The selected set has no identical signal mask pair and
+every range candidate includes a direction-consistent signed-body predicate.
+
+```text
+finite candidates evaluated:   560
+support-eligible candidates:   518
+diversity rejections:          15
+directionless rules rejected:  60
+proposals frozen:              12
+```
+
+The governed request SHA-256 is
+`686989bba64c3af79acc206280bf5f543fc66bd482ec56523254c20f93049392`;
+the reduced v2 context SHA-256 is
+`bf746b478a7d41be86e3ab6356615f9897254d1a5816ba1b20b4ac7e9e54c6fb`;
+and the direction-consistent batch SHA-256 is
+`2a9a0642b841c57308f55061046dac9686ac76ace4257b7c01bca4c20537ef18`.
+Independent CLI replay reproduced the exact bytes. The persistent workstation
+database remained at migrations `(28, 28)` after Batch 2 as well. Its status is
+still `HYPOTHESES_GENERATED_AWAITING_ELIGIBLE_DATA`, not performance evidence.
