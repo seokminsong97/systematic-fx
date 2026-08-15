@@ -894,3 +894,66 @@ manifest and split metadata were read. The authority remains retrospective
 symbolic rule language and fixed local bar, execution, cost, and null-control
 contract. It does not establish that no market pattern exists and has no
 paper, live, promotion, or M0b registration authority.
+
+## 19. Retrospective Delayed Multi-Timeframe V1 Search Completed With Zero Finalists
+
+On 2026-08-14 local time, delayed multi-timeframe v1 completed its retrospective
+100-member Search diagnostic. Source commit
+`5e39d39ff3681a0c447c8b38ed96e992b5bc22dc` added the governed runtime and
+tests; the following data-only precommit
+`7c0477ac0a0a383569cecb4c129fefbe1150402c` froze the exact configuration
+before the Search outcome payload opened. The configuration has semantic
+SHA-256 `9d1c6aa031ed45f1c27fe187613608516b571de0033e40a803ed4886c3109a61`,
+and its frozen 100-candidate catalog has SHA-256
+`04abb5a3820caf509c44b389c2ec6f0f9d070159c108a8de30ba08f86554bdf9`.
+The family contained 36 delayed-MACD, 24 compression-breakout, 24
+trend-pullback-continuation, and 16 range-regime-mean-reversion candidates.
+
+All 100 real, circular-shift, and causal-matched masks were frozen before the
+Search 1-second paths were read. All 100 candidates were sample-eligible for
+the real/null comparison. Exactly five candidates had positive fully loaded
+net ticks, but they had only 12 to 25 fills versus the frozen minimum of 36
+and no more than 21 active entry days versus the minimum of 24. Each therefore
+failed at least one sample/economic gate; across the full family there were no
+economic-gate passes, BH rejections, or finalists.
+
+```text
+retrospective Search candidates: 100
+sample-eligible candidates:      100 / 100
+positive-net candidates:           5 / 100
+fully loaded net ticks range: -24,046 to 178
+economic-gate passes:               0 / 100
+BH rejections at q = 0.05:          0 / 100
+Search finalists:                   0 / 100
+```
+
+The exact append-only lifecycle is:
+
+```text
+PRECOMMITTED
+SEARCH_MASKS_FROZEN
+SEARCH_RESULTS_RELEASED
+WALK_FORWARD_SKIPPED
+HOLDOUT_SKIPPED
+COMPLETED
+```
+
+Canonical SHA-256 identities are:
+
+```text
+request:         89e5aa36cd5a0e74bace53573d8d1ef5da20f867a348fc6024ae6f1ac21bb74c
+Search masks:    dcfd75226aacd15e6a1bf2a2364de695aa200a3f27219fa51b0205f72fc96ce8
+Search result:   f83b1c292c9c8aa4df1b6807a3f0369fb24b52cbbd34e348e16605dbba384a83
+WF skip:         0498dbddc70d137d801f2a84d7856426b8efa9083eadfa8eff8a78fa0bb62045
+holdout skip:    e1d6b31d5f826fdc8e333f5adfaeeedfe840bd06823def8e4a6daf1e2cd5d9a7
+terminal report: dc44b65049cff5f9385ccb9869de42001697f4d2b13537a162e824c2fff5955b
+ledger head:     1c47697e7684248896d828b2e3c31f22348299da492e1d4432b683eade22e1a2
+```
+
+Because Search selected no candidate, the walk-forward and holdout payloads
+remained unopened. The fresh locked/offline public verifier recomputed the
+result and exited `0`. Terminal status is
+`NO_SEARCH_FINALISTS_HOLDOUT_NOT_OPENED` under authority
+`UNSEALED_LOCAL_DELAYED_MTF_RESEARCH`. Search was retrospective screening, and
+the first out-of-sample stage was never opened; this result is therefore no
+out-of-sample, alpha, strict-backtest, paper/live, or promotion claim.

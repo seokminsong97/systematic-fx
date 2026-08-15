@@ -149,9 +149,18 @@ current M0b quote slice still has zero entry-eligible labels and remains blocked
 until official schedule/status/active-contract evidence makes that transition
 honest.
 
+Delayed multi-timeframe v1 also completed a separate retrospective 100-member
+Search. All 100 candidates were sample-eligible; exactly five had positive net
+ticks, but only 12 to 25 fills, and every candidate failed the frozen
+sample/economic qualification. BH rejections, economic-gate passes, and
+finalists were all zero. Walk-forward and holdout payloads remained unopened,
+and a fresh locked/offline public verifier exited `0`. This unsealed screening
+result supplies no out-of-sample or alpha evidence.
+
 ```bash
 uv run --locked --offline python -B -m scripts.run_ai_pattern_holdout verify --json
 uv run --locked --offline python -B -m scripts.run_ai_pattern_exhaustive_search verify --json
+uv run --locked --offline python -B -m scripts.run_ai_delayed_mtf verify --json
 ```
 
 Environment readiness is not research-data eligibility. All 1,434 source files
