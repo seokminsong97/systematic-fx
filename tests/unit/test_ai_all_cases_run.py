@@ -1088,12 +1088,12 @@ def test_public_entry_points_are_root_only_and_have_no_service_injection() -> No
         assert tuple(inspect.signature(function).parameters) == ("project_root",)
 
 
-def test_attempt2_identity_is_fixed_and_predecessor_guard_precedes_root_creation(
+def test_attempt3_identity_is_fixed_and_dual_predecessor_guards_precede_root_creation(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     assert DEFAULT_AI_ALL_CASES_ROOT == AI_ALL_CASES_RUN_RELATIVE_ROOT
-    assert DEFAULT_AI_ALL_CASES_ROOT.as_posix().endswith("ai_all_cases_v1_attempt2")
+    assert DEFAULT_AI_ALL_CASES_ROOT.as_posix().endswith("ai_all_cases_v1_attempt3")
     config = _config(tmp_path)
     expected_root = tmp_path / DEFAULT_AI_ALL_CASES_ROOT
     calls: list[str] = []
@@ -1114,23 +1114,35 @@ def test_attempt2_identity_is_fixed_and_predecessor_guard_precedes_root_creation
         lambda _root: calls.append("dataset"),
     )
 
-    def predecessor(_root: Path) -> None:
+    def predecessor1(_root: Path) -> None:
         assert not expected_root.exists()
-        calls.append("predecessor")
+        calls.append("attempt1")
+
+    def predecessor2(_root: Path) -> None:
+        assert not expected_root.exists()
+        calls.append("attempt2")
 
     def fixed(_root: Path, *, create: bool) -> Path:
         assert create is True
-        calls.append("create_attempt2")
+        calls.append("create_attempt3")
         return expected_root
 
-    monkeypatch.setattr(run_module, "verify_failed_predecessor_attempt", predecessor)
+    monkeypatch.setattr(run_module, "verify_failed_predecessor_attempt", predecessor1)
+    monkeypatch.setattr(run_module, "verify_failed_attempt2_predecessor", predecessor2)
     monkeypatch.setattr(run_module, "_fixed_run_root", fixed)
 
     assert run_module._prepare_mutation(tmp_path) == (tmp_path, config, expected_root)
-    assert calls == ["bootstrap", "config", "dataset", "predecessor", "create_attempt2"]
+    assert calls == [
+        "bootstrap",
+        "config",
+        "dataset",
+        "attempt1",
+        "attempt2",
+        "create_attempt3",
+    ]
 
 
-def test_fresh_public_verify_guards_predecessor_before_attempt2_root_open(
+def test_fresh_public_verify_guards_both_predecessors_before_attempt3_root_open(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1157,7 +1169,12 @@ def test_fresh_public_verify_guards_predecessor_before_attempt2_root_open(
     monkeypatch.setattr(
         run_module,
         "verify_failed_predecessor_attempt",
-        lambda _root: calls.append("predecessor"),
+        lambda _root: calls.append("attempt1"),
+    )
+    monkeypatch.setattr(
+        run_module,
+        "verify_failed_attempt2_predecessor",
+        lambda _root: calls.append("attempt2"),
     )
     monkeypatch.setattr(
         run_module,
@@ -1180,7 +1197,8 @@ def test_fresh_public_verify_guards_predecessor_before_attempt2_root_open(
         "bootstrap",
         "config",
         "dataset",
-        "predecessor",
+        "attempt1",
+        "attempt2",
         "root:False",
         "services:True",
         "verify",

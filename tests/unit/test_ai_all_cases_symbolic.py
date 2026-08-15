@@ -1368,6 +1368,45 @@ def test_feature_only_controls_are_distinct_group_cardinality_preserving_and_com
         )
 
 
+def test_control_opportunity_lattice_canonicalizes_nonmonotonic_uint64_segments() -> None:
+    source = _bars(300, 220)
+    high_segment_id = 2**63 + 123
+    bars = tuple(
+        BarWithOutcomeSpan(
+            replace(
+                wrapped.bar,
+                segment_id=high_segment_id if index < 110 else 7,
+            ),
+            wrapped.outcome_span_id,
+        )
+        for index, wrapped in enumerate(source)
+    )
+    decision_dates = tuple(sorted({item.bar.source_date for item in bars}))
+
+    first = build_control_opportunity_lattice(
+        bars,
+        decision_dates=decision_dates,
+        allowed_tail_end_ns=bars[-1].bar.end_ns,
+    )
+    second = build_control_opportunity_lattice(
+        bars,
+        decision_dates=decision_dates,
+        allowed_tail_end_ns=bars[-1].bar.end_ns,
+    )
+
+    assert len(first.opportunities) == 12
+    assert first.opportunities == tuple(sorted(first.opportunities))
+    assert Counter(item.segment_id for item in first.opportunities) == {
+        7: 6,
+        high_segment_id: 6,
+    }
+    assert first == second
+    with pytest.raises(ValueError, match="must be non-empty"):
+        replace(first, opportunities=())
+    with pytest.raises(ValueError, match="non-canonical"):
+        replace(first, opportunities=tuple(reversed(first.opportunities)))
+
+
 def test_deterministic_complete_maximum_matching_repairs_greedy_dead_end() -> None:
     module = __import__(
         "campaigns.ai_all_cases_v1.symbolic",

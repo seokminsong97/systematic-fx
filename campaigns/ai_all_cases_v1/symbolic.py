@@ -5320,8 +5320,10 @@ class ControlOpportunityLattice:
     artifact_sha256: str
 
     def __post_init__(self) -> None:
-        if not self.opportunities or self.opportunities != tuple(sorted(self.opportunities)):
-            raise SymbolicEngineError("control opportunities must be non-empty canonical rows")
+        if not self.opportunities:
+            raise SymbolicEngineError("control opportunities must be non-empty")
+        if self.opportunities != tuple(sorted(self.opportunities)):
+            raise SymbolicEngineError("control opportunities are non-canonical")
         keys = [
             (item.contract, item.outcome_span_id, item.segment_id, item.anchor_ns)
             for item in self.opportunities
@@ -5568,7 +5570,7 @@ def build_control_opportunity_lattice(
                 hour // CONTROL_TIME_BUCKET_HOURS,
             )
         )
-    canonical = tuple(opportunities)
+    canonical = tuple(sorted(opportunities))
     source_bars = (
         {FIVE_MINUTES: values}
         if signal_bars_by_timeframe is None
