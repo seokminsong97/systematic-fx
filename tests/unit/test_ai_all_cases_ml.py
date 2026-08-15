@@ -13,6 +13,8 @@ import pytest
 
 from campaigns.ai_all_cases_v1 import ml, symbolic
 
+_HIGH_UINT64_SEGMENT_ID = 2**63 + 0x12345
+
 
 def _direct_candidate(
     learner: str = "ENET_A",
@@ -221,7 +223,7 @@ def _ranking_dates(matrix: ml.TrainingMatrix) -> tuple[date, ...]:
     return certificate.training_dates
 
 
-def _bars(timeframe: int, count: int) -> ml.CausalBarSeries:
+def _bars(timeframe: int, count: int, *, segment_id: int = 1) -> ml.CausalBarSeries:
     index = np.arange(count, dtype=np.float64)
     close = 100.0 + 0.002 * index + 0.1 * np.sin(index / 11.0)
     open_price = close - 0.01 * np.cos(index / 7.0)
@@ -243,7 +245,7 @@ def _bars(timeframe: int, count: int) -> ml.CausalBarSeries:
         source_dates=tuple(date(2024, 1, 1) for _ in range(count)),
         contracts=tuple("6E" for _ in range(count)),
         outcome_span_ids=np.ones(count, dtype=np.int64),
-        segment_ids=np.ones(count, dtype=np.int64),
+        segment_ids=np.full(count, segment_id, dtype=np.uint64),
         stage_date_ranks=np.zeros(count, dtype=np.int64),
         stage_key="SEARCH",
         buy_volume=buy,
@@ -328,12 +330,12 @@ def _schedule(
 
 
 def _causal_rows(
-    *, plus_expert: bool = False
+    *, plus_expert: bool = False, segment_id: int = 1
 ) -> tuple[ml.CausalFeatureRows, dict[int, ml.CausalBarSeries]]:
     bars = {
-        300: _bars(300, 2_200),
-        1_800: _bars(1_800, 400),
-        3_600: _bars(3_600, 200),
+        300: _bars(300, 2_200, segment_id=segment_id),
+        1_800: _bars(1_800, 400, segment_id=segment_id),
+        3_600: _bars(3_600, 200, segment_id=segment_id),
     }
     decisions = np.arange(130, 180, dtype=np.int64) * 3_600 * 1_000_000_000
     entries = decisions + 1_000_000_000
@@ -360,7 +362,7 @@ def _causal_rows(
                 date(2024, 1, 1),
                 "6E",
                 1,
-                1,
+                segment_id,
                 int(decision),
                 candidate.direction,
                 int(decision) - 300 * 1_000_000_000,
@@ -405,7 +407,7 @@ def _causal_rows(
         source_dates=tuple(date(2024, 1, 1) for _ in entries),
         contracts=tuple("6E" for _ in entries),
         outcome_span_ids=np.ones(len(entries), dtype=np.int64),
-        segment_ids=np.ones(len(entries), dtype=np.int64),
+        segment_ids=np.full(len(entries), segment_id, dtype=np.uint64),
         stage_date_ranks=np.zeros(len(entries), dtype=np.int64),
         stage_key="SEARCH",
         decision_timeframe_seconds=300,
@@ -942,7 +944,7 @@ def test_decision_cutoff_and_utc_features_ignore_later_scheduled_entry() -> None
 
 
 def test_structural_lattice_preserves_raw_anchors_and_freezes_feature_only_subset() -> None:
-    rows, bars = _causal_rows()
+    rows, bars = _causal_rows(segment_id=_HIGH_UINT64_SEGMENT_ID)
     anchors = ml.CausalAnchorRows(
         row_ids=rows.row_ids,
         decision_ns=rows.decision_ns,
@@ -957,6 +959,9 @@ def test_structural_lattice_preserves_raw_anchors_and_freezes_feature_only_subse
         entry_schedule_sha256=rows.entry_schedule_sha256,
     )
     lattice = ml.build_structural_opportunity_lattice(anchors, bars[300])
+    assert rows.segment_ids.dtype == np.dtype(np.uint64)
+    assert {int(value) for value in rows.segment_ids} == {_HIGH_UINT64_SEGMENT_ID}
+    assert set(lattice.segment_ids) == {_HIGH_UINT64_SEGMENT_ID}
     assert len(lattice.row_ids) == rows.row_count == 50
     assert 2 <= len(lattice.eligible_row_ids) < len(lattice.row_ids)
     assert lattice == ml.build_structural_opportunity_lattice(anchors, bars[300])
@@ -966,7 +971,7 @@ def test_structural_lattice_preserves_raw_anchors_and_freezes_feature_only_subse
 
 
 def test_direct_oos_schedule_preserves_decision_entry_and_lattice_proofs() -> None:
-    rows, bars = _causal_rows()
+    rows, bars = _causal_rows(segment_id=_HIGH_UINT64_SEGMENT_ID)
     wf_rows = replace(rows, stage_key="WF1")
     anchors = ml.CausalAnchorRows(
         row_ids=wf_rows.row_ids,
@@ -1015,6 +1020,8 @@ def test_direct_oos_schedule_preserves_decision_entry_and_lattice_proofs() -> No
         )
     )
     assert direct_schedule.feature_rows_sha256 == eligible_rows.artifact_sha256
+    assert set(direct_schedule.segment_ids) == {_HIGH_UINT64_SEGMENT_ID}
+    assert ml.OutcomeFreeExecutionSchedule.from_dict(direct_schedule.as_dict()) == direct_schedule
     mismatched_contracts = replace(
         eligible_rows,
         contracts=("M6E", *eligible_rows.contracts[1:]),
@@ -1106,6 +1113,85 @@ def test_match_strata_are_fixed_outcome_free_and_used_by_matrix_builder() -> Non
     assert all(value.startswith("tf0300_utc4h_") and value.count("|") == 2 for value in strata)
 
 
+def _same_date_segment_transition(
+    source: ml.CausalBarSeries,
+    *,
+    boundary: int,
+    closed_interval_ns: int,
+    change_segment: bool = True,
+) -> ml.CausalBarSeries:
+    ends = np.array(source.bar_end_ns, copy=True)
+    ends[boundary:] += closed_interval_ns
+    segments = np.array(source.segment_ids, copy=True)
+    if change_segment:
+        segments[boundary:] = np.uint64(2)
+    return replace(source, bar_end_ns=ends, segment_ids=segments)
+
+
+@pytest.mark.parametrize("timeframe", ml.TF_ORDER)
+def test_exact_one_hour_closed_interval_bridge_is_timeframe_generic_and_fully_warm(
+    timeframe: int,
+) -> None:
+    boundary = 25
+    bridge = _same_date_segment_transition(
+        _bars(timeframe, 120),
+        boundary=boundary,
+        closed_interval_ns=3_600 * 1_000_000_000,
+    )
+    assert bridge._continuity_by_index[boundary]
+    assert bridge._run_length_by_index[boundary] == boundary + 1
+    assert bridge._run_length_by_index[49] == ml.MIN_CAUSAL_HISTORY_BARS == 50
+    columns, atr = ml._timeframe_feature_columns(bridge)
+    assert np.isfinite(atr[49]) and atr[49] > 0
+    assert all(np.isfinite(values[49]) for values in columns.values())
+
+
+@pytest.mark.parametrize("timeframe", ml.TF_ORDER)
+def test_segment_transition_resets_for_adjacent_or_other_closed_intervals(
+    timeframe: int,
+) -> None:
+    base = _bars(timeframe, 120)
+    boundary = 60
+    exact_bridge = _same_date_segment_transition(
+        base,
+        boundary=boundary,
+        closed_interval_ns=3_600 * 1_000_000_000,
+    )
+    cases = (
+        _same_date_segment_transition(
+            base,
+            boundary=boundary,
+            closed_interval_ns=0,
+        ),
+        _same_date_segment_transition(
+            base,
+            boundary=boundary,
+            closed_interval_ns=2 * 3_600 * 1_000_000_000,
+        ),
+        _same_date_segment_transition(
+            base,
+            boundary=boundary,
+            closed_interval_ns=3_600 * 1_000_000_000 + 1,
+        ),
+        _same_date_segment_transition(
+            base,
+            boundary=boundary,
+            closed_interval_ns=3_600 * 1_000_000_000,
+            change_segment=False,
+        ),
+        replace(
+            exact_bridge,
+            contracts=tuple("6E" if index < boundary else "6M" for index in range(120)),
+        ),
+        replace(
+            exact_bridge,
+            outcome_span_ids=np.where(np.arange(120) < boundary, 1, 2),
+        ),
+    )
+    assert all(not series._continuity_by_index[boundary] for series in cases)
+    assert all(series._run_length_by_index[boundary] == 1 for series in cases)
+
+
 def test_lineage_breaks_reset_features_and_adjacent_weekend_bridge_is_bounded() -> None:
     base = _bars(3_600, 120)
     segments = np.ones(120, dtype=np.int64)
@@ -1141,10 +1227,12 @@ def test_lineage_breaks_reset_features_and_adjacent_weekend_bridge_is_bounded() 
     ranks = np.where(np.arange(120) < 60, 0, 1)
     weekend_ends = np.array(base.bar_end_ns, copy=True)
     weekend_ends[60:] += 72 * 3_600 * 1_000_000_000
+    weekend_segments = np.where(np.arange(120) < 60, 1, 2).astype(np.uint64)
     weekend = replace(
         base,
         bar_end_ns=weekend_ends,
         source_dates=source_dates,
+        segment_ids=weekend_segments,
         stage_date_ranks=ranks,
     )
     assert weekend._continuity_by_index[60]
@@ -1160,6 +1248,126 @@ def test_lineage_breaks_reset_features_and_adjacent_weekend_bridge_is_bounded() 
     )
     assert not long_gap._continuity_by_index[60]
     assert long_gap._run_length_by_index[60] == 1
+
+
+def test_closed_interval_bridge_keeps_full_50_bar_features_finite_and_causal() -> None:
+    hour_ns = 3_600 * 1_000_000_000
+    bars = {
+        timeframe: _same_date_segment_transition(
+            _bars(timeframe, count),
+            boundary=25,
+            closed_interval_ns=hour_ns,
+        )
+        for timeframe, count in ((300, 2_200), (1_800, 400), (3_600, 200))
+    }
+    decisions = np.arange(51, 101, dtype=np.int64) * hour_ns
+    anchors = ml.CausalAnchorRows(
+        row_ids=tuple(f"bridged-{index:03d}" for index in range(len(decisions))),
+        decision_ns=decisions,
+        entry_ns=decisions + 1_000_000_000,
+        source_dates=tuple(date(2024, 1, 1) for _ in decisions),
+        contracts=tuple("6E" for _ in decisions),
+        outcome_span_ids=np.ones(len(decisions), dtype=np.int64),
+        segment_ids=np.full(len(decisions), 2, dtype=np.uint64),
+        stage_date_ranks=np.zeros(len(decisions), dtype=np.int64),
+        stage_key="SEARCH",
+        decision_timeframe_seconds=300,
+        entry_schedule_sha256="a" * 64,
+    )
+    rows = ml.build_causal_feature_rows(anchors=anchors, bars_by_timeframe=bars)
+    assert ml.MIN_CAUSAL_HISTORY_BARS == 50
+    assert rows.row_count == len(decisions)
+    assert np.isfinite(rows.values).all()
+    assert np.isfinite(rows.atr_ticks_by_timeframe).all()
+    assert all(
+        bars[timeframe]._run_length_by_index[rows.aligned_bar_indexes[:, column]].min() >= 50
+        for column, timeframe in enumerate(ml.TF_ORDER)
+    )
+
+    hour_bars = bars[3_600]
+    pre_bridge = np.arange(len(hour_bars.close)) < 25
+    history_offset = np.zeros(len(hour_bars.close), dtype=np.float64)
+    history_offset[pre_bridge] = 0.75 + 0.125 * np.sin(
+        np.arange(np.count_nonzero(pre_bridge), dtype=np.float64) / 2.0
+    )
+    history_volume = np.array(hour_bars.volume, copy=True)
+    history_volume[pre_bridge] += 17.0 + 3.0 * np.arange(np.count_nonzero(pre_bridge))
+    history_trade_count = np.array(hour_bars.trade_count, copy=True)
+    history_trade_count[pre_bridge] += 5.0 + np.arange(np.count_nonzero(pre_bridge)) % 7
+    history_changed_bars = {
+        **bars,
+        3_600: replace(
+            hour_bars,
+            open=hour_bars.open + history_offset,
+            high=hour_bars.high + history_offset,
+            low=hour_bars.low + history_offset,
+            close=hour_bars.close + history_offset,
+            volume=history_volume,
+            trade_count=history_trade_count,
+        ),
+    }
+    history_changed = ml.build_causal_feature_rows(
+        anchors=anchors,
+        bars_by_timeframe=history_changed_bars,
+    )
+    assert history_changed.source_commitment_sha256 != rows.source_commitment_sha256
+    assert np.array_equal(history_changed.aligned_bar_indexes, rows.aligned_bar_indexes)
+    ema50_dependent_index = rows.feature_names.index("tf3600_ema_20_50_distance_atr")
+    assert history_changed.values[0, ema50_dependent_index] != rows.values[0, ema50_dependent_index]
+    long_window_indexes = tuple(
+        rows.feature_names.index(name)
+        for name in (
+            "tf3600_donchian_position_48",
+            "tf3600_vwap_distance_atr_48",
+            "tf3600_atr_ratio_12_48",
+            "tf3600_volume_z_48",
+            "tf3600_trade_count_z_48",
+        )
+    )
+    assert any(
+        history_changed.values[0, index] != rows.values[0, index] for index in long_window_indexes
+    )
+
+    last_decision = int(decisions[-1])
+    changed_bars = {}
+    for timeframe, series in bars.items():
+        future = series.bar_end_ns > last_decision
+        offset = future.astype(np.float64) * 1_000.0
+        changed_bars[timeframe] = replace(
+            series,
+            open=series.open + offset,
+            high=series.high + offset,
+            low=series.low + offset,
+            close=series.close + offset,
+        )
+    changed = ml.build_causal_feature_rows(anchors=anchors, bars_by_timeframe=changed_bars)
+    assert changed.source_commitment_sha256 != rows.source_commitment_sha256
+    assert np.array_equal(changed.aligned_bar_indexes, rows.aligned_bar_indexes)
+    assert np.array_equal(changed.values, rows.values)
+    assert np.array_equal(changed.atr_ticks_by_timeframe, rows.atr_ticks_by_timeframe)
+
+    wrong_segment_anchors = replace(
+        anchors,
+        segment_ids=np.ones(len(decisions), dtype=np.uint64),
+    )
+    with pytest.raises(ml.AllCasesMLError, match="fewer than two anchors"):
+        ml.build_causal_feature_rows(
+            anchors=wrong_segment_anchors,
+            bars_by_timeframe=bars,
+        )
+
+    feature_contract = ml.ml_engine_contract()["feature_engine"]
+    assert feature_contract["minimum_completed_bars_each_timeframe"] == 50
+    assert ml.FEATURE_HISTORY_CLOSED_INTERVAL_BRIDGE_SECONDS == 3_600
+    assert feature_contract["alignment"] == (
+        "LATEST_COMPLETED_BAR_AT_OR_BEFORE_DECISION_NS_COMPATIBLE_WITH_CONTRACT_SPAN_"
+        "AND_SAME_DATE_SEGMENT_OR_ADJACENT_DATE_96H_BRIDGE"
+    )
+    assert "EXACT_ONE_HOUR_CLOSED_INTERVAL_BRIDGE" in feature_contract["continuity"]
+    assert (
+        "FEATURE_HISTORY_ONLY_NO_ANCHOR_ALIGNMENT_STRUCTURAL_LATTICE_OR_EXECUTION_AUTHORIZATION"
+        in feature_contract["continuity"]
+    )
 
 
 def _duplicate_timestamp_lineages(source: ml.CausalBarSeries) -> ml.CausalBarSeries:
@@ -1220,7 +1428,10 @@ def test_same_timestamp_lineages_never_cross_join() -> None:
 
 
 def test_outcome_builders_bind_direct_and_meta_training_rows() -> None:
-    rows, _ = _causal_rows(plus_expert=True)
+    rows, _ = _causal_rows(
+        plus_expert=True,
+        segment_id=_HIGH_UINT64_SEGMENT_ID,
+    )
     count = rows.row_count
     direct_candidate = _direct_candidate(
         "ENET_A",
@@ -1259,6 +1470,8 @@ def test_outcome_builders_bind_direct_and_meta_training_rows() -> None:
     )
     assert direct.values.shape == (count, 90)
     assert np.array_equal(direct.outcome_span_ids, rows.outcome_span_ids[eligible])
+    assert direct.segment_ids.dtype == np.dtype(np.uint64)
+    assert {int(value) for value in direct.segment_ids} == {_HIGH_UINT64_SEGMENT_ID}
     assert direct.outcome_lineage_sha256 == "c" * 64
     assert direct.match_strata == ml.build_match_strata(rows.for_feature_set("FLOW_TIME_REGIME_90"))
     assert not hasattr(ml, "build_direct_terminal_targets")
@@ -1366,6 +1579,8 @@ def test_outcome_builders_bind_direct_and_meta_training_rows() -> None:
         **meta_inputs,
     )
     assert meta.values.shape == (len(base_indexes), 221)
+    assert meta.segment_ids.dtype == np.dtype(np.uint64)
+    assert {int(value) for value in meta.segment_ids} == {_HIGH_UINT64_SEGMENT_ID}
     assert np.array_equal(meta.targets, (net_ticks[list(base_indexes)] > 0).astype(float))
     assert meta.base_strategy_id == recipe.strategy_id
     for field_name, forged in (
@@ -1890,6 +2105,28 @@ def test_frozen_preprocessor_parser_rejects_bool_and_coerced_widths() -> None:
         ml.FrozenPreprocessor(True, (0.0,), (), None, None)
 
 
+def test_uint64_segment_boundaries_reject_lossy_or_out_of_range_values() -> None:
+    series = _bars(300, 50, segment_id=_HIGH_UINT64_SEGMENT_ID)
+    invalid_arrays = (
+        np.full(50, -1, dtype=np.int64),
+        np.ones(50, dtype=np.bool_),
+        np.ones(50, dtype=np.float64),
+        np.full(50, 2**64, dtype=object),
+    )
+    for invalid in invalid_arrays:
+        with pytest.raises(ml.AllCasesMLError, match="uint64"):
+            replace(series, segment_ids=invalid)
+
+    matrix = replace(
+        _matrix(row_count=20),
+        segment_ids=np.full(20, _HIGH_UINT64_SEGMENT_ID, dtype=np.uint64),
+    )
+    schedule = _schedule(matrix, 2)
+    for invalid in (-1, 2**64, True, 1.0):
+        with pytest.raises(ml.AllCasesMLError, match="execution schedule differs"):
+            replace(schedule, segment_ids=(invalid, schedule.segment_ids[1]))
+
+
 def test_oos_schedule_binds_full_partition_calendar_and_emits_explicit_zero_days() -> None:
     matrix = _matrix(row_count=180)
     candidate = _direct_candidate()
@@ -1986,7 +2223,7 @@ def test_oos_schedule_binds_full_partition_calendar_and_emits_explicit_zero_days
 
 def test_meta_oos_is_an_anchor_gate_then_symbolic_order_filter() -> None:
     candidate = _meta_candidate()
-    source_rows, _ = _causal_rows()
+    source_rows, _ = _causal_rows(segment_id=_HIGH_UINT64_SEGMENT_ID)
     indexes = tuple(range(0, 20, 2))
     feature_rows, orders, order_batch, recipe, experts, policy = _symbolic_orders_for_feature_rows(
         replace(source_rows, stage_key="WF1"), indexes
@@ -2015,6 +2252,7 @@ def test_meta_oos_is_an_anchor_gate_then_symbolic_order_filter() -> None:
     gate = ml.freeze_meta_anchor_gate(model, feature_rows, schedule)
     admitted_orders = ml.apply_meta_gate_to_symbolic_orders(gate, order_batch)
     assert schedule.decision_ns == tuple(item.anchor.outcome_key[3] for item in orders)
+    assert {row["anchor_key"][2] for row in schedule.as_dict()["rows"]} == {_HIGH_UINT64_SEGMENT_ID}
     assert tuple(item.order_id for item in admitted_orders) == tuple(
         order_id
         for order_id, admitted in zip(schedule.order_ids, gate.predictions.admitted, strict=True)
@@ -2913,7 +3151,10 @@ def test_search_diversity_uses_exact_action_jaccard_and_integer_daily_correlatio
 
 
 def test_frozen_oos_outcomes_preserve_lattice_and_never_drop_missing_rows() -> None:
-    matrix = _matrix(row_count=180)
+    matrix = replace(
+        _matrix(row_count=180),
+        segment_ids=np.full(180, _HIGH_UINT64_SEGMENT_ID, dtype=np.uint64),
+    )
     model = ml.fit_direct_model(_direct_candidate(), matrix)
     schedule = _schedule(matrix, 20)
     feature_rows = _direct_feature_rows(matrix, 20)
@@ -2937,6 +3178,7 @@ def test_frozen_oos_outcomes_preserve_lattice_and_never_drop_missing_rows() -> N
         outcome_lineage_sha256=schedule.lineage_sha256,
         opportunity_lattice_sha256=schedule.opportunity_lattice_sha256,
     )
+    assert set(schedule.segment_ids) == {_HIGH_UINT64_SEGMENT_ID}
     evaluated = ml.evaluate_frozen_mask_economics(
         mask,
         outcomes,
@@ -2977,7 +3219,8 @@ def test_frozen_oos_outcomes_preserve_lattice_and_never_drop_missing_rows() -> N
         ("outcome_span_ids", (True,) * 20),
         ("segment_ids", (True,) * 20),
     ):
-        with pytest.raises(ml.AllCasesMLError, match="exact int64"):
+        expected = "exact uint64" if key == "segment_ids" else "exact int64"
+        with pytest.raises(ml.AllCasesMLError, match=expected):
             ml.build_frozen_resolved_outcome_rows(
                 schedule,
                 **{**response, key: bad_values},

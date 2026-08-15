@@ -79,6 +79,10 @@ MAX_RAW_FEATURES: Final = 221
 MAX_TRANSFORMED_FEATURES: Final = 442
 MAX_SEARCH_MODEL_FITS: Final = 5_040
 MIN_CAUSAL_HISTORY_BARS: Final = 50
+FEATURE_HISTORY_CLOSED_INTERVAL_BRIDGE_SECONDS: Final = 3_600
+_FEATURE_HISTORY_CLOSED_INTERVAL_BRIDGE_NS: Final = (
+    FEATURE_HISTORY_CLOSED_INTERVAL_BRIDGE_SECONDS * 1_000_000_000
+)
 
 # The runner must set these before importing numerical libraries.  They are
 # part of the campaign contract even though this pure module does not mutate
@@ -1869,8 +1873,12 @@ def ml_engine_contract() -> dict[str, object]:
             "stochastic_d": "SIMPLE_MEAN_LAST_3_K",
             "time": "DECISION_NS_UTC_SECOND_OF_DAY_AND_MONDAY_ZERO_WEEKDAY",
             "continuity": (
-                "SAME_DATE_EXACT_TIMEFRAME_ADJACENCY_AND_CONTRACT_SPAN_SEGMENT;"
+                "SAME_DATE_EXACT_TIMEFRAME_ADJACENCY_AND_SAME_CONTRACT_SPAN_SEGMENT;"
+                "SAME_DATE_SAME_CONTRACT_SPAN_SEGMENT_TRANSITION_"
+                "EXACT_ONE_HOUR_CLOSED_INTERVAL_BRIDGE;"
                 "CROSS_DATE_SAME_CONTRACT_SPAN_ADJACENT_STAGE_RANK_GAP_LTE_96H;"
+                "FEATURE_HISTORY_ONLY_NO_ANCHOR_ALIGNMENT_STRUCTURAL_LATTICE_OR_"
+                "EXECUTION_AUTHORIZATION;"
                 "RESET_ALL_ROLLING_AND_EMA_AT_EVERY_BREAK_AND_STAGE"
             ),
             "volume_z": "CURRENT_MINUS_ROLLING_MEAN_DIV_POPULATION_STD_ZERO_TO_ZERO",
@@ -2205,7 +2213,7 @@ class CausalBarSeries:
             (count,),
             "bar outcome_span_ids",
         )
-        self.segment_ids = _deep_exact_int64_array(
+        self.segment_ids = _deep_exact_uint64_array(
             self.segment_ids,
             (count,),
             "bar segment_ids",
@@ -2280,20 +2288,30 @@ class CausalBarSeries:
         for indexes in self._indices_by_contract_span.values():
             for previous, current in pairwise(indexes):
                 same_date = self.source_dates[previous] == self.source_dates[current]
-                continues = (
-                    int(end[previous]) == int(end[current]) - duration_ns
-                    and self.contracts[previous] == self.contracts[current]
+                same_contract_span = (
+                    self.contracts[previous] == self.contracts[current]
                     and self.outcome_span_ids[previous] == self.outcome_span_ids[current]
-                    and self.segment_ids[previous] == self.segment_ids[current]
-                    if same_date
-                    else int(self.stage_date_ranks[current])
-                    == int(self.stage_date_ranks[previous]) + 1
-                    and self.contracts[previous] == self.contracts[current]
-                    and self.outcome_span_ids[previous] == self.outcome_span_ids[current]
-                    and 0
-                    <= int(end[current]) - duration_ns - int(end[previous])
-                    <= 96 * 3_600 * 1_000_000_000
                 )
+                closed_interval_ns = int(end[current]) - int(end[previous]) - duration_ns
+                if same_date:
+                    exact_adjacency = (
+                        closed_interval_ns == 0
+                        and self.segment_ids[previous] == self.segment_ids[current]
+                    )
+                    exact_one_hour_closed_interval_bridge = (
+                        closed_interval_ns == _FEATURE_HISTORY_CLOSED_INTERVAL_BRIDGE_NS
+                        and self.segment_ids[previous] != self.segment_ids[current]
+                    )
+                    continues = same_contract_span and (
+                        exact_adjacency or exact_one_hour_closed_interval_bridge
+                    )
+                else:
+                    continues = (
+                        int(self.stage_date_ranks[current])
+                        == int(self.stage_date_ranks[previous]) + 1
+                        and same_contract_span
+                        and 0 <= closed_interval_ns <= 96 * 3_600 * 1_000_000_000
+                    )
                 continuity[current] = continues
                 run_length[current] = run_length[previous] + 1 if continues else 1
         continuity.setflags(write=False)
@@ -2563,7 +2581,7 @@ class CausalAnchorRows:
             (count,),
             "anchor outcome_span_ids",
         )
-        self.segment_ids = _deep_exact_int64_array(
+        self.segment_ids = _deep_exact_uint64_array(
             self.segment_ids,
             (count,),
             "anchor segment_ids",
@@ -2673,6 +2691,7 @@ class StructuralOpportunityLattice:
             or not self.stage_key
             or len(self.entry_schedule_sha256) != 64
             or len(self.artifact_sha256) != 64
+            or any(not _is_exact_uint64_scalar(value) or value <= 0 for value in self.segment_ids)
             or canonical_sha256(self.definition_dict()) != self.artifact_sha256
         ):
             raise AllCasesMLError("structural opportunity lattice differs")
@@ -3023,7 +3042,7 @@ class CausalFeatureRows:
         object.__setattr__(
             self,
             "segment_ids",
-            _deep_exact_int64_array(
+            _deep_exact_uint64_array(
                 self.segment_ids,
                 (count,),
                 "feature segment_ids",
@@ -3479,7 +3498,7 @@ class TrainingMatrix:
         self.outcome_span_ids = _deep_exact_int64_array(
             self.outcome_span_ids, (count,), "outcome_span_ids"
         )
-        self.segment_ids = _deep_exact_int64_array(self.segment_ids, (count,), "segment_ids")
+        self.segment_ids = _deep_exact_uint64_array(self.segment_ids, (count,), "segment_ids")
         if (
             np.any(self.outcome_span_ids <= 0)
             or np.any(self.segment_ids <= 0)
@@ -3692,6 +3711,13 @@ def _deep_exact_int64_array(value: object, shape: tuple[int, ...], label: str) -
     return result
 
 
+def _deep_exact_uint64_array(value: object, shape: tuple[int, ...], label: str) -> np.ndarray:
+    exact = _exact_uint64_array(value, shape, label)
+    result = np.frombuffer(exact.tobytes(order="C"), dtype=np.uint64).reshape(shape)
+    result.setflags(write=False)
+    return result
+
+
 def _exact_int64_array(value: object, shape: tuple[int, ...], label: str) -> np.ndarray:
     source = np.asarray(value)
     if source.shape != shape or source.dtype.kind not in {"i", "u"}:
@@ -3705,6 +3731,19 @@ def _exact_int64_array(value: object, shape: tuple[int, ...], label: str) -> np.
     return result
 
 
+def _exact_uint64_array(value: object, shape: tuple[int, ...], label: str) -> np.ndarray:
+    source = np.asarray(value)
+    if source.shape != shape or source.dtype.kind not in {"i", "u"}:
+        raise AllCasesMLError(f"{label} must be an exact integral uint64 lineage array")
+    if source.dtype.kind == "i" and source.size and int(source.min()) < 0:
+        raise AllCasesMLError(f"{label} escapes uint64")
+    result = np.array(source, dtype=np.uint64, copy=True)
+    if any(int(left) != int(right) for left, right in zip(source.flat, result.flat, strict=True)):
+        raise AllCasesMLError(f"{label} escapes uint64")
+    result.setflags(write=False)
+    return result
+
+
 def _is_exact_int64_scalar(value: object) -> bool:
     return (
         not isinstance(value, (bool, np.bool_))
@@ -3713,10 +3752,25 @@ def _is_exact_int64_scalar(value: object) -> bool:
     )
 
 
+def _is_exact_uint64_scalar(value: object) -> bool:
+    return (
+        not isinstance(value, (bool, np.bool_))
+        and isinstance(value, (int, np.integer))
+        and 0 <= int(value) <= np.iinfo(np.uint64).max
+    )
+
+
 def _exact_int64_tuple(values: Sequence[object], *, label: str) -> tuple[int, ...]:
     raw = tuple(values)
     if any(not _is_exact_int64_scalar(value) for value in raw):
         raise AllCasesMLError(f"{label} must contain exact int64 scalars")
+    return tuple(int(value) for value in raw)
+
+
+def _exact_uint64_tuple(values: Sequence[object], *, label: str) -> tuple[int, ...]:
+    raw = tuple(values)
+    if any(not _is_exact_uint64_scalar(value) for value in raw):
+        raise AllCasesMLError(f"{label} must contain exact uint64 scalars")
     return tuple(int(value) for value in raw)
 
 
@@ -3848,7 +3902,7 @@ def build_direct_training_matrix(
     terminal = _exact_int64_array(terminal_ticks, (source_count,), "terminal_ticks")
     contract_values = tuple(outcome_contracts)
     spans = _exact_int64_array(outcome_span_ids, (source_count,), "outcome_span_ids")
-    segments = _exact_int64_array(segment_ids, (source_count,), "segment_ids")
+    segments = _exact_uint64_array(segment_ids, (source_count,), "segment_ids")
     valid_paths = np.asarray(valid_label_paths)
     strata = build_match_strata(rows)
     if (
@@ -4071,7 +4125,7 @@ def build_meta_training_matrix(
     entries = _exact_int64_array(base_entry_ns, (source_count,), "base_entry_ns")
     contract_values = tuple(outcome_contracts)
     spans = _exact_int64_array(outcome_span_ids, (source_count,), "outcome_span_ids")
-    segments = _exact_int64_array(segment_ids, (source_count,), "segment_ids")
+    segments = _exact_uint64_array(segment_ids, (source_count,), "segment_ids")
     strata = build_match_strata(rows)
     net = _exact_int64_array(
         fully_loaded_net_ticks,
@@ -8771,10 +8825,10 @@ class OutcomeFreeExecutionSchedule:
                     self.entry_ns,
                     self.planned_exit_ns,
                     self.outcome_span_ids,
-                    self.segment_ids,
                 )
                 for value in values
             )
+            or any(not _is_exact_uint64_scalar(value) for value in self.segment_ids)
             or any(value <= 0 for value in self.outcome_span_ids)
             or any(value <= 0 for value in self.segment_ids)
             or any(
@@ -9133,10 +9187,9 @@ class MetaAnchorGateSchedule:
                 len(key) != 5
                 or not isinstance(key[0], str)
                 or not key[0]
-                or any(
-                    isinstance(key[index], bool) or not isinstance(key[index], int)
-                    for index in (1, 2, 3)
-                )
+                or not _is_exact_int64_scalar(key[1])
+                or not _is_exact_uint64_scalar(key[2])
+                or not _is_exact_int64_scalar(key[3])
                 or key[1] <= 0
                 or key[2] <= 0
                 or key[3] <= 0
@@ -9931,7 +9984,7 @@ def build_frozen_resolved_outcome_rows(
     valid = tuple(valid_label_paths)
     contracts = tuple(outcome_contracts)
     spans = _exact_int64_tuple(outcome_span_ids, label="outcome_span_ids")
-    segments = _exact_int64_tuple(segment_ids, label="segment_ids")
+    segments = _exact_uint64_tuple(segment_ids, label="segment_ids")
     count = len(execution_schedule.row_ids)
     if (
         identifiers != execution_schedule.row_ids

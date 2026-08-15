@@ -29,6 +29,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
 from .config import (
+    AI_ALL_CASES_CONFIG_ID,
+    AI_ALL_CASES_RUN_RELATIVE_ROOT,
     AllCasesConfig,
     _load_validated_dataset_contract,
     _require_deterministic_runtime_environment,
@@ -38,7 +40,7 @@ if TYPE_CHECKING:
     from systematic_fx.features.bars import TradeBar
     from systematic_fx.research.bar_pipeline import BarDatasetPartition
 
-_RUN_RELATIVE_ROOT: Final = Path("data/derived/bar_patterns/ai_all_cases_v1")
+_RUN_RELATIVE_ROOT: Final = AI_ALL_CASES_RUN_RELATIVE_ROOT
 _SEARCH_INTERNAL_RELATIVE_ROOT: Final = _RUN_RELATIVE_ROOT / "internal/search"
 _SEARCH_PHASE_ORDER: Final = (
     "STAGE_A_SCORE_CHUNKS",
@@ -1917,7 +1919,7 @@ def verify_internal_universe_release(
     """Cross-bind the exact 64 internal universe leaves to the public barrier."""
 
     root = project_root / _RUN_RELATIVE_ROOT / "internal/universe"
-    production_release = config.as_dict().get("config_id") == "ai_all_cases_v1"
+    production_release = config.as_dict().get("config_id") == AI_ALL_CASES_CONFIG_ID
     if (
         production_release
         and universe.get("schema") != "systematic_fx.ai_all_cases_search_universe_payload.v1"
@@ -2676,6 +2678,7 @@ class _FilledTradeEvidence:
             or self.exit_ns < self.entry_ns
             or self.outcome_span_id < 1
             or self.segment_id < 1
+            or self.segment_id > (1 << 64) - 1
             or _sha256(self.definition_dict()) != self.trade_sha256
         ):
             raise AllCasesPipelineError("filled-trade evidence differs")
@@ -2971,7 +2974,7 @@ def _ml_bar_series(state: _SearchFeatureState) -> Mapping[int, object]:
             source_dates=tuple(item.bar.source_date for item in wrapped),
             contracts=tuple(item.bar.contract for item in wrapped),
             outcome_span_ids=np.asarray([item.outcome_span_id for item in wrapped], dtype=np.int64),
-            segment_ids=np.asarray([item.bar.segment_id for item in wrapped], dtype=np.int64),
+            segment_ids=np.asarray([item.bar.segment_id for item in wrapped], dtype=np.uint64),
             stage_date_ranks=np.asarray(
                 [rank_by_date[item.bar.source_date] for item in wrapped], dtype=np.int64
             ),
@@ -3105,7 +3108,7 @@ def _direct_feature_bundles(
             outcome_span_ids=np.asarray(
                 [item.outcome_span_id for item in opportunities], dtype=np.int64
             ),
-            segment_ids=np.asarray([item.segment_id for item in opportunities], dtype=np.int64),
+            segment_ids=np.asarray([item.segment_id for item in opportunities], dtype=np.uint64),
             stage_date_ranks=np.asarray(
                 [stage_rank[item.decision_source_date] for item in opportunities],
                 dtype=np.int64,
@@ -3308,7 +3311,7 @@ def _direct_outcome_bundles(
                 terminal_by_coordinate[timeframe, horizon],
                 rows.contracts,
                 np.asarray(rows.outcome_span_ids, dtype=np.int64),
-                np.asarray(rows.segment_ids, dtype=np.int64),
+                np.asarray(rows.segment_ids, dtype=np.uint64),
                 tuple(bool(value) for value in valid),
                 _sha256(lineage_document),
                 rows.row_ids,
@@ -5766,7 +5769,7 @@ def _meta_base_bundle(
         source_dates=tuple(anchor.source_date for anchor in anchors),
         contracts=tuple(anchor.contract for anchor in anchors),
         outcome_span_ids=np.asarray([anchor.outcome_span_id for anchor in anchors], dtype=np.int64),
-        segment_ids=np.asarray([anchor.segment_id for anchor in anchors], dtype=np.int64),
+        segment_ids=np.asarray([anchor.segment_id for anchor in anchors], dtype=np.uint64),
         stage_date_ranks=np.asarray(
             [stage_rank[anchor.source_date] for anchor in anchors], dtype=np.int64
         ),
@@ -5832,7 +5835,7 @@ def _meta_base_bundle(
         np.asarray([row.exit_ns for row in selected_rows], dtype=np.int64),
         tuple(anchor.contract for anchor in selected_anchors),
         np.asarray([anchor.outcome_span_id for anchor in selected_anchors], dtype=np.int64),
-        np.asarray([anchor.segment_id for anchor in selected_anchors], dtype=np.int64),
+        np.asarray([anchor.segment_id for anchor in selected_anchors], dtype=np.uint64),
         np.ones(count, dtype=np.bool_),
         outcome_lineage_sha256,
         state.structural_lattice.artifact_sha256,
@@ -7300,7 +7303,7 @@ def verify_internal_search_release(
 ) -> None:
     """Require the complete internal Search closure behind a production release."""
 
-    if config.as_dict().get("config_id") != "ai_all_cases_v1":
+    if config.as_dict().get("config_id") != AI_ALL_CASES_CONFIG_ID:
         return
     if search.get("schema") != "systematic_fx.ai_all_cases_search_result_payload.v1":
         raise AllCasesPipelineError("released Search payload schema differs")
@@ -7470,7 +7473,7 @@ def _meta_feature_gate(
             [order.anchor.outcome_span_id for order in base_orders.orders], dtype=np.int64
         ),
         segment_ids=np.asarray(
-            [order.anchor.segment_id for order in base_orders.orders], dtype=np.int64
+            [order.anchor.segment_id for order in base_orders.orders], dtype=np.uint64
         ),
         stage_date_ranks=np.asarray(
             [stage_rank[order.anchor.source_date] for order in base_orders.orders],
@@ -7849,6 +7852,18 @@ def _direct_partition_evidence(
             raise AllCasesPipelineError(f"{label} contains a non-exact integer")
         return tuple(int(value) for value in raw)
 
+    def exact_positive_uint64s(values: object, *, label: str) -> tuple[int, ...]:
+        try:
+            raw = tuple(values)  # type: ignore[arg-type]
+        except TypeError as error:
+            raise AllCasesPipelineError(f"{label} is not an integer sequence") from error
+        if any(
+            isinstance(value, bool) or not isinstance(value, Integral) or not 0 < int(value) < 2**64
+            for value in raw
+        ):
+            raise AllCasesPipelineError(f"{label} contains a non-exact integer")
+        return tuple(int(value) for value in raw)
+
     controls = runtime.direct_controls
     if controls is None:
         raise AllCasesPipelineError("direct mask runtime is absent")
@@ -7866,7 +7881,7 @@ def _direct_partition_evidence(
     entry_ticks = exact_integers(response.entry_ticks, label="direct entry_ticks")
     terminal_ticks = exact_integers(response.terminal_ticks, label="direct terminal_ticks")
     outcome_span_ids = exact_integers(response.outcome_span_ids, label="direct outcome_span_ids")
-    segment_ids = exact_integers(response.segment_ids, label="direct segment_ids")
+    segment_ids = exact_positive_uint64s(response.segment_ids, label="direct segment_ids")
     valid_label_paths = tuple(response.valid_label_paths)
     if any(type(value) is not bool for value in valid_label_paths):
         raise AllCasesPipelineError("direct valid_label_paths contains a non-boolean")

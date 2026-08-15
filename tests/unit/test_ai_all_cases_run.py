@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 import json
+import os
 import stat
 from collections.abc import Mapping
 from datetime import date, timedelta
@@ -13,7 +14,12 @@ import pytest
 
 from campaigns.ai_all_cases_v1 import pipeline as pipeline_module
 from campaigns.ai_all_cases_v1 import run as run_module
-from campaigns.ai_all_cases_v1.config import DETERMINISTIC_RUNTIME_ENV, AllCasesConfig
+from campaigns.ai_all_cases_v1.config import (
+    AI_ALL_CASES_CONFIG_ID,
+    AI_ALL_CASES_RUN_RELATIVE_ROOT,
+    DETERMINISTIC_RUNTIME_ENV,
+    AllCasesConfig,
+)
 from campaigns.ai_all_cases_v1.pipeline import (
     _SUBLEDGER_ARTIFACT_SCHEMA,
     AllCasesPipelineError,
@@ -53,6 +59,11 @@ from campaigns.ai_all_cases_v1.run import (
     precommit_ai_all_cases,
     run_ai_all_cases,
     verify_ai_all_cases,
+)
+
+ROOT = Path(__file__).resolve().parents[2]
+RUN_REAL_SEARCH_FEATURE_SMOKE = (
+    os.environ.get("SYSTEMATIC_FX_RUN_AI_ALL_CASES_REAL_SEARCH_FEATURE_SMOKE") == "1"
 )
 
 _PHASES = (
@@ -149,6 +160,27 @@ def test_exact_daily_p_star_and_multiplicity_include_full_frozen_families() -> N
     p_values = {family[0]: Fraction(1, 100), family[1]: Fraction(1), family[2]: Fraction(1)}
     assert _benjamini_hochberg_rejections(family, p_values, q=Fraction(1, 20)) == family[:1]
     assert _holm_rejections(family, p_values, alpha=Fraction(1, 20)) == family[:1]
+
+
+def test_filled_trade_segment_identity_accepts_exact_uint64_domain_only() -> None:
+    arguments = {
+        "candidate_id": "1" * 64,
+        "stage_key": "WF1",
+        "world": "REAL",
+        "source_identity": {"row": 1},
+        "decision_date": "2024-01-01",
+        "decision_ns": 1,
+        "entry_ns": 2,
+        "exit_ns": 3,
+        "contract": "6E",
+        "outcome_span_id": 1,
+        "direction": "LONG",
+        "net_ticks": 1,
+    }
+    evidence = _filled_trade_evidence(segment_id=(1 << 64) - 1, **arguments)
+    assert evidence.segment_id == (1 << 64) - 1
+    with pytest.raises(AllCasesPipelineError, match="filled-trade evidence"):
+        _filled_trade_evidence(segment_id=1 << 64, **arguments)
 
 
 def test_production_result_assemblers_close_full_zero_filled_date_domains() -> None:
@@ -651,7 +683,7 @@ def _config(tmp_path: Path) -> AllCasesConfig:
 def _production_identity_config(tmp_path: Path) -> AllCasesConfig:
     original = _config(tmp_path)
     document = original.as_dict()
-    document["config_id"] = "ai_all_cases_v1"
+    document["config_id"] = AI_ALL_CASES_CONFIG_ID
     raw = json.dumps(document, sort_keys=True, separators=(",", ":")).encode("ascii")
     return AllCasesConfig(
         path=original.path,
@@ -1054,6 +1086,105 @@ def _rechain_request_artifact(run_root: Path) -> None:
 def test_public_entry_points_are_root_only_and_have_no_service_injection() -> None:
     for function in (precommit_ai_all_cases, run_ai_all_cases, verify_ai_all_cases):
         assert tuple(inspect.signature(function).parameters) == ("project_root",)
+
+
+def test_attempt2_identity_is_fixed_and_predecessor_guard_precedes_root_creation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert DEFAULT_AI_ALL_CASES_ROOT == AI_ALL_CASES_RUN_RELATIVE_ROOT
+    assert DEFAULT_AI_ALL_CASES_ROOT.as_posix().endswith("ai_all_cases_v1_attempt2")
+    config = _config(tmp_path)
+    expected_root = tmp_path / DEFAULT_AI_ALL_CASES_ROOT
+    calls: list[str] = []
+    monkeypatch.setattr(run_module, "_project_root", lambda _value: tmp_path)
+    monkeypatch.setattr(
+        run_module,
+        "_require_trusted_bootstrap_runtime",
+        lambda _root: calls.append("bootstrap"),
+    )
+    monkeypatch.setattr(
+        run_module,
+        "load_ai_all_cases_config",
+        lambda _root: calls.append("config") or config,
+    )
+    monkeypatch.setattr(
+        run_module,
+        "_load_validated_dataset_contract",
+        lambda _root: calls.append("dataset"),
+    )
+
+    def predecessor(_root: Path) -> None:
+        assert not expected_root.exists()
+        calls.append("predecessor")
+
+    def fixed(_root: Path, *, create: bool) -> Path:
+        assert create is True
+        calls.append("create_attempt2")
+        return expected_root
+
+    monkeypatch.setattr(run_module, "verify_failed_predecessor_attempt", predecessor)
+    monkeypatch.setattr(run_module, "_fixed_run_root", fixed)
+
+    assert run_module._prepare_mutation(tmp_path) == (tmp_path, config, expected_root)
+    assert calls == ["bootstrap", "config", "dataset", "predecessor", "create_attempt2"]
+
+
+def test_fresh_public_verify_guards_predecessor_before_attempt2_root_open(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = _config(tmp_path)
+    run_root = tmp_path / DEFAULT_AI_ALL_CASES_ROOT
+    result = SimpleNamespace(status="VERIFIED")
+    calls: list[str] = []
+    monkeypatch.setattr(run_module, "_project_root", lambda _value: tmp_path)
+    monkeypatch.setattr(
+        run_module,
+        "_require_trusted_bootstrap_runtime",
+        lambda _root: calls.append("bootstrap"),
+    )
+    monkeypatch.setattr(
+        run_module,
+        "load_ai_all_cases_config",
+        lambda _root: calls.append("config") or config,
+    )
+    monkeypatch.setattr(
+        run_module,
+        "_load_validated_dataset_contract",
+        lambda _root: calls.append("dataset"),
+    )
+    monkeypatch.setattr(
+        run_module,
+        "verify_failed_predecessor_attempt",
+        lambda _root: calls.append("predecessor"),
+    )
+    monkeypatch.setattr(
+        run_module,
+        "_fixed_run_root",
+        lambda _root, *, create: calls.append(f"root:{create}") or run_root,
+    )
+    monkeypatch.setattr(
+        run_module,
+        "_default_services",
+        lambda *, verify_only: calls.append(f"services:{verify_only}") or object(),
+    )
+    monkeypatch.setattr(
+        run_module,
+        "_verify_with_services",
+        lambda *_args: calls.append("verify") or result,
+    )
+
+    assert verify_ai_all_cases(tmp_path) is result
+    assert calls == [
+        "bootstrap",
+        "config",
+        "dataset",
+        "predecessor",
+        "root:False",
+        "services:True",
+        "verify",
+    ]
 
 
 def test_full_lifecycle_freezes_every_stage_before_outcomes_and_publishes_0444(
@@ -1886,6 +2017,8 @@ def test_preexisting_one_shot_holdout_prefix_is_failed_without_any_service_retry
         ("label_exit_ns", (True,)),
         ("outcome_span_ids", (True,)),
         ("segment_ids", (True,)),
+        ("segment_ids", (0,)),
+        ("segment_ids", (2**64,)),
         ("valid_label_paths", (1,)),
     ),
 )
@@ -1941,12 +2074,178 @@ def test_direct_oos_response_rejects_bool_integer_coercion(
         )
 
 
+def test_pipeline_causal_bar_adapter_preserves_maximum_uint64_segment_id() -> None:
+    import numpy as np
+
+    maximum_segment_id = int(np.iinfo(np.uint64).max)
+    source_date = date(2026, 1, 2)
+
+    def wrapped_bars(timeframe_seconds: int) -> tuple[object, ...]:
+        return tuple(
+            SimpleNamespace(
+                bar=SimpleNamespace(
+                    buy_volume=None,
+                    close_ticks=100,
+                    contract="6EH6",
+                    end_ns=(index + 1) * timeframe_seconds * 1_000_000_000,
+                    high_ticks=101,
+                    low_ticks=99,
+                    open_ticks=100,
+                    segment_id=maximum_segment_id,
+                    sell_volume=None,
+                    source_date=source_date,
+                    trade_count=1,
+                    volume=1,
+                ),
+                outcome_span_id=1,
+            )
+            for index in range(60)
+        )
+
+    state = SimpleNamespace(
+        bars_by_timeframe={timeframe: wrapped_bars(timeframe) for timeframe in (300, 1_800, 3_600)},
+        plan=SimpleNamespace(stage_key="SEARCH"),
+    )
+
+    series = pipeline_module._ml_bar_series(state)
+
+    assert set(series) == {300, 1_800, 3_600}
+    for timeframe in (300, 1_800, 3_600):
+        assert series[timeframe].segment_ids.dtype == np.dtype(np.uint64)
+        assert not series[timeframe].segment_ids.flags.writeable
+        assert {int(value) for value in series[timeframe].segment_ids} == {maximum_segment_id}
+
+
+def test_direct_oos_response_preserves_maximum_uint64_segment_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import numpy as np
+
+    from campaigns.ai_all_cases_v1 import ml
+
+    maximum_segment_id = int(np.iinfo(np.uint64).max)
+    source_date = date(2026, 1, 2)
+    schedule = SimpleNamespace(
+        contracts=("EURUSD",),
+        decision_dates=(source_date,),
+        decision_ns=(1_000,),
+        entry_ns=(2_000,),
+        entry_schedule_sha256="a" * 64,
+        lineage_sha256="b" * 64,
+        opportunity_lattice_sha256="c" * 64,
+        outcome_span_ids=(7,),
+        planned_exit_ns=(3_000,),
+        row_ids=("row-1",),
+        segment_ids=(maximum_segment_id,),
+    )
+    controls = tuple(
+        SimpleNamespace(
+            execution_schedule=schedule,
+            null_world=world,
+            predictions=SimpleNamespace(admitted=(False,), directions=(ml.TradeDirection.FLAT,)),
+        )
+        for world in ml.NULL_WORLD_ORDER
+    )
+    runtime = SimpleNamespace(
+        candidate=SimpleNamespace(candidate_id="d" * 64),
+        direct_controls=controls,
+        direct_response_coordinate=(300, 3_600),
+        sample_eligible=False,
+    )
+    response = SimpleNamespace(
+        decision_ns=(1_000,),
+        decision_timeframe_seconds=300,
+        entry_schedule_sha256="a" * 64,
+        entry_ticks=(100,),
+        fill_ns=(2_000,),
+        horizon_seconds=3_600,
+        label_exit_ns=(3_000,),
+        opportunity_lattice_sha256="c" * 64,
+        outcome_contracts=("EURUSD",),
+        outcome_lineage_sha256="b" * 64,
+        outcome_span_ids=(7,),
+        row_ids=("row-1",),
+        segment_ids=np.asarray([maximum_segment_id], dtype=np.uint64),
+        source_dates=(source_date,),
+        terminal_ticks=(120,),
+        valid_label_paths=(True,),
+    )
+    observed_segments: list[tuple[int, ...]] = []
+
+    def frozen_rows(*_args: object, **kwargs: object) -> object:
+        observed_segments.append(tuple(int(value) for value in kwargs["segment_ids"]))
+        return SimpleNamespace()
+
+    monkeypatch.setattr(ml, "build_frozen_resolved_outcome_rows", frozen_rows)
+
+    result = pipeline_module._direct_partition_evidence(
+        SimpleNamespace(plan=SimpleNamespace(decision_dates=(source_date,))),
+        runtime,
+        response,
+    )
+
+    assert observed_segments == [(maximum_segment_id,)] * len(ml.NULL_WORLD_ORDER)
+    assert result["REAL"] == _WorldPartitionEvidence(((source_date.isoformat(), 0),), ())
+    assert result["CIRCULAR_TARGET"] is None
+    assert result["MATCHED_TARGET"] is None
+
+
+@pytest.mark.skipif(
+    not RUN_REAL_SEARCH_FEATURE_SMOKE,
+    reason=(
+        "set SYSTEMATIC_FX_RUN_AI_ALL_CASES_REAL_SEARCH_FEATURE_SMOKE=1 for the "
+        "real outcome-free Search feature gate"
+    ),
+)
+def test_real_search_feature_adapters_preserve_uint64_lineage_without_opening_outcomes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import numpy as np
+
+    monkeypatch.setattr(
+        pipeline_module,
+        "_one_second_path_parts",
+        lambda *_args, **_kwargs: pytest.fail("feature-only smoke opened 1s outcomes"),
+    )
+    state = pipeline_module._search_feature_state(ROOT)
+    expected_rows = {300: 111_297, 1_800: 18_808, 3_600: 9_418}
+    expected_overflow_rows = {300: 57_820, 1_800: 9_764, 3_600: 4_889}
+    maximum = 18_437_447_912_945_337_878
+    for timeframe, wrapped in state.bars_by_timeframe.items():
+        segment_ids = tuple(item.bar.segment_id for item in wrapped)
+        assert len(segment_ids) == expected_rows[timeframe]
+        assert (
+            sum(value > np.iinfo(np.int64).max for value in segment_ids)
+            == (expected_overflow_rows[timeframe])
+        )
+        assert max(segment_ids) == maximum
+
+    bundles = pipeline_module._direct_feature_bundles(state)
+    commitment, summaries = pipeline_module._direct_feature_universe_commitment(bundles)
+
+    expected_bundle_rows = {300: 65_729, 1_800: 10_969, 3_600: 5_494}
+    assert set(bundles) == {300, 1_800, 3_600}
+    assert {
+        timeframe: bundle.feature_rows.row_count for timeframe, bundle in bundles.items()
+    } == expected_bundle_rows
+    assert commitment == "922abd762e3d10f91f5307c1fdc2a0f3b9614a14623397adb262b082020d2801"
+    assert commitment == pipeline_module._direct_feature_universe_commitment(bundles)[0]
+    assert tuple(item["timeframe_seconds"] for item in summaries) == (300, 1_800, 3_600)
+    assert {int(item["timeframe_seconds"]): int(item["row_count"]) for item in summaries} == (
+        expected_bundle_rows
+    )
+    for bundle in bundles.values():
+        assert bundle.feature_rows.segment_ids.dtype == np.dtype(np.uint64)
+        assert max(int(value) for value in bundle.feature_rows.segment_ids) > np.iinfo(np.int64).max
+
+
 def test_direct_only_stage_streams_once_and_builds_only_selected_coordinates(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     import numpy as np
 
+    maximum_segment_id = int(np.iinfo(np.uint64).max)
     candidate_id = _ids(1)[0]
     candidate = _FrozenSearchCandidate(candidate_id, "DIRECT_ML", "direct", 1, {})
     coordinate = (300, 3_600)
@@ -1966,7 +2265,7 @@ def test_direct_only_stage_streams_once_and_builds_only_selected_coordinates(
         outcome_span_ids=np.asarray([1], dtype=np.int64),
         row_count=1,
         row_ids=("row-1",),
-        segment_ids=np.asarray([1], dtype=np.int64),
+        segment_ids=np.asarray([maximum_segment_id], dtype=np.uint64),
         source_dates=(source_date,),
     )
     feature_bundle = pipeline_module._DirectFeatureBundle(
@@ -1976,7 +2275,7 @@ def test_direct_only_stage_streams_once_and_builds_only_selected_coordinates(
     )
     path = SimpleNamespace(
         ends=(exit_ns,),
-        lineage=("EURUSD", 1, 1),
+        lineage=("EURUSD", 1, maximum_segment_id),
         rows=(
             SimpleNamespace(
                 bar=SimpleNamespace(
@@ -2023,6 +2322,8 @@ def test_direct_only_stage_streams_once_and_builds_only_selected_coordinates(
     assert len(observed_responses) == 1
     assert observed_responses[0].decision_timeframe_seconds == coordinate[0]
     assert observed_responses[0].horizon_seconds == coordinate[1]
+    assert observed_responses[0].segment_ids.dtype == np.dtype(np.uint64)
+    assert tuple(int(value) for value in observed_responses[0].segment_ids) == (maximum_segment_id,)
     assert tuple(observed_responses[0].terminal_ticks) == (110,)
     assert result[0].candidate == candidate
 

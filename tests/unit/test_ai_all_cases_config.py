@@ -12,7 +12,11 @@ import pytest
 
 from campaigns.ai_all_cases_v1 import config as all_cases_config
 from campaigns.ai_all_cases_v1.config import (
+    AI_ALL_CASES_CAMPAIGN_DESIGN_ID,
+    AI_ALL_CASES_CONFIG_ID,
     AI_ALL_CASES_CONFIG_RELATIVE_PATH,
+    AI_ALL_CASES_CONFIG_SCHEMA,
+    AI_ALL_CASES_RUN_RELATIVE_ROOT,
     DETERMINISTIC_RUNTIME_ENV,
     AllCasesConfigError,
     all_cases_implementation_document,
@@ -49,17 +53,29 @@ def _bindings() -> dict[str, object]:
     return {
         "anchor_policy_recipe_sha256": "5" * 64,
         "catalog_summaries_canonical_json": "{}",
-        "catalog_summaries_sha256": "1" * 64,
-        "complete_strategy_recipe_sha256": "4" * 64,
-        "direct_catalog_sha256": "6" * 64,
-        "entry_catalog_sha256": "7" * 64,
-        "exit_catalog_sha256": "8" * 64,
+        "catalog_summaries_sha256": (
+            "1423f4207669c0d3c46cd407f89b2b6f3217dec11dfeb01b93f397ff3192479d"
+        ),
+        "complete_strategy_recipe_sha256": (
+            "087acf54de64ac42d790f0b1906b784933393969318390b257aae0b9f8652e2b"
+        ),
+        "direct_catalog_sha256": (
+            "8c3a81a9e9a5429e6c08d8cb6fe6b18718f62d7ee285e67858f79fdfa052b8b0"
+        ),
+        "entry_catalog_sha256": (
+            "e5719ceb390f3d71e218e7d1726d60336c8baab44b5022fa7a0be69224fc64f5"
+        ),
+        "exit_catalog_sha256": ("1f49ea3d10dc191e04ecb571aa591983681d16edc82686ed8f6e1a28fbfe8815"),
         "ml_contract_canonical_json": "{}",
         "ml_contract_sha256": "2" * 64,
-        "meta_catalog_sha256": "9" * 64,
-        "stage_a_chunk_plan_sha256": "a" * 64,
+        "meta_catalog_sha256": ("154ba02db47b32af25e167c575217661606c055807d5136ac354908ba6cf1818"),
+        "stage_a_chunk_plan_sha256": (
+            "3f8f1769f7fc7e6531b7ec8928da06c069d9e7888301c3eb746f9100b19d2144"
+        ),
         "symbolic_contract_canonical_json": "{}",
-        "symbolic_contract_sha256": "3" * 64,
+        "symbolic_contract_sha256": (
+            "d9c81c606683eb8d9700dc216cd605a1f09388bd5aba07a8a7fea8096f79e0e3"
+        ),
     }
 
 
@@ -72,6 +88,39 @@ def test_template_freezes_access_order_budgets_and_invalid_provenance(
 
     for key, value in expected.items():
         assert document[key] == value
+    assert document["schema_version"] == AI_ALL_CASES_CONFIG_SCHEMA
+    assert document["config_id"] == AI_ALL_CASES_CONFIG_ID
+    assert document["campaign_design_id"] == AI_ALL_CASES_CAMPAIGN_DESIGN_ID
+    assert AI_ALL_CASES_CONFIG_RELATIVE_PATH.as_posix().endswith("_attempt2.toml")
+    assert AI_ALL_CASES_RUN_RELATIVE_ROOT.as_posix().endswith("_attempt2")
+    recovery = document["recovery"]
+    assert recovery["attempt_number"] == 2
+    assert recovery["failure_boundary"] == "BEFORE_SEARCH_UNIVERSE_FROZEN"
+    assert recovery["failure_outcomes_opened"] is False
+    assert recovery["failure_cause"] == "NATIVE_UINT64_SEGMENT_ID_CAST_TO_NUMPY_INT64"
+    assert recovery["search_1s_opened"] is False
+    assert recovery["walk_forward_opened"] is False
+    assert recovery["embargo_opened"] is False
+    assert recovery["holdout_opened"] is False
+    assert recovery["repair_representation"] == "UINT64_NO_REENCODING"
+    assert recovery["repair_observed_uint64_overflow_rows_300s"] == 57_820
+    assert recovery["repair_observed_uint64_total_rows_300s"] == 111_297
+    assert recovery["repair_observed_uint64_overflow_rows_1800s"] == 9_764
+    assert recovery["repair_observed_uint64_total_rows_1800s"] == 18_808
+    assert recovery["repair_observed_uint64_overflow_rows_3600s"] == 4_889
+    assert recovery["repair_observed_uint64_total_rows_3600s"] == 9_418
+    assert recovery["scientific_contract_equality_claim"] is False
+    assert recovery["scientific_delta"].endswith("EXACT_ONE_HOUR_CLOSED_INTERVAL_BRIDGE")
+    assert recovery["current_scientific_section_sha256"] == (
+        all_cases_config._scientific_section_sha256(document)
+    )
+    assert (
+        recovery["current_scientific_section_sha256"]
+        != (recovery["predecessor_scientific_section_sha256"])
+    )
+    assert recovery["catalogs_unchanged"] is True
+    assert recovery["gates_unchanged"] is True
+    assert recovery["costs_unchanged"] is True
     assert document["selection"] == {
         "holdout_family_maximum": 3,
         "search_selection_maximum": 12,
@@ -295,7 +344,7 @@ def test_pinned_env_i_launcher_accepts_only_the_exact_clean_entry_environment() 
     clean = subprocess.run(command, check=False, capture_output=True, stdin=subprocess.DEVNULL)
     assert clean.returncode == 0, clean.stderr.decode("utf-8", errors="replace")
     assert (
-        'schema_version = "systematic_fx.ai_all_cases_config.v1"'
+        'schema_version = "systematic_fx.ai_all_cases_config.v2"'
         in json.loads(clean.stdout)["toml"]
     )
 
@@ -876,3 +925,37 @@ def test_data_only_config_commit_rejects_an_extra_file_or_wrong_parent(
     )
     with pytest.raises(AllCasesConfigError, match="parent differs"):
         all_cases_config._verify_data_only_config_commit(other, other_source, other_raw)
+
+
+def test_failed_predecessor_guard_recomputes_exact_evidence_without_mutation() -> None:
+    root = Path(all_cases_config.__file__).resolve().parents[2]
+    predecessor = root / "data/derived/bar_patterns/ai_all_cases_v1"
+    before = all_cases_config._predecessor_lstat_snapshot(predecessor)
+
+    all_cases_config.verify_failed_predecessor_attempt(root)
+
+    assert all_cases_config._predecessor_lstat_snapshot(predecessor) == before
+    raw, document = all_cases_config._verify_predecessor_config(root)
+    assert __import__("hashlib").sha256(raw).hexdigest() == (
+        "d63278a150345a086c73dc38daa4fff8a478fd43caaa1ea374e3584c793ccbd4"
+    )
+    assert all_cases_config._scientific_section_sha256(document) == (
+        "11ed94cf78e796a9faec78142c9cfc1d797c50de97716e234531d44d124b5444"
+    )
+
+
+def test_failed_predecessor_guard_rejects_metadata_drift_without_touching_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = Path(all_cases_config.__file__).resolve().parents[2]
+    predecessor = root / "data/derived/bar_patterns/ai_all_cases_v1"
+    before = all_cases_config._predecessor_lstat_snapshot(predecessor)
+    forged = dict(all_cases_config._PREDECESSOR_TREE_CONTRACT)
+    kind, mode, nlink, size, digest = forged[".mutation.lock"]
+    forged[".mutation.lock"] = (kind, mode, nlink, size + 1, digest)
+    monkeypatch.setattr(all_cases_config, "_PREDECESSOR_TREE_CONTRACT", forged)
+
+    with pytest.raises(AllCasesConfigError, match="metadata"):
+        all_cases_config.verify_failed_predecessor_attempt(root)
+
+    assert all_cases_config._predecessor_lstat_snapshot(predecessor) == before

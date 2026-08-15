@@ -32,8 +32,11 @@ from scripts.ai_pattern_holdout_config import (
     EXPECTED_SPLIT_PLAN_SHA256,
 )
 
-AI_ALL_CASES_CONFIG_SCHEMA: Final = "systematic_fx.ai_all_cases_config.v1"
-AI_ALL_CASES_CONFIG_RELATIVE_PATH: Final = Path("configs/research/ai_all_cases_v1.toml")
+AI_ALL_CASES_CAMPAIGN_DESIGN_ID: Final = "ai_all_cases_v1"
+AI_ALL_CASES_CONFIG_ID: Final = "ai_all_cases_v1_attempt2"
+AI_ALL_CASES_CONFIG_SCHEMA: Final = "systematic_fx.ai_all_cases_config.v2"
+AI_ALL_CASES_CONFIG_RELATIVE_PATH: Final = Path("configs/research/ai_all_cases_v1_attempt2.toml")
+AI_ALL_CASES_RUN_RELATIVE_ROOT: Final = Path("data/derived/bar_patterns/ai_all_cases_v1_attempt2")
 AI_ALL_CASES_AUTHORITY: Final = "UNSEALED_LOCAL_AI_ALL_CASES_RESEARCH"
 CAMPAIGN_PACKAGE_RELATIVE_PATH: Final = Path("campaigns/ai_all_cases_v1")
 TRUSTED_BOOTSTRAP_RELATIVE_PATH: Final = CAMPAIGN_PACKAGE_RELATIVE_PATH / "bootstrap.py"
@@ -139,6 +142,61 @@ _PROJECT_BLOBS: Final = ("pyproject.toml", "uv.lock")
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 _COMMIT = re.compile(r"[0-9a-f]{40}")
 _UTC_TIMESTAMP = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
+_SCIENTIFIC_SECTION_KEYS: Final = (
+    "authority",
+    "bindings",
+    "compute_caps",
+    "dataset",
+    "execution",
+    "holdout_gates",
+    "lifecycle",
+    "ml",
+    "multiplicity",
+    "nulls",
+    "scope",
+    "search_design",
+    "selection",
+    "stage_a_gates",
+    "status",
+    "universe_counts",
+    "walk_forward_gates",
+)
+_CATALOG_IDENTITY_BINDING_KEYS: Final = (
+    "catalog_summaries_sha256",
+    "complete_strategy_recipe_sha256",
+    "direct_catalog_sha256",
+    "entry_catalog_sha256",
+    "exit_catalog_sha256",
+    "meta_catalog_sha256",
+    "stage_a_chunk_plan_sha256",
+    "symbolic_contract_sha256",
+)
+_GATE_SECTION_KEYS: Final = (
+    "holdout_gates",
+    "search_gates",
+    "stage_a_gates",
+    "walk_forward_gates",
+)
+_COST_FIELD_KEYS: Final = (
+    "allocated_fixed_cost_ticks",
+    "entry_adverse_ticks",
+    "standard_friction_ticks",
+    "stress_friction_ticks",
+    "terminal_adverse_ticks",
+    "variable_cost_ticks",
+)
+_PREDECESSOR_SCIENTIFIC_SECTION_SHA256: Final = (
+    "11ed94cf78e796a9faec78142c9cfc1d797c50de97716e234531d44d124b5444"
+)
+_PREDECESSOR_CATALOG_IDENTITY_SHA256: Final = (
+    "fcfd0dfcaacbcd630d340664a39e698f6528ef4f757f260bbbf77b5aea9dd155"
+)
+_PREDECESSOR_GATE_IDENTITY_SHA256: Final = (
+    "17230ab79eb75154084ed79bbbc2b95e917b44d07b6da4cccccbcea02b405e89"
+)
+_PREDECESSOR_COST_IDENTITY_SHA256: Final = (
+    "88849d988724ebc452d4ee9cc23fa85a917e64473f45c2f43fd6f0eda8f81070"
+)
 DETERMINISTIC_RUNTIME_ENV: Final = {
     "LC_ALL": "C",
     "MKL_NUM_THREADS": "1",
@@ -880,6 +938,18 @@ def _research_bindings() -> dict[str, object]:
     }
 
 
+def _selected_contract_sha256(document: dict[str, object], keys: tuple[str, ...]) -> str:
+    if any(key not in document for key in keys):
+        raise AllCasesConfigError("scientific contract section is incomplete")
+    return _canonical_sha256({key: document[key] for key in keys})
+
+
+def _scientific_section_sha256(document: dict[str, object]) -> str:
+    """Hash the frozen attempt-1 scientific-section key projection exactly."""
+
+    return _selected_contract_sha256(document, _SCIENTIFIC_SECTION_KEYS)
+
+
 def _static_contract() -> dict[str, object]:
     bindings = _research_bindings()
     entry_lattice = {
@@ -922,9 +992,10 @@ def _static_contract() -> dict[str, object]:
             "variant_count": 8,
         },
     }
-    return {
+    contract: dict[str, object] = {
         "authority": AI_ALL_CASES_AUTHORITY,
         "bindings": bindings,
+        "campaign_design_id": AI_ALL_CASES_CAMPAIGN_DESIGN_ID,
         "compute_caps": {
             "artifact_bytes_maximum": 20 * 1024**3,
             "artifact_cap_enforcement_scope": (
@@ -957,7 +1028,7 @@ def _static_contract() -> dict[str, object]:
             "stage_b_recipe_rows_per_chunk_maximum": 3_060,
             "verifier_wall_seconds_maximum": 172_800,
         },
-        "config_id": "ai_all_cases_v1",
+        "config_id": AI_ALL_CASES_CONFIG_ID,
         "dataset": {
             "active_calendar_payload": "BARE_ORDERED_ISO_DATE_STRING_LIST",
             "active_calendar_sha256": EXPECTED_ACTIVE_CALENDAR_SHA256,
@@ -1377,6 +1448,82 @@ def _static_contract() -> dict[str, object]:
             "worst_loss_over_median_positive_maximum_numerator": 3,
         },
     }
+    catalog_identity = _canonical_sha256(
+        {key: bindings[key] for key in _CATALOG_IDENTITY_BINDING_KEYS}
+    )
+    gate_identity = _selected_contract_sha256(contract, _GATE_SECTION_KEYS)
+    execution = contract.get("execution")
+    if not isinstance(execution, dict):  # pragma: no cover - construction invariant
+        raise AllCasesConfigError("execution contract is absent")
+    cost_identity = _canonical_sha256({key: execution[key] for key in _COST_FIELD_KEYS})
+    if (
+        catalog_identity != _PREDECESSOR_CATALOG_IDENTITY_SHA256
+        or gate_identity != _PREDECESSOR_GATE_IDENTITY_SHA256
+        or cost_identity != _PREDECESSOR_COST_IDENTITY_SHA256
+    ):
+        raise AllCasesConfigError("attempt-2 catalogs, gates, or costs drifted")
+    contract["recovery"] = {
+        "attempt_number": 2,
+        "catalog_identity_sha256": catalog_identity,
+        "catalogs_unchanged": True,
+        "cost_identity_sha256": cost_identity,
+        "costs_unchanged": True,
+        "current_scientific_section_sha256": _scientific_section_sha256(contract),
+        "failure_boundary": "BEFORE_SEARCH_UNIVERSE_FROZEN",
+        "embargo_opened": False,
+        "failure_cause": "NATIVE_UINT64_SEGMENT_ID_CAST_TO_NUMPY_INT64",
+        "failure_outcomes_opened": False,
+        "gate_identity_sha256": gate_identity,
+        "gates_unchanged": True,
+        "holdout_opened": False,
+        "predecessor_code_commit": "35464327d67a8a4e1001c3ba258bcaef4be69715",
+        "predecessor_config_commit": "b51b320c8f2bdfdb0f5b42d65989aca092e0d4d4",
+        "predecessor_config_file_sha256": (
+            "d63278a150345a086c73dc38daa4fff8a478fd43caaa1ea374e3584c793ccbd4"
+        ),
+        "predecessor_config_id": "ai_all_cases_v1",
+        "predecessor_config_relative_path": "configs/research/ai_all_cases_v1.toml",
+        "predecessor_config_semantic_sha256": (
+            "bd2c5d86f76094dcaf82a209904b9ea23694a4aaf72421f3cbf042dce0faee96"
+        ),
+        "predecessor_failed_event_sha256": (
+            "1a93f3229f4f0d6be5ffe0722941c8d6d9a00a182ef6ee2f4be68453a7305a38"
+        ),
+        "predecessor_failure_code": "INTEGRITY_D327C1949A6A6B78BAEA59A2",
+        "predecessor_implementation_sha256": (
+            "41b6a921b3cd38c8a5c8cb22f2137b5271809540df803f329059f34f51087962"
+        ),
+        "predecessor_precommitted_event_sha256": (
+            "35a7d8d495869b27cb6cbf9feffa791fe3feef9438c4a74ef9dbfdad9f1de838"
+        ),
+        "predecessor_request_sha256": (
+            "f2cba305bc6e0522a992a5562bf089ddcb92e8cdf12236000f0565d1028f351c"
+        ),
+        "predecessor_root_evidence_manifest_kind": "OPAQUE_RECORDED_EXACT_TREE_ID",
+        "predecessor_root_evidence_manifest_sha256": (
+            "d4e325e01ddf88ee122902e554e04dc7ed6061a729e0566fb5b1b701515f93ca"
+        ),
+        "predecessor_run_relative_root": "data/derived/bar_patterns/ai_all_cases_v1",
+        "predecessor_runtime_identity_sha256": (
+            "bdc98c52f9e92550473b77785c9fa1e00845d5ea7fc51257e2a9f85f0b5de141"
+        ),
+        "predecessor_scientific_section_sha256": (_PREDECESSOR_SCIENTIFIC_SECTION_SHA256),
+        "repair_observed_segment_id_maximum": 18_437_447_912_945_337_878,
+        "repair_observed_uint64_overflow_rows_1800s": 9_764,
+        "repair_observed_uint64_overflow_rows_300s": 57_820,
+        "repair_observed_uint64_overflow_rows_3600s": 4_889,
+        "repair_observed_uint64_total_rows_1800s": 18_808,
+        "repair_observed_uint64_total_rows_300s": 111_297,
+        "repair_observed_uint64_total_rows_3600s": 9_418,
+        "repair_representation": "UINT64_NO_REENCODING",
+        "search_1s_opened": False,
+        "scientific_contract_equality_claim": False,
+        "scientific_delta": (
+            "ML_CAUSAL_CONTINUITY_SAME_DATE_EXACT_ONE_HOUR_CLOSED_INTERVAL_BRIDGE"
+        ),
+        "walk_forward_opened": False,
+    }
+    return contract
 
 
 def expected_ai_all_cases_contract() -> dict[str, object]:
@@ -1841,6 +1988,350 @@ def _verify_data_only_config_commit(
         raise AllCasesConfigError("runtime/config closure is not clean at HEAD")
 
 
+_PREDECESSOR_CONFIG_RELATIVE_PATH: Final = Path("configs/research/ai_all_cases_v1.toml")
+_PREDECESSOR_RUN_RELATIVE_ROOT: Final = Path("data/derived/bar_patterns/ai_all_cases_v1")
+_PREDECESSOR_CODE_COMMIT: Final = "35464327d67a8a4e1001c3ba258bcaef4be69715"
+_PREDECESSOR_CONFIG_COMMIT: Final = "b51b320c8f2bdfdb0f5b42d65989aca092e0d4d4"
+_PREDECESSOR_CONFIG_FILE_SHA256: Final = (
+    "d63278a150345a086c73dc38daa4fff8a478fd43caaa1ea374e3584c793ccbd4"
+)
+_PREDECESSOR_CONFIG_SEMANTIC_SHA256: Final = (
+    "bd2c5d86f76094dcaf82a209904b9ea23694a4aaf72421f3cbf042dce0faee96"
+)
+_PREDECESSOR_REQUEST_SHA256: Final = (
+    "f2cba305bc6e0522a992a5562bf089ddcb92e8cdf12236000f0565d1028f351c"
+)
+_PREDECESSOR_PRECOMMITTED_EVENT_SHA256: Final = (
+    "35a7d8d495869b27cb6cbf9feffa791fe3feef9438c4a74ef9dbfdad9f1de838"
+)
+_PREDECESSOR_FAILED_EVENT_SHA256: Final = (
+    "1a93f3229f4f0d6be5ffe0722941c8d6d9a00a182ef6ee2f4be68453a7305a38"
+)
+_PREDECESSOR_RUNTIME_IDENTITY_SHA256: Final = (
+    "bdc98c52f9e92550473b77785c9fa1e00845d5ea7fc51257e2a9f85f0b5de141"
+)
+_PREDECESSOR_FAILURE_CODE: Final = "INTEGRITY_D327C1949A6A6B78BAEA59A2"
+_PREDECESSOR_REQUEST_RELATIVE_PATH: Final = (
+    f"artifacts/all-cases-request-{_PREDECESSOR_REQUEST_SHA256}.json"
+)
+_PREDECESSOR_TREE_CONTRACT: Final = {
+    ".": ("DIRECTORY", 0o755, 6, 192, None),
+    ".mutation.lock": (
+        "FILE",
+        0o600,
+        1,
+        0,
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    ),
+    "artifacts": ("DIRECTORY", 0o755, 3, 96, None),
+    _PREDECESSOR_REQUEST_RELATIVE_PATH: (
+        "FILE",
+        0o444,
+        1,
+        72_295,
+        _PREDECESSOR_REQUEST_SHA256,
+    ),
+    "ledger": ("DIRECTORY", 0o755, 4, 128, None),
+    "ledger/events": ("DIRECTORY", 0o755, 4, 128, None),
+    "ledger/events/event-00000001.json": (
+        "FILE",
+        0o444,
+        1,
+        528,
+        _PREDECESSOR_PRECOMMITTED_EVENT_SHA256,
+    ),
+    "ledger/events/event-00000002.json": (
+        "FILE",
+        0o444,
+        1,
+        376,
+        _PREDECESSOR_FAILED_EVENT_SHA256,
+    ),
+    "ledger/staging": ("DIRECTORY", 0o755, 2, 64, None),
+    "staging": ("DIRECTORY", 0o755, 3, 96, None),
+    "staging/artifacts": ("DIRECTORY", 0o755, 2, 64, None),
+}
+
+
+def _predecessor_lstat_snapshot(root: Path) -> tuple[tuple[object, ...], ...]:
+    paths = (root, *sorted(root.rglob("*")))
+    rows: list[tuple[object, ...]] = []
+    for path in paths:
+        metadata = path.lstat()
+        rows.append(
+            (
+                "." if path == root else path.relative_to(root).as_posix(),
+                metadata.st_dev,
+                metadata.st_ino,
+                metadata.st_mode,
+                metadata.st_nlink,
+                metadata.st_uid,
+                metadata.st_gid,
+                metadata.st_size,
+                metadata.st_mtime_ns,
+                metadata.st_ctime_ns,
+            )
+        )
+    return tuple(rows)
+
+
+def _predecessor_config_snapshot(path: Path) -> tuple[object, ...]:
+    metadata = path.lstat()
+    digest = (
+        hashlib.sha256(path.read_bytes()).hexdigest() if stat.S_ISREG(metadata.st_mode) else None
+    )
+    return (
+        metadata.st_dev,
+        metadata.st_ino,
+        metadata.st_mode,
+        metadata.st_nlink,
+        metadata.st_uid,
+        metadata.st_gid,
+        metadata.st_size,
+        metadata.st_mtime_ns,
+        metadata.st_ctime_ns,
+        digest,
+    )
+
+
+def _verify_predecessor_tree_contract(root: Path) -> None:
+    observed_paths = (root, *sorted(root.rglob("*")))
+    observed_relative = tuple(
+        "." if path == root else path.relative_to(root).as_posix() for path in observed_paths
+    )
+    if observed_relative != tuple(_PREDECESSOR_TREE_CONTRACT):
+        raise AllCasesConfigError("predecessor run tree leaf set differs")
+    for path, relative in zip(observed_paths, observed_relative, strict=True):
+        expected_type, expected_mode, expected_nlink, expected_size, expected_sha = (
+            _PREDECESSOR_TREE_CONTRACT[relative]
+        )
+        metadata = path.lstat()
+        actual_type = (
+            "DIRECTORY"
+            if stat.S_ISDIR(metadata.st_mode)
+            else "FILE"
+            if stat.S_ISREG(metadata.st_mode)
+            else "OTHER"
+        )
+        if (
+            path.is_symlink()
+            or actual_type != expected_type
+            or stat.S_IMODE(metadata.st_mode) != expected_mode
+            or metadata.st_nlink != expected_nlink
+            or metadata.st_uid != os.geteuid()
+            or metadata.st_size != expected_size
+        ):
+            raise AllCasesConfigError("predecessor run tree metadata differs")
+        if (
+            expected_sha is not None
+            and hashlib.sha256(path.read_bytes()).hexdigest() != expected_sha
+        ):
+            raise AllCasesConfigError("predecessor run tree bytes differ")
+    if (
+        (root / "internal").exists()
+        or (root / "internal").is_symlink()
+        or any((root / "ledger/staging").iterdir())
+        or any((root / "staging/artifacts").iterdir())
+    ):
+        raise AllCasesConfigError("predecessor crossed its recorded failure boundary")
+
+
+def _verify_predecessor_config(
+    project_root: Path,
+) -> tuple[bytes, dict[str, object]]:
+    relative = _PREDECESSOR_CONFIG_RELATIVE_PATH.as_posix()
+    path = _safe_project_descendant(
+        project_root,
+        project_root / _PREDECESSOR_CONFIG_RELATIVE_PATH,
+        directory=False,
+    )
+    raw = path.read_bytes()
+    if (
+        path.is_symlink()
+        or stat.S_IMODE(path.stat().st_mode) != 0o644
+        or path.stat().st_nlink != 1
+        or hashlib.sha256(raw).hexdigest() != _PREDECESSOR_CONFIG_FILE_SHA256
+        or _git(project_root, "cat-file", "-t", _PREDECESSOR_CONFIG_COMMIT).strip() != b"commit"
+        or _git(project_root, "show", f"{_PREDECESSOR_CONFIG_COMMIT}:{relative}") != raw
+        or _git(project_root, "show", f"HEAD:{relative}") != raw
+        or _git(project_root, "show", f":{relative}") != raw
+        or _git(project_root, "rev-parse", f"{_PREDECESSOR_CONFIG_COMMIT}^").decode("ascii").strip()
+        != _PREDECESSOR_CODE_COMMIT
+    ):
+        raise AllCasesConfigError("predecessor config bytes or commit differs")
+    changed = tuple(
+        line
+        for line in _git(
+            project_root,
+            "diff-tree",
+            "--no-commit-id",
+            "--name-status",
+            "-r",
+            _PREDECESSOR_CONFIG_COMMIT,
+        )
+        .decode("utf-8")
+        .splitlines()
+        if line
+    )
+    history = tuple(
+        line
+        for line in _git(
+            project_root,
+            "log",
+            "--first-parent",
+            "--reverse",
+            "--format=%H",
+            "HEAD",
+            "--",
+            relative,
+        )
+        .decode("ascii")
+        .splitlines()
+        if line
+    )
+    if (
+        changed != (f"A\t{relative}",)
+        or history != (_PREDECESSOR_CONFIG_COMMIT,)
+        or _git(
+            project_root,
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=all",
+            "--",
+            relative,
+        )
+        != b""
+    ):
+        raise AllCasesConfigError("predecessor config provenance differs")
+    _git(project_root, "merge-base", "--is-ancestor", _PREDECESSOR_CONFIG_COMMIT, "HEAD")
+    try:
+        parsed = tomllib.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, tomllib.TOMLDecodeError) as error:  # pragma: no cover
+        raise AllCasesConfigError("predecessor config cannot be decoded") from error
+    if (
+        not isinstance(parsed, dict)
+        or parsed.get("schema_version") != "systematic_fx.ai_all_cases_config.v1"
+        or parsed.get("config_id") != "ai_all_cases_v1"
+        or parsed.get("code_commit") != _PREDECESSOR_CODE_COMMIT
+        or parsed.get("implementation_sha256")
+        != "41b6a921b3cd38c8a5c8cb22f2137b5271809540df803f329059f34f51087962"
+        or _canonical_sha256(parsed) != _PREDECESSOR_CONFIG_SEMANTIC_SHA256
+        or _scientific_section_sha256(parsed) != _PREDECESSOR_SCIENTIFIC_SECTION_SHA256
+    ):
+        raise AllCasesConfigError("predecessor config semantic identity differs")
+    bindings = parsed.get("bindings")
+    execution = parsed.get("execution")
+    if (
+        not isinstance(bindings, dict)
+        or not isinstance(execution, dict)
+        or _canonical_sha256({key: bindings[key] for key in _CATALOG_IDENTITY_BINDING_KEYS})
+        != _PREDECESSOR_CATALOG_IDENTITY_SHA256
+        or _selected_contract_sha256(parsed, _GATE_SECTION_KEYS)
+        != _PREDECESSOR_GATE_IDENTITY_SHA256
+        or _canonical_sha256({key: execution[key] for key in _COST_FIELD_KEYS})
+        != _PREDECESSOR_COST_IDENTITY_SHA256
+    ):
+        raise AllCasesConfigError("predecessor catalogs, gates, or costs differ")
+    return raw, parsed
+
+
+def _verify_predecessor_ledger_and_request(
+    run_root: Path,
+    predecessor_config: dict[str, object],
+) -> None:
+    request_path = run_root / _PREDECESSOR_REQUEST_RELATIVE_PATH
+    event_paths = (
+        run_root / "ledger/events/event-00000001.json",
+        run_root / "ledger/events/event-00000002.json",
+    )
+    try:
+        request = json.loads(request_path.read_bytes())
+        events = tuple(json.loads(path.read_bytes()) for path in event_paths)
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:  # pragma: no cover
+        raise AllCasesConfigError("predecessor evidence is invalid JSON") from error
+    if (
+        _canonical_json_bytes(request) != request_path.read_bytes()
+        or _canonical_json_bytes(request.get("config")) != _canonical_json_bytes(predecessor_config)
+        or request.get("artifact_schema") != "systematic_fx.ai_all_cases_request.v1"
+        or request.get("authority") != AI_ALL_CASES_AUTHORITY
+        or request.get("config_file_sha256") != _PREDECESSOR_CONFIG_FILE_SHA256
+        or request.get("config_semantic_sha256") != _PREDECESSOR_CONFIG_SEMANTIC_SHA256
+        or request.get("runtime_identity_sha256") != _PREDECESSOR_RUNTIME_IDENTITY_SHA256
+        or _canonical_sha256(request.get("runtime_identity"))
+        != _PREDECESSOR_RUNTIME_IDENTITY_SHA256
+    ):
+        raise AllCasesConfigError("predecessor request binding differs")
+    first, second = events
+    if any(
+        _canonical_json_bytes(event) != path.read_bytes()
+        for event, path in zip(events, event_paths, strict=True)
+    ):
+        raise AllCasesConfigError("predecessor ledger bytes are not canonical")
+    expected_artifact = {
+        "artifact_type": "AI_ALL_CASES_REQUEST",
+        "byte_size": 72_295,
+        "relative_path": _PREDECESSOR_REQUEST_RELATIVE_PATH.removeprefix("artifacts/"),
+        "sha256": _PREDECESSOR_REQUEST_SHA256,
+    }
+    if (
+        set(first)
+        != {
+            "artifact_schema",
+            "event_type",
+            "payload",
+            "predecessor_sha256",
+            "recorded_at_utc",
+            "request_sha256",
+            "sequence",
+        }
+        or set(second) != set(first)
+        or first.get("artifact_schema") != "systematic_fx.ai_all_cases_event.v1"
+        or second.get("artifact_schema") != "systematic_fx.ai_all_cases_event.v1"
+        or first.get("event_type") != "PRECOMMITTED"
+        or second.get("event_type") != "FAILED"
+        or first.get("sequence") != 1
+        or second.get("sequence") != 2
+        or first.get("predecessor_sha256") is not None
+        or second.get("predecessor_sha256") != _PREDECESSOR_PRECOMMITTED_EVENT_SHA256
+        or first.get("request_sha256") != _PREDECESSOR_REQUEST_SHA256
+        or second.get("request_sha256") != _PREDECESSOR_REQUEST_SHA256
+        or first.get("payload") != {"request_artifact": expected_artifact}
+        or second.get("payload") != {"failure_code": _PREDECESSOR_FAILURE_CODE}
+    ):
+        raise AllCasesConfigError("predecessor ledger semantic boundary differs")
+
+
+def verify_failed_predecessor_attempt(project_root: Path | str) -> None:
+    """Read-only exact audit of the immutable attempt-1 PRECOMMITTED->FAILED evidence."""
+
+    root = Path(project_root).expanduser().resolve(strict=True)
+    run_root = _safe_project_descendant(
+        root,
+        root / _PREDECESSOR_RUN_RELATIVE_ROOT,
+        directory=True,
+    )
+    config_path = root / _PREDECESSOR_CONFIG_RELATIVE_PATH
+    before = _predecessor_lstat_snapshot(run_root)
+    config_before = _predecessor_config_snapshot(config_path)
+    try:
+        _raw, predecessor_config = _verify_predecessor_config(root)
+        _verify_predecessor_tree_contract(run_root)
+        _verify_predecessor_ledger_and_request(run_root, predecessor_config)
+    finally:
+        try:
+            after = _predecessor_lstat_snapshot(run_root)
+        except OSError as error:  # pragma: no cover - adversarial concurrent mutation
+            raise AllCasesConfigError("predecessor evidence changed during audit") from error
+        if after != before:
+            raise AllCasesConfigError("predecessor evidence mutated during read-only audit")
+        try:
+            config_after = _predecessor_config_snapshot(config_path)
+        except OSError as error:  # pragma: no cover - adversarial concurrent mutation
+            raise AllCasesConfigError("predecessor config changed during audit") from error
+        if config_after != config_before:
+            raise AllCasesConfigError("predecessor config mutated during read-only audit")
+
+
 @dataclass(frozen=True, slots=True)
 class AllCasesConfig:
     path: Path
@@ -1922,8 +2413,11 @@ def load_ai_all_cases_config(project_root: Path | str) -> AllCasesConfig:
 
 __all__ = [
     "AI_ALL_CASES_AUTHORITY",
+    "AI_ALL_CASES_CAMPAIGN_DESIGN_ID",
+    "AI_ALL_CASES_CONFIG_ID",
     "AI_ALL_CASES_CONFIG_RELATIVE_PATH",
     "AI_ALL_CASES_CONFIG_SCHEMA",
+    "AI_ALL_CASES_RUN_RELATIVE_ROOT",
     "AllCasesConfig",
     "AllCasesConfigError",
     "all_cases_implementation_document",
@@ -1933,4 +2427,5 @@ __all__ = [
     "load_ai_all_cases_config",
     "render_ai_all_cases_toml_template",
     "verify_committed_all_cases_implementation",
+    "verify_failed_predecessor_attempt",
 ]

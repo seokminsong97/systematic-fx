@@ -29,16 +29,20 @@ from typing import Final
 
 from .config import (
     AI_ALL_CASES_AUTHORITY,
+    AI_ALL_CASES_CONFIG_ID,
+    AI_ALL_CASES_CONFIG_RELATIVE_PATH,
+    AI_ALL_CASES_RUN_RELATIVE_ROOT,
     AllCasesConfig,
     _load_validated_dataset_contract,
     _require_trusted_bootstrap_runtime,
     _runtime_identity_document,
     load_ai_all_cases_config,
+    verify_failed_predecessor_attempt,
 )
 
 AI_ALL_CASES_RUN_SCHEMA: Final = "systematic_fx.ai_all_cases_run.v1"
 AI_ALL_CASES_EVENT_SCHEMA: Final = "systematic_fx.ai_all_cases_event.v1"
-DEFAULT_AI_ALL_CASES_ROOT: Final = Path("data/derived/bar_patterns/ai_all_cases_v1")
+DEFAULT_AI_ALL_CASES_ROOT: Final = AI_ALL_CASES_RUN_RELATIVE_ROOT
 WALK_FORWARD_FOLD_KEYS: Final = ("WF1", "WF2", "WF3", "WF4", "WF5")
 MAXIMUM_SEARCH_SELECTION: Final = 12
 MAXIMUM_HOLDOUT_FINALISTS: Final = 3
@@ -1397,7 +1401,7 @@ def _publish_envelope(
 
 
 def _runtime_identity_for_config(config: AllCasesConfig) -> dict[str, object]:
-    expected_suffix = Path("configs/research/ai_all_cases_v1.toml")
+    expected_suffix = AI_ALL_CASES_CONFIG_RELATIVE_PATH
     parts = config.path.parts
     if tuple(parts[-len(expected_suffix.parts) :]) == expected_suffix.parts:
         return _runtime_identity_document(config.path.parents[2])
@@ -2244,7 +2248,7 @@ def _production_decision_date_domains(
 ) -> tuple[tuple[str, ...], tuple[int, ...], tuple[str, ...]] | None:
     """Derive the exact OOS calendars from the committed manifest/split metadata."""
 
-    if config.as_dict().get("config_id") != "ai_all_cases_v1":
+    if config.as_dict().get("config_id") != AI_ALL_CASES_CONFIG_ID:
         return None
     dataset, split = _load_validated_dataset_contract(project_root)
     eligible = dataset.eligible_active_dates
@@ -4047,6 +4051,7 @@ def _prepare_mutation(project_root: Path | str) -> tuple[Path, AllCasesConfig, P
     _require_trusted_bootstrap_runtime(root)
     config = load_ai_all_cases_config(root)
     _load_validated_dataset_contract(root)
+    verify_failed_predecessor_attempt(root)
     run_root = _fixed_run_root(root, create=True)
     return root, config, run_root
 
@@ -4538,6 +4543,7 @@ def verify_ai_all_cases(project_root: Path | str) -> AllCasesRun:
     _require_trusted_bootstrap_runtime(root)
     config = load_ai_all_cases_config(root)
     _load_validated_dataset_contract(root)
+    verify_failed_predecessor_attempt(root)
     run_root = _fixed_run_root(root, create=False)
     return _verify_with_services(
         root,
