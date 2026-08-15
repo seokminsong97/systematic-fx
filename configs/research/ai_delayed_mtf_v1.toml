@@ -1,0 +1,177 @@
+authority = "UNSEALED_LOCAL_DELAYED_MTF_RESEARCH"
+code_commit = "5e39d39ff3681a0c447c8b38ed96e992b5bc22dc"
+config_id = "ai_delayed_mtf_v1"
+dependency_lock_sha256 = "d5192590f9c80d3c2f23f65323d4963ee3fb9aa209301770651f4376c491bd1b"
+implementation_sha256 = "dcaa688b8f7775ba48f84f18dcc19b480d21641ebb3504a43b63bed7fac4a98c"
+precommitted_at_utc = "2026-08-15T06:23:15Z"
+schema_version = "systematic_fx.ai_delayed_mtf_config.v1"
+
+[catalog]
+candidate_catalog_sha256 = "04abb5a3820caf509c44b389c2ec6f0f9d070159c108a8de30ba08f86554bdf9"
+candidate_count = 100
+compression_breakout_count = 24
+delayed_macd_count = 36
+family_count = 100
+global_multiplicity_family_count = 100
+meta_label_count = 0
+pullback_continuation_count = 24
+range_mean_reversion_count = 16
+stage_subset_order = "PRESERVE_CATALOG_SEMANTIC_SELECTION_RANK_ORDER"
+
+[continuity]
+active_calendar_sha256 = "b414eae72afdb1c149977ff0ea5b672069380997d91e74adf0407e35836e8ac1"
+cross_date_carry_policy = "SAME_CONTRACT_OUTCOME_SPAN_ADJACENT_ALLOWLISTED_ACTIVE_DATE_GAP_LE_96H"
+execution_continuity = "EXACT_SIGNAL_SEGMENT_ONLY"
+indicator_policy = "INDICATOR_CONTINUITY_V1"
+intra_date_gap_policy = "RESET"
+maximum_cross_date_wall_gap_hours = 96
+official_schedule_evidence = false
+segment_contract_or_outcome_span_change_policy = "RESET"
+stage_or_fold_start_policy = "RESET"
+weekend_carry_allowed_when_predicates_hold = true
+
+[dataset]
+active_calendar_payload = "BARE_ORDERED_ISO_DATE_STRING_LIST"
+active_date_count = 1413
+active_date_end = "2026-07-31"
+active_date_start = "2022-01-03"
+dataset_handoff_sha256 = "26b1bb96f7323cae13bbe5d670c12f3e85615bbb9aab56932ce6523e67af7b00"
+dataset_manifest_relative_path = "data/derived/bar_patterns/trade_bar_dataset_manifest/identity_sha256=b0ecab04cdd3626d3c488f9108c8e9184f5dd610f51950ab7e7f74a5b7524297/sha256=e2c066ce4c8a97c4059dd2499f881300f905f4bab589240f87532d5cc49599dc.json"
+dataset_manifest_sha256 = "e2c066ce4c8a97c4059dd2499f881300f905f4bab589240f87532d5cc49599dc"
+embargo_access = "PROHIBITED"
+source_manifest_sha256 = "14db710d8a522a83d495faeac1c05c9a0169f80f088dfbeb7a66b38f14b6e3de"
+split_plan_sha256 = "5594725f6769a706018d414a5b27e3903f1d7d1cc22c98e93b6e973ead1af043"
+timeframes_seconds = [1, 300, 1800, 3600]
+
+[engine]
+allowed_legacy_container_symbols = ["BarWithOutcomeSpan", "SignalMask"]
+contract_canonical_json = "{\"candidate_catalog_count\":100,\"candidate_catalog_sha256\":\"04abb5a3820caf509c44b389c2ec6f0f9d070159c108a8de30ba08f86554bdf9\",\"catalog_family_counts\":{\"COMPRESSION_BREAKOUT\":24,\"DELAYED_MACD\":36,\"RANGE_REGIME_MEAN_REVERSION\":16,\"TREND_PULLBACK_CONTINUATION\":24},\"continuity\":{\"cross_date_bridge\":\"adjacent allowlisted active source dates, same contract/outcome span, wall gap <=96h\",\"cross_date_max_seconds\":345600,\"intra_date\":\"exact timeframe adjacency and same contract/span/segment\",\"stage_start\":\"reset; no pre-stage warmup\"},\"ema\":{\"rounding\":\"ROUND_HALF_EVEN\",\"scale_microticks\":1000000,\"seed\":\"period-close SMA\",\"update\":\"round_half_even(((p-1)*ema+2*x)/(p+1))\"},\"execution\":{\"allocated_fixed_cost_ticks\":5,\"entry_adverse_ticks\":2,\"horizon_seconds\":10800,\"occupancy\":\"one position per mask; skip entry strictly before prior exit; equality allowed; censored signals do not occupy\",\"scenario_id\":\"DELAYED_FIXED_HORIZON_3H\",\"terminal_adverse_ticks\":2,\"total_friction_ticks\":14,\"variable_debit_ticks\":5},\"formulas\":{\"compression\":\"disjoint completed context ranges: 2*sum(recent_n)<=sum(previous_n); trigger close beyond prior-b trigger high/low; persist beyond frozen level\",\"macd\":\"closed-bar histogram cross; target ceil(end,1h)+extra delay; strict-sign persistence\",\"pullback\":\"HTF fast/slow EMA direction+slope; m preceding LTF closes pullback-side then current trend-side cross; trend-side persistence\",\"range\":\"pre-trigger efficiency ratio <=1/3 or1/2; false channel break and close back inside; inside persistence\"},\"neutral_imports\":{\"allowed\":[\"BarWithOutcomeSpan\",\"SignalMask\"],\"old_execution_or_signal_functions_called\":false,\"source_module\":\"scripts.ai_pattern_holdout_engine\"},\"nulls\":{\"circular\":\"date/contract/span/segment aligned-hour orbits; invariant group orbits retained; aggregate mask must preserve cardinality and be nonidentity\",\"master_seed\":\"ai-delayed-mtf-v1\",\"matched_common\":\"exclude all real positions; deterministic without replacement; preserve cardinality/nonidentity; persist pair and relaxation-level histogram\",\"matched_relaxation_levels\":[\"L0 same date/contract/span/segment + exact vol/regime + same 4h bucket\",\"L1 L0 with adjacent 4h bucket\",\"L2 same date/contract/span/segment + exact vol/regime, drop bucket\",\"L3 same date/contract/span/segment + same regime\",\"L4 same date/contract/span/segment, any complete-case opportunity\",\"L5 same date/contract/span, drop segment + exact vol/regime\",\"L6 same date/contract/span, any strata ranked by cyclic 4h distance\",\"L7 same contract/span across dates + exact strata + same/adjacent 4h\",\"L8 same contract/span any complete-case ranked by cyclic 4h, regime, vol ordinal, date distance, seed hash\"],\"missing_strata\":[\"MISSING_BASE_VOLATILITY_HISTORY\",\"MISSING_PRIOR_20_HISTORY\",\"MISSING_REGIME_HISTORY\"],\"opportunity_lattice\":\"candidate-independent exact 3h structural coverage and date/contract/span/segment group size>=2; every opportunity has an explicit causal stratum\"},\"schema\":\"systematic_fx.ai_delayed_mtf_engine.v1\"}"
+contract_sha256 = "4cf56a460cd95fa97e544e9b2bb3a25174ed1b265875d50fef2b533bc06ff7e7"
+existing_holdout_engine_reuse = "OLD_EXECUTION_AND_SIGNAL_LOGIC_PROHIBITED_NEUTRAL_DATA_CONTAINERS_ONLY"
+fixed_horizon_primary_seconds = 10800
+fixed_take_profit_or_stop_loss = false
+new_engine_module = "scripts.ai_delayed_mtf_engine"
+
+[holdout_gates]
+active_entry_days_minimum = 18
+both_halves_net_ticks_strictly_positive = true
+contract_count_minimum = 2
+fills_minimum = 24
+holm_alpha_denominator = 20
+holm_alpha_numerator = 1
+holm_family_maximum = 3
+holm_method = "HOLM_STEP_DOWN"
+net_over_maximum_drawdown_minimum_denominator = 4
+net_over_maximum_drawdown_minimum_numerator = 3
+net_ticks_strictly_positive = true
+null_deltas_strictly_positive = true
+profit_factor_minimum_denominator = 10
+profit_factor_minimum_numerator = 11
+terminal_fail_status = "ONE_SHOT_UNSEALED_DELAYED_MTF_HOLDOUT_DIAGNOSTIC_FAIL"
+terminal_pass_rule = "AT_LEAST_ONE_HOLM_REJECT_AND_ALL_GATES_PASS"
+terminal_pass_status = "ONE_SHOT_UNSEALED_DELAYED_MTF_HOLDOUT_DIAGNOSTIC_PASS"
+
+[lifecycle]
+artifact_publication = "CONTENT_ADDRESSED_CANONICAL_JSON_MODE_0444"
+candidate_change_after_precommit = "PROHIBITED"
+crash_policy = "REPLAY_VERIFY_AND_RESUME_NEXT_EVENT"
+failed_branch = "ANY_NONTERMINAL_INTEGRITY_FAILURE_TO_FAILED_TERMINAL"
+holdout_feature_open_barrier = "WF_MAXIMUM_3_FINALISTS_THEN_ONE_SHOT_AUTHORIZATION"
+holdout_masks_before_holdout_one_second_loader = true
+ledger = "ATOMIC_APPEND_ONLY_PREDECESSOR_HASHED_SINGLE_WRITER"
+partial_or_intermediate_result_release = "PROHIBITED"
+search_masks_before_search_one_second_loader = true
+stage_order_main = ["PRECOMMITTED", "SEARCH_MASKS_FROZEN_ALL_100", "SEARCH_RESULTS_RELEASED", "WALK_FORWARD_MASKS_FROZEN_SELECTED_MAXIMUM_8_ALL_5_FOLDS", "WALK_FORWARD_RESULTS_RELEASED_ALL_5_FOLDS", "HOLDOUT_AUTHORIZED_MAXIMUM_3", "HOLDOUT_MASKS_FROZEN", "HOLDOUT_RESULTS_RELEASED", "COMPLETED"]
+stage_order_no_search_finalists = ["SEARCH_RESULTS_RELEASED_EMPTY", "WALK_FORWARD_SKIPPED", "HOLDOUT_SKIPPED", "COMPLETED_NO_SEARCH_FINALISTS"]
+stage_order_no_walk_forward_finalists = ["WALK_FORWARD_RESULTS_RELEASED_EMPTY", "HOLDOUT_SKIPPED", "COMPLETED_NO_WALK_FORWARD_FINALISTS"]
+walk_forward_feature_open_barrier = "SEARCH_FROZEN_SELECTION_MAXIMUM_8"
+walk_forward_masks_before_any_walk_forward_one_second_loader = true
+
+[multiplicity]
+daily_grouping = "SIGNAL_ANCHOR_DECISION_DATE_NOT_EXIT_DATE"
+global_search_family_count = 100
+holdout_method = "HOLM_STEP_DOWN"
+missing_or_error_p_value = 1
+p_star = "MAX_ZERO_SHIFT_MATCHED_PAIRED_DAILY_EXACT_ONE_SIDED_P"
+search_method = "BENJAMINI_HOCHBERG"
+search_q_denominator = 20
+search_q_numerator = 1
+walk_forward_family = "FROZEN_SEARCH_SELECTION_MAXIMUM_8"
+walk_forward_method = "BENJAMINI_HOCHBERG"
+walk_forward_q_denominator = 20
+walk_forward_q_numerator = 1
+
+[nulls]
+master_seed = "ai-delayed-mtf-v1"
+seed_type = "EXACT_UTF8_STRING"
+
+[provenance]
+config_policy = "SOURCE_COMMIT_FIRST_THEN_DATA_ONLY_CONFIG_COMMIT"
+implementation_closure = "ALL_SRC_PY_ALL_SCRIPTS_PY_PYPROJECT_UV_LOCK"
+verify_policy = "FRESH_READ_ONLY_FULL_RESULT_RECOMPUTATION"
+
+[scope]
+holdout_evidence = "ONE_SHOT_UNSEALED_LOCAL_DIAGNOSTIC"
+physical_holdout_isolation = false
+search_claim = "RETROSPECTIVE_DEVELOPMENT_DIAGNOSTIC_NOT_OOS_EVIDENCE"
+strict_backtest_claim = false
+walk_forward_claim = "FIRST_OOS_EVIDENCE_IF_PRECOMMITTED_BEFORE_OPEN"
+
+[search_gates]
+active_entry_days_minimum = 24
+bh_q_denominator = 20
+bh_q_numerator = 1
+fills_each_reporting_block_minimum = 4
+fills_minimum = 36
+maximum_selection = 8
+net_ticks_strictly_positive = true
+null_deltas_strictly_positive = true
+positive_reporting_blocks_minimum = 3
+profit_factor_minimum_denominator = 20
+profit_factor_minimum_numerator = 21
+qualification = "BH_REJECT_AND_EVERY_SAMPLE_AND_ECONOMIC_GATE_PASS"
+ranking = ["P_STAR_ASC", "WORST_GROUP_EV_DESC", "AGGREGATE_EV_DESC", "PROFIT_FACTOR_DESC", "CATALOG_SELECTION_RANK_ASC"]
+raw_signals_each_reporting_block_minimum = 6
+raw_signals_minimum = 48
+reporting_block_count = 4
+signal_days_minimum = 30
+worst_reporting_block_ev_ticks_minimum = -14
+
+[status]
+database_mutation = false
+network_access = false
+paper_live_or_promotion_authority = false
+physical_holdout_isolation = false
+strict_backtest_claim = false
+strict_sealed_holdout_claim = false
+
+[walk_forward_gates]
+active_entry_days_each_fold_minimum = 10
+active_entry_days_minimum = 75
+bh_q_denominator = 20
+bh_q_numerator = 1
+contract_count_minimum = 5
+fills_each_fold_minimum = 12
+fills_minimum = 100
+maximum_finalists = 3
+minimum_positive_folds = 4
+net_over_maximum_drawdown_minimum_denominator = 1
+net_over_maximum_drawdown_minimum_numerator = 1
+net_ticks_strictly_positive = true
+null_deltas_strictly_positive = true
+profit_factor_minimum_denominator = 10
+profit_factor_minimum_numerator = 11
+qualification = "BH_REJECT_AND_EVERY_SAMPLE_AND_ECONOMIC_GATE_PASS"
+ranking = ["P_STAR_ASC", "WORST_GROUP_EV_DESC", "AGGREGATE_EV_DESC", "PROFIT_FACTOR_DESC", "CATALOG_SELECTION_RANK_ASC"]
+worst_fold_profit_factor_floor_denominator = 10
+worst_fold_profit_factor_floor_numerator = 7
+worst_loss_over_median_positive_maximum_denominator = 2
+worst_loss_over_median_positive_maximum_numerator = 3
+
+[warmup]
+cross_stage_or_embargo_warmup_rows = "PROHIBITED"
+engine_contract_sha256 = "4cf56a460cd95fa97e544e9b2bb3a25174ed1b265875d50fef2b533bc06ff7e7"
+first_post_closure_cross_semantics = "OBSERVATION_TIME_CHART_SEMANTICS"
+stage_local_only = true
+stage_start_indicator_reset = true
+stage_start_warmup_ineligible = true
