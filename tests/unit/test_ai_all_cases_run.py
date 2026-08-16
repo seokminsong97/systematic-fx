@@ -65,6 +65,9 @@ ROOT = Path(__file__).resolve().parents[2]
 RUN_REAL_SEARCH_FEATURE_SMOKE = (
     os.environ.get("SYSTEMATIC_FX_RUN_AI_ALL_CASES_REAL_SEARCH_FEATURE_SMOKE") == "1"
 )
+RUN_REAL_SEARCH_TERMINAL_LIVENESS_SMOKE = (
+    os.environ.get("SYSTEMATIC_FX_RUN_AI_ALL_CASES_REAL_SEARCH_TERMINAL_LIVENESS_SMOKE") == "1"
+)
 
 _PHASES = (
     "STAGE_A_SCORE_CHUNKS",
@@ -1088,12 +1091,12 @@ def test_public_entry_points_are_root_only_and_have_no_service_injection() -> No
         assert tuple(inspect.signature(function).parameters) == ("project_root",)
 
 
-def test_attempt3_identity_is_fixed_and_dual_predecessor_guards_precede_root_creation(
+def test_attempt4_identity_is_fixed_and_triple_predecessor_guards_precede_root_creation(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     assert DEFAULT_AI_ALL_CASES_ROOT == AI_ALL_CASES_RUN_RELATIVE_ROOT
-    assert DEFAULT_AI_ALL_CASES_ROOT.as_posix().endswith("ai_all_cases_v1_attempt3")
+    assert DEFAULT_AI_ALL_CASES_ROOT.as_posix().endswith("ai_all_cases_v1_attempt4")
     config = _config(tmp_path)
     expected_root = tmp_path / DEFAULT_AI_ALL_CASES_ROOT
     calls: list[str] = []
@@ -1122,13 +1125,18 @@ def test_attempt3_identity_is_fixed_and_dual_predecessor_guards_precede_root_cre
         assert not expected_root.exists()
         calls.append("attempt2")
 
+    def predecessor3(_root: Path) -> None:
+        assert not expected_root.exists()
+        calls.append("attempt3")
+
     def fixed(_root: Path, *, create: bool) -> Path:
         assert create is True
-        calls.append("create_attempt3")
+        calls.append("create_attempt4")
         return expected_root
 
     monkeypatch.setattr(run_module, "verify_failed_predecessor_attempt", predecessor1)
     monkeypatch.setattr(run_module, "verify_failed_attempt2_predecessor", predecessor2)
+    monkeypatch.setattr(run_module, "verify_failed_attempt3_predecessor", predecessor3)
     monkeypatch.setattr(run_module, "_fixed_run_root", fixed)
 
     assert run_module._prepare_mutation(tmp_path) == (tmp_path, config, expected_root)
@@ -1138,11 +1146,54 @@ def test_attempt3_identity_is_fixed_and_dual_predecessor_guards_precede_root_cre
         "dataset",
         "attempt1",
         "attempt2",
-        "create_attempt3",
+        "attempt3",
+        "create_attempt4",
     ]
 
 
-def test_fresh_public_verify_guards_both_predecessors_before_attempt3_root_open(
+def test_attempt3_guard_failure_prevents_attempt4_root_creation_or_cross_resume(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = _config(tmp_path)
+    expected_root = tmp_path / DEFAULT_AI_ALL_CASES_ROOT
+    predecessor_root = tmp_path / "data/derived/bar_patterns/ai_all_cases_v1_attempt3"
+    calls: list[str] = []
+    monkeypatch.setattr(run_module, "_project_root", lambda _value: tmp_path)
+    monkeypatch.setattr(run_module, "_require_trusted_bootstrap_runtime", lambda _root: None)
+    monkeypatch.setattr(run_module, "load_ai_all_cases_config", lambda _root: config)
+    monkeypatch.setattr(run_module, "_load_validated_dataset_contract", lambda _root: None)
+    monkeypatch.setattr(
+        run_module,
+        "verify_failed_predecessor_attempt",
+        lambda _root: calls.append("attempt1"),
+    )
+    monkeypatch.setattr(
+        run_module,
+        "verify_failed_attempt2_predecessor",
+        lambda _root: calls.append("attempt2"),
+    )
+
+    def reject_attempt3(_root: Path) -> None:
+        calls.append("attempt3")
+        raise RuntimeError("attempt3 guard failed")
+
+    def forbidden_root(_root: Path, *, create: bool) -> Path:
+        calls.append(f"root:{create}")
+        raise AssertionError("attempt4 root opened after failed predecessor guard")
+
+    monkeypatch.setattr(run_module, "verify_failed_attempt3_predecessor", reject_attempt3)
+    monkeypatch.setattr(run_module, "_fixed_run_root", forbidden_root)
+
+    with pytest.raises(RuntimeError, match="attempt3 guard failed"):
+        run_module._prepare_mutation(tmp_path)
+
+    assert calls == ["attempt1", "attempt2", "attempt3"]
+    assert expected_root != predecessor_root
+    assert not expected_root.exists()
+
+
+def test_fresh_public_verify_guards_all_predecessors_before_attempt4_root_open(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1178,6 +1229,11 @@ def test_fresh_public_verify_guards_both_predecessors_before_attempt3_root_open(
     )
     monkeypatch.setattr(
         run_module,
+        "verify_failed_attempt3_predecessor",
+        lambda _root: calls.append("attempt3"),
+    )
+    monkeypatch.setattr(
+        run_module,
         "_fixed_run_root",
         lambda _root, *, create: calls.append(f"root:{create}") or run_root,
     )
@@ -1199,6 +1255,7 @@ def test_fresh_public_verify_guards_both_predecessors_before_attempt3_root_open(
         "dataset",
         "attempt1",
         "attempt2",
+        "attempt3",
         "root:False",
         "services:True",
         "verify",
@@ -2241,12 +2298,12 @@ def test_real_search_feature_adapters_preserve_uint64_lineage_without_opening_ou
     bundles = pipeline_module._direct_feature_bundles(state)
     commitment, summaries = pipeline_module._direct_feature_universe_commitment(bundles)
 
-    expected_bundle_rows = {300: 65_729, 1_800: 10_969, 3_600: 5_494}
+    expected_bundle_rows = {300: 65_728, 1_800: 10_969, 3_600: 5_494}
     assert set(bundles) == {300, 1_800, 3_600}
     assert {
         timeframe: bundle.feature_rows.row_count for timeframe, bundle in bundles.items()
     } == expected_bundle_rows
-    assert commitment == "922abd762e3d10f91f5307c1fdc2a0f3b9614a14623397adb262b082020d2801"
+    assert commitment == "b83f8b9443049390232423220f9e913e5eabbf14f4b45bd5f063c165ab15c24f"
     assert commitment == pipeline_module._direct_feature_universe_commitment(bundles)[0]
     assert tuple(item["timeframe_seconds"] for item in summaries) == (300, 1_800, 3_600)
     assert {int(item["timeframe_seconds"]): int(item["row_count"]) for item in summaries} == (
@@ -2255,6 +2312,42 @@ def test_real_search_feature_adapters_preserve_uint64_lineage_without_opening_ou
     for bundle in bundles.values():
         assert bundle.feature_rows.segment_ids.dtype == np.dtype(np.uint64)
         assert max(int(value) for value in bundle.feature_rows.segment_ids) > np.iinfo(np.int64).max
+
+
+@pytest.mark.skipif(
+    not RUN_REAL_SEARCH_TERMINAL_LIVENESS_SMOKE,
+    reason=(
+        "set SYSTEMATIC_FX_RUN_AI_ALL_CASES_REAL_SEARCH_TERMINAL_LIVENESS_SMOKE=1 "
+        "for the exact Search-only 1s terminal audit"
+    ),
+)
+def test_real_search_direct_terminal_liveness_filter_closes_every_retained_coordinate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original_path_parts = pipeline_module._one_second_path_parts
+    opened_stage_keys: list[str] = []
+
+    def search_only_path_parts(project_root: Path, plan: object) -> object:
+        stage_key = getattr(plan, "stage_key", None)
+        assert stage_key == "SEARCH", "terminal-liveness smoke attempted WF/holdout access"
+        opened_stage_keys.append(stage_key)
+        yield from original_path_parts(project_root, plan)
+
+    monkeypatch.setattr(pipeline_module, "_one_second_path_parts", search_only_path_parts)
+    state = pipeline_module._search_feature_state(ROOT)
+    assert state.plan.stage_key == "SEARCH"
+    bundles = pipeline_module._direct_feature_bundles(state)
+    responses = pipeline_module._direct_outcome_bundles(ROOT, state, bundles)
+
+    assert set(responses) == {
+        (timeframe, horizon)
+        for timeframe in (300, 1_800, 3_600)
+        for horizon in (3_600, 10_800, 21_600)
+    }
+    assert sum(len(response.valid_label_paths) for response in responses.values()) == 246_573
+    assert all(all(response.valid_label_paths) for response in responses.values())
+    assert opened_stage_keys
+    assert set(opened_stage_keys) == {"SEARCH"}
 
 
 def test_direct_only_stage_streams_once_and_builds_only_selected_coordinates(
@@ -2344,6 +2437,102 @@ def test_direct_only_stage_streams_once_and_builds_only_selected_coordinates(
     assert tuple(int(value) for value in observed_responses[0].segment_ids) == (maximum_segment_id,)
     assert tuple(observed_responses[0].terminal_ticks) == (110,)
     assert result[0].candidate == candidate
+
+
+def test_direct_outcome_terminal_staleness_remains_strict_and_postfreeze_fatal(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import numpy as np
+
+    coordinate = (300, 3_600)
+    entry_ns = 1_000_000_000
+    exit_ns = entry_ns + coordinate[1] * 1_000_000_000
+    source_date = date(2026, 1, 2)
+    feature_rows = SimpleNamespace(
+        contracts=("EURUSD",),
+        decision_ns=np.asarray([entry_ns - 1], dtype=np.int64),
+        entry_ns=np.asarray([entry_ns], dtype=np.int64),
+        entry_schedule_sha256="a" * 64,
+        outcome_span_ids=np.asarray([1], dtype=np.int64),
+        row_count=1,
+        row_ids=("row-1",),
+        segment_ids=np.asarray([1], dtype=np.uint64),
+        source_dates=(source_date,),
+    )
+    feature_bundle = pipeline_module._DirectFeatureBundle(
+        feature_rows,
+        (100,),
+        SimpleNamespace(artifact_sha256="b" * 64),
+    )
+
+    def path_with_terminal_age(age_seconds: int) -> object:
+        terminal_end_ns = exit_ns - age_seconds * 1_000_000_000
+        return SimpleNamespace(
+            ends=(entry_ns + 1_000_000_000, terminal_end_ns),
+            lineage=("EURUSD", 1, 1),
+            rows=(
+                SimpleNamespace(
+                    bar=SimpleNamespace(
+                        close_ticks=100,
+                        open_ticks=100,
+                        start_ns=entry_ns,
+                    )
+                ),
+                SimpleNamespace(
+                    bar=SimpleNamespace(
+                        close_ticks=110,
+                        open_ticks=110,
+                        start_ns=terminal_end_ns - 1_000_000_000,
+                    )
+                ),
+            ),
+            starts=(entry_ns, terminal_end_ns - 1_000_000_000),
+            structurally_covers=lambda start, end: (start, end) == (entry_ns, exit_ns),
+        )
+
+    state = SimpleNamespace(plan=SimpleNamespace(stage_key="WF1"))
+    monkeypatch.setattr(
+        pipeline_module,
+        "_one_second_path_parts",
+        lambda *_args, **_kwargs: iter(((path_with_terminal_age(299),),)),
+    )
+    fresh = pipeline_module._direct_outcome_bundles(
+        tmp_path,
+        state,
+        {300: feature_bundle},
+        required_coordinates={coordinate},
+    )[coordinate]
+
+    assert fresh.valid_label_paths == (True,)
+    assert tuple(int(value) for value in fresh.terminal_ticks) == (110,)
+
+    monkeypatch.setattr(
+        pipeline_module,
+        "_one_second_path_parts",
+        lambda *_args, **_kwargs: iter(((path_with_terminal_age(300),),)),
+    )
+    with pytest.raises(AllCasesPipelineError, match="frozen direct terminal is missing or stale"):
+        pipeline_module._direct_outcome_bundles(
+            tmp_path,
+            state,
+            {300: feature_bundle},
+            required_coordinates={coordinate},
+        )
+
+
+def test_direct_terminal_liveness_horizons_match_ml_and_runtime_coordinates() -> None:
+    from campaigns.ai_all_cases_v1 import ml, symbolic
+
+    runtime_coordinates = pipeline_module._direct_required_coordinates(None)
+    runtime_horizons = tuple(sorted({horizon for _timeframe, horizon in runtime_coordinates}))
+    catalog_horizons = tuple(
+        sorted({candidate.horizon_seconds for candidate in ml.build_direct_candidate_catalog()})
+    )
+
+    assert symbolic.DIRECT_TERMINAL_HORIZONS_SECONDS == ml.DIRECT_HORIZONS_SECONDS
+    assert catalog_horizons == symbolic.DIRECT_TERMINAL_HORIZONS_SECONDS
+    assert runtime_horizons == symbolic.DIRECT_TERMINAL_HORIZONS_SECONDS
 
 
 def test_empty_symbolic_partition_skips_the_one_second_loader(

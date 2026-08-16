@@ -58,33 +58,67 @@ def test_template_freezes_access_order_budgets_and_invalid_provenance() -> None:
     assert document["schema_version"] == AI_ALL_CASES_CONFIG_SCHEMA
     assert document["config_id"] == AI_ALL_CASES_CONFIG_ID
     assert document["campaign_design_id"] == AI_ALL_CASES_CAMPAIGN_DESIGN_ID
-    assert AI_ALL_CASES_CONFIG_RELATIVE_PATH.as_posix().endswith("_attempt3.toml")
-    assert AI_ALL_CASES_RUN_RELATIVE_ROOT.as_posix().endswith("_attempt3")
+    assert AI_ALL_CASES_CONFIG_RELATIVE_PATH.as_posix().endswith("_attempt4.toml")
+    assert AI_ALL_CASES_RUN_RELATIVE_ROOT.as_posix().endswith("_attempt4")
     recovery = document["recovery"]
-    assert recovery["attempt_number"] == 3
-    assert recovery["failure_boundary"] == ("AFTER_STAGE_A_TOP256_BEFORE_STAGE_B_PLAN_FROZEN")
+    assert recovery["attempt_number"] == 4
+    assert recovery["failure_boundary"] == (
+        "AFTER_SYMBOLIC_TOP24_BEFORE_DIRECT_ML_CHUNK_0_PUBLICATION"
+    )
     assert recovery["failure_outcomes_opened"] is True
     assert recovery["failure_cause"] == (
-        "CONTROL_OPPORTUNITY_CHRONOLOGICAL_ROWS_NOT_CANONICAL_UINT64_SEGMENT_ORDER"
+        "OFFSET_ENTRY_EXACT_TERMINAL_STRICT_LT_300S_NOT_IMPLIED_BY_"
+        "CONTIGUOUS_NONEMPTY_5M_STRUCTURAL_RUN"
     )
     assert recovery["search_1s_opened"] is True
     assert recovery["walk_forward_opened"] is False
     assert recovery["embargo_opened"] is False
     assert recovery["holdout_opened"] is False
     assert recovery["implementation_delta"] == (
-        "CONTROL_OPPORTUNITY_ROWS_SORTED_BY_EXISTING_TYPED_CANONICAL_KEY_"
-        "BEFORE_HASH_AND_DATACLASS_VALIDATION"
+        "PRE_OUTCOME_SAME_LINEAGE_5M_FIRST_LAST_TRADE_TERMINAL_LIVENESS_"
+        "FILTER_ALL_FIXED_DIRECT_HORIZONS_BEFORE_DIRECT_FEATURE_COMMITMENT"
     )
-    assert recovery["predecessor_internal_search_event_count"] == 65
+    assert recovery["direct_liveness_fixed_horizons_seconds"] == [3_600, 10_800, 21_600]
+    assert recovery["direct_liveness_diagnostic_checked_coordinate_count"] == 246_576
+    assert recovery["direct_liveness_diagnostic_stale_coordinate_count"] == 1
+    assert recovery["direct_liveness_diagnostic_false_positive_count"] == 0
+    assert recovery["direct_liveness_diagnostic_false_negative_count"] == 0
+    assert recovery["direct_liveness_diagnostic_sha256"] == (
+        "8bd23a22a06ad8ecb361fbcb2bfa60810c30e0cad5d127a6610df68a65ed5291"
+    )
+    assert recovery["direct_liveness_expected_raw_exclusion_count"] == 9
+    assert recovery["direct_liveness_expected_raw_opportunity_count"] == 69_585
+    assert recovery["direct_liveness_expected_lattice_sha256"] == (
+        "dac23dd944b9ba34f28671beca6489a72fdc38febe5d6183adfcdf8bcc1f3a97"
+    )
+    assert recovery["direct_liveness_expected_feature_commitment_sha256"] == (
+        "b83f8b9443049390232423220f9e913e5eabbf14f4b45bd5f063c165ab15c24f"
+    )
+    assert recovery["direct_liveness_replay_status"] == ("FEATURE_ONLY_EQUIVALENCE_AUDIT_PASSED")
+    assert recovery["terminal_liveness_filter_outcome_free"] is True
+    assert recovery["terminal_liveness_strict_300_second_rule_preserved"] is True
+    assert recovery["terminal_post_freeze_failure_policy_preserved"] is True
+    assert recovery["predecessor_guard_config_ids"] == [
+        "ai_all_cases_v1",
+        "ai_all_cases_v1_attempt2",
+        "ai_all_cases_v1_attempt3",
+    ]
+    assert recovery["predecessor_internal_search_event_count"] == 131
     assert recovery["predecessor_outer_event_count"] == 3
     assert recovery["predecessor_universe_leaf_count"] == 64
     assert recovery["predecessor_search_universe_frozen"] is True
     assert recovery["predecessor_stage_a_score_chunk_count"] == 64
     assert recovery["predecessor_stage_a_top256_complete"] is True
-    assert recovery["predecessor_stage_b_plan_frozen"] is False
-    assert recovery["predecessor_root_file_count"] == 200
+    assert recovery["predecessor_stage_b_plan_frozen"] is True
+    assert recovery["predecessor_stage_b_raw_chunk_count"] == 64
+    assert recovery["predecessor_symbolic_top24_complete"] is True
+    assert recovery["predecessor_direct_ml_chunk_count"] == 0
+    assert recovery["predecessor_next_internal_phase"] == "DIRECT_ML_CHUNKS"
+    assert recovery["predecessor_next_internal_sequence"] == 132
+    assert recovery["predecessor_root_file_count"] == 332
     assert recovery["predecessor_root_directory_count"] == 14
-    assert recovery["predecessor_root_file_bytes"] == 6_259_097_194
+    assert recovery["predecessor_root_file_bytes"] == 9_815_674_432
+    assert recovery["predecessor_root_row_count"] == 346
     assert recovery["scientific_contract_equality_claim"] is True
     assert recovery["scientific_delta"] == "NONE"
     assert recovery["current_scientific_section_sha256"] == (
@@ -323,7 +357,7 @@ def test_pinned_env_i_launcher_accepts_only_the_exact_clean_entry_environment() 
     clean = subprocess.run(command, check=False, capture_output=True, stdin=subprocess.DEVNULL)
     assert clean.returncode == 0, clean.stderr.decode("utf-8", errors="replace")
     assert (
-        'schema_version = "systematic_fx.ai_all_cases_config.v3"'
+        'schema_version = "systematic_fx.ai_all_cases_config.v4"'
         in json.loads(clean.stdout)["toml"]
     )
 
@@ -982,3 +1016,113 @@ def test_attempt2_predecessor_guard_rejects_bound_head_tamper_without_mutation(
         all_cases_config.verify_failed_attempt2_predecessor(root)
 
     assert all_cases_config._predecessor_lstat_snapshot(attempt2) == before
+
+
+def test_attempt3_predecessor_guard_closes_symbolic_prefix_and_is_read_only() -> None:
+    root = Path(all_cases_config.__file__).resolve().parents[2]
+    run_roots = tuple(
+        root / relative
+        for relative in (
+            "data/derived/bar_patterns/ai_all_cases_v1",
+            "data/derived/bar_patterns/ai_all_cases_v1_attempt2",
+            "data/derived/bar_patterns/ai_all_cases_v1_attempt3",
+        )
+    )
+    config_paths = tuple(
+        root / relative
+        for relative in (
+            "configs/research/ai_all_cases_v1.toml",
+            "configs/research/ai_all_cases_v1_attempt2.toml",
+            "configs/research/ai_all_cases_v1_attempt3.toml",
+        )
+    )
+    run_before = tuple(all_cases_config._predecessor_lstat_snapshot(path) for path in run_roots)
+    config_before = tuple(
+        all_cases_config._predecessor_config_snapshot(path) for path in config_paths
+    )
+
+    all_cases_config.verify_failed_predecessor_attempt(root)
+    all_cases_config.verify_failed_attempt2_predecessor(root)
+    all_cases_config.verify_failed_attempt3_predecessor(root)
+
+    assert tuple(all_cases_config._predecessor_lstat_snapshot(path) for path in run_roots) == (
+        run_before
+    )
+    assert (
+        tuple(all_cases_config._predecessor_config_snapshot(path) for path in config_paths)
+        == config_before
+    )
+    attempt3 = run_roots[-1]
+    manifest, files = all_cases_config._attempt3_tree_manifest(attempt3)
+    assert all_cases_config._canonical_sha256(manifest) == (
+        "f99a43c29acd87e5c6cc73aef36c41276c33476b112de5c8fbdcca8fbae3f5a9"
+    )
+    assert len(manifest["rows"]) == 346
+    assert len(files) == 332
+    assert sum(row["size"] for row in manifest["rows"] if row["kind"] == "FILE") == (9_815_674_432)
+    assert not any(
+        marker in relative
+        for relative in files
+        for marker in ("direct_ml_chunks", "meta_plan_frozen", "meta_ml_chunks", "final_max12")
+    )
+    assert (
+        files[
+            "internal/search/artifacts/"
+            "symbolic_top24-000000-"
+            "d60490551ee36f518000700e281b6816295f053ef8b0366438b2d3ab95bf9f30.json"
+        ]
+        == "d60490551ee36f518000700e281b6816295f053ef8b0366438b2d3ab95bf9f30"
+    )
+
+
+def test_attempt3_predecessor_guard_rejects_config_identity_tamper_read_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = Path(all_cases_config.__file__).resolve().parents[2]
+    attempt3 = root / "data/derived/bar_patterns/ai_all_cases_v1_attempt3"
+    config3 = root / "configs/research/ai_all_cases_v1_attempt3.toml"
+    before = all_cases_config._predecessor_lstat_snapshot(attempt3)
+    config_before = all_cases_config._predecessor_config_snapshot(config3)
+    monkeypatch.setattr(all_cases_config, "_ATTEMPT3_CONFIG_SEMANTIC_SHA256", "0" * 64)
+
+    with pytest.raises(AllCasesConfigError, match="semantic identity"):
+        all_cases_config.verify_failed_attempt3_predecessor(root)
+
+    assert all_cases_config._predecessor_lstat_snapshot(attempt3) == before
+    assert all_cases_config._predecessor_config_snapshot(config3) == config_before
+
+
+def test_attempt3_predecessor_guard_rejects_manifest_tamper_read_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = Path(all_cases_config.__file__).resolve().parents[2]
+    attempt3 = root / "data/derived/bar_patterns/ai_all_cases_v1_attempt3"
+    before = all_cases_config._predecessor_lstat_snapshot(attempt3)
+    monkeypatch.setattr(all_cases_config, "_ATTEMPT3_TREE_MANIFEST_SHA256", "0" * 64)
+
+    with pytest.raises(AllCasesConfigError, match="tree manifest"):
+        all_cases_config._attempt3_tree_manifest(attempt3)
+
+    assert all_cases_config._predecessor_lstat_snapshot(attempt3) == before
+
+
+def test_attempt3_predecessor_guard_rejects_outer_or_internal_tamper_read_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = Path(all_cases_config.__file__).resolve().parents[2]
+    attempt3 = root / "data/derived/bar_patterns/ai_all_cases_v1_attempt3"
+    before = all_cases_config._predecessor_lstat_snapshot(attempt3)
+    _raw, predecessor_config = all_cases_config._verify_attempt3_config(root)
+    monkeypatch.setattr(all_cases_config, "_ATTEMPT3_FAILURE_CODE", "INTEGRITY_" + "0" * 24)
+
+    with pytest.raises(AllCasesConfigError, match="outer boundary"):
+        all_cases_config._verify_attempt3_outer_evidence(attempt3, predecessor_config)
+
+    monkeypatch.undo()
+    _manifest, files = all_cases_config._attempt3_tree_manifest(attempt3)
+    universe = all_cases_config._verify_attempt3_outer_evidence(attempt3, predecessor_config)
+    monkeypatch.setattr(all_cases_config, "_ATTEMPT3_INTERNAL_HEAD_SHA256", "0" * 64)
+    with pytest.raises(AllCasesConfigError, match="internal boundary"):
+        all_cases_config._verify_attempt3_internal_evidence(attempt3, universe, files)
+
+    assert all_cases_config._predecessor_lstat_snapshot(attempt3) == before

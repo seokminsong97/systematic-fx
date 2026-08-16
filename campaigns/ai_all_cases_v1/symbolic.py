@@ -65,6 +65,7 @@ LOGICAL_ANCHOR_POLICY_COUNT: Final = (
 )
 REFERENCE_HORIZONS_SECONDS: Final = (1_800, 3_600, 7_200, 10_800, 21_600)
 REFERENCE_SCORE_CELL_COUNT: Final = LOGICAL_ANCHOR_POLICY_COUNT * len(REFERENCE_HORIZONS_SECONDS)
+DIRECT_TERMINAL_HORIZONS_SECONDS: Final = (3_600, 10_800, 21_600)
 STAGE_A_MAXIMUM_SELECTION: Final = 256
 STAGE_B_PAIR_BUDGET_MAXIMUM: Final = 100_000
 STAGE_B_CONTROL_WORLD_COUNT: Final = 3
@@ -3029,7 +3030,7 @@ def build_direct_opportunity_lattice(
     five_minute_bars: Sequence[BarWithOutcomeSpan],
     structural_lattice: StructuralEligibilityLattice,
 ) -> DirectOpportunityLattice:
-    """Freeze exact next-5m first-trade/open entries for direct model rows."""
+    """Freeze complete-case next-5m entries before any outcome access."""
 
     values = tuple(five_minute_bars)
     if not values:
@@ -3050,12 +3051,66 @@ def build_direct_opportunity_lattice(
         next_by_start[lineage_start] = wrapped
         current_by_end[lineage_end] = wrapped
 
+    contiguous_end_by_start: dict[StructuralAnchorKey, int] = {}
+    for wrapped in reversed(values):
+        bar = wrapped.bar
+        lineage_start = (bar.contract, wrapped.outcome_span_id, bar.segment_id, bar.start_ns)
+        lineage_end = (bar.contract, wrapped.outcome_span_id, bar.segment_id, bar.end_ns)
+        contiguous_end_by_start[lineage_start] = contiguous_end_by_start.get(
+            lineage_end,
+            bar.end_ns,
+        )
+
+    def has_terminal_liveness(
+        following: BarWithOutcomeSpan,
+        scheduled_entry_ns: int,
+    ) -> bool:
+        """Prove every Direct terminal from feature-only 5m trade timestamps."""
+
+        lineage = (
+            following.bar.contract,
+            following.outcome_span_id,
+            following.bar.segment_id,
+        )
+        following_key = (*lineage, following.bar.start_ns)
+        maximum_exit_ns = scheduled_entry_ns + max(DIRECT_TERMINAL_HORIZONS_SECONDS) * (
+            ONE_SECOND_NS
+        )
+        if contiguous_end_by_start.get(following_key, following.bar.end_ns) < maximum_exit_ns:
+            return False
+
+        width_ns = FIVE_MINUTES * ONE_SECOND_NS
+        for horizon_seconds in DIRECT_TERMINAL_HORIZONS_SECONDS:
+            exit_ns = scheduled_entry_ns + horizon_seconds * ONE_SECOND_NS
+            # A boundary endpoint belongs to the immediately preceding 5m bar:
+            # start < exit <= end.
+            containing_start_ns = (exit_ns - 1) // width_ns * width_ns
+            containing = next_by_start.get((*lineage, containing_start_ns))
+            if containing is None or not (
+                containing.bar.start_ns < exit_ns <= containing.bar.end_ns
+            ):
+                return False
+
+            terminal_end_ns = (containing.bar.first_trade_ns // ONE_SECOND_NS + 1) * ONE_SECOND_NS
+            if terminal_end_ns > exit_ns:
+                previous = next_by_start.get((*lineage, containing_start_ns - width_ns))
+                if previous is None or previous.bar.end_ns != containing.bar.start_ns:
+                    return False
+                terminal_end_ns = (previous.bar.last_trade_ns // ONE_SECOND_NS + 1) * ONE_SECOND_NS
+            if not 0 <= exit_ns - terminal_end_ns < width_ns:
+                return False
+        return True
+
     opportunities: list[DirectOpportunity] = []
     excluded: list[StructuralAnchorKey] = []
     for key in structural_lattice.eligible_anchor_keys:
         current = current_by_end.get(key)
         following = next_by_start.get(key)
         if current is None or following is None or _lineage(current) != _lineage(following):
+            excluded.append(key)
+            continue
+        scheduled_entry_ns = following.bar.first_trade_ns // ONE_SECOND_NS * ONE_SECOND_NS
+        if not has_terminal_liveness(following, scheduled_entry_ns):
             excluded.append(key)
             continue
         opportunities.append(
@@ -3065,7 +3120,7 @@ def build_direct_opportunity_lattice(
                 key[1],
                 key[2],
                 key[3],
-                following.bar.first_trade_ns // ONE_SECOND_NS * ONE_SECOND_NS,
+                scheduled_entry_ns,
                 following.bar.open_ticks,
             )
         )
@@ -10114,6 +10169,7 @@ __all__ = [
     "CONTEXT_COUNT",
     "DELAY_CATALOG_SHA256",
     "DELAY_COUNT",
+    "DIRECT_TERMINAL_HORIZONS_SECONDS",
     "ENTRY_CATALOG_SHA256",
     "ENTRY_POLICY_COUNT",
     "EXIT_CATALOG_SHA256",

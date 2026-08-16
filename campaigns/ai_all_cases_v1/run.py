@@ -38,6 +38,7 @@ from .config import (
     _runtime_identity_document,
     load_ai_all_cases_config,
     verify_failed_attempt2_predecessor,
+    verify_failed_attempt3_predecessor,
     verify_failed_predecessor_attempt,
 )
 
@@ -4054,6 +4055,7 @@ def _prepare_mutation(project_root: Path | str) -> tuple[Path, AllCasesConfig, P
     _load_validated_dataset_contract(root)
     verify_failed_predecessor_attempt(root)
     verify_failed_attempt2_predecessor(root)
+    verify_failed_attempt3_predecessor(root)
     run_root = _fixed_run_root(root, create=True)
     return root, config, run_root
 
@@ -4547,6 +4549,7 @@ def verify_ai_all_cases(project_root: Path | str) -> AllCasesRun:
     _load_validated_dataset_contract(root)
     verify_failed_predecessor_attempt(root)
     verify_failed_attempt2_predecessor(root)
+    verify_failed_attempt3_predecessor(root)
     run_root = _fixed_run_root(root, create=False)
     return _verify_with_services(
         root,

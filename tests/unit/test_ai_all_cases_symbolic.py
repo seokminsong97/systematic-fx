@@ -16,6 +16,7 @@ from campaigns.ai_all_cases_v1.symbolic import (
     COMPLETE_STRATEGY_RECIPE_SHA256,
     CONTEXT_CATALOG_SHA256,
     DELAY_CATALOG_SHA256,
+    DIRECT_TERMINAL_HORIZONS_SECONDS,
     ENTRY_CATALOG_SHA256,
     ENTRY_POLICY_COUNT,
     EXIT_CATALOG_SHA256,
@@ -38,6 +39,7 @@ from campaigns.ai_all_cases_v1.symbolic import (
     RuleExitTimes,
     SelectedStrategyDetailRequest,
     SharedPathEvaluator,
+    StructuralEligibilityLattice,
     build_base_event_catalog,
     build_candidate_policy_cube,
     build_causal_expert_feature_artifact,
@@ -1267,6 +1269,149 @@ def test_direct_opportunity_lattice_freezes_next_5m_first_trade_and_open() -> No
     assert (
         missing_next.opportunity_count + len(missing_next.excluded_anchor_keys)
         == missing_next.structural_anchor_count
+    )
+
+
+def _direct_terminal_liveness_case(
+    horizon_seconds: int,
+    *,
+    terminal_age_seconds: int,
+    containing_first_before_exit: bool = False,
+) -> tuple[
+    list[BarWithOutcomeSpan],
+    StructuralEligibilityLattice,
+    tuple[str, int, int, int],
+]:
+    bars = list(_bars(300, 100))
+    entry_offset_ns = 18 * ONE_SECOND_NS
+    following = bars[1]
+    bars[1] = BarWithOutcomeSpan(
+        replace(
+            following.bar,
+            first_trade_ns=following.bar.start_ns + entry_offset_ns,
+        ),
+        following.outcome_span_id,
+    )
+    exit_ns = following.bar.start_ns + entry_offset_ns + horizon_seconds * ONE_SECOND_NS
+    containing_index = 1 + horizon_seconds // 300
+    containing = bars[containing_index]
+    containing_first_ns = exit_ns - 1 if containing_first_before_exit else exit_ns
+    bars[containing_index] = BarWithOutcomeSpan(
+        replace(containing.bar, first_trade_ns=containing_first_ns),
+        containing.outcome_span_id,
+    )
+    previous = bars[containing_index - 1]
+    bars[containing_index - 1] = BarWithOutcomeSpan(
+        replace(
+            previous.bar,
+            last_trade_ns=exit_ns - (terminal_age_seconds + 1) * ONE_SECOND_NS,
+        ),
+        previous.outcome_span_id,
+    )
+    dates = tuple(sorted({item.bar.source_date for item in bars}))
+    structural = build_structural_eligibility_lattice(
+        bars,
+        decision_dates=dates,
+        allowed_tail_end_ns=bars[-1].bar.end_ns,
+    )
+    return bars, structural, structural.eligible_anchor_keys[0]
+
+
+@pytest.mark.parametrize(
+    ("terminal_age_seconds", "expected_eligible"),
+    ((299, True), (300, False), (317, False)),
+)
+def test_direct_terminal_liveness_uses_strict_one_second_bar_end_threshold(
+    terminal_age_seconds: int,
+    expected_eligible: bool,
+) -> None:
+    bars, structural, target = _direct_terminal_liveness_case(
+        3_600,
+        terminal_age_seconds=terminal_age_seconds,
+    )
+    direct = build_direct_opportunity_lattice(bars, structural)
+    opportunity_keys = tuple(item.structural_anchor_key for item in direct.opportunities)
+
+    assert (target in opportunity_keys) is expected_eligible
+    assert (target in direct.excluded_anchor_keys) is not expected_eligible
+    assert direct.opportunity_count + len(direct.excluded_anchor_keys) == (
+        direct.structural_anchor_count
+    )
+    assert canonical_sha256(direct.definition_dict()) == direct.artifact_sha256
+    assert direct_opportunity_lattice_from_dict(direct.as_dict()) == direct
+
+
+def test_direct_terminal_liveness_prefers_trade_in_containing_bar() -> None:
+    bars, structural, target = _direct_terminal_liveness_case(
+        3_600,
+        terminal_age_seconds=317,
+        containing_first_before_exit=True,
+    )
+    direct = build_direct_opportunity_lattice(bars, structural)
+
+    assert target in {item.structural_anchor_key for item in direct.opportunities}
+    assert target not in direct.excluded_anchor_keys
+
+
+def test_direct_terminal_liveness_assigns_exact_cap_boundary_to_preceding_bar() -> None:
+    bars = list(_bars(300, 100))
+    dates = tuple(sorted({item.bar.source_date for item in bars}))
+    structural = build_structural_eligibility_lattice(
+        bars,
+        decision_dates=dates,
+        allowed_tail_end_ns=bars[-1].bar.end_ns,
+    )
+    target = structural.eligible_anchor_keys[0]
+    # The target's aligned 6h cap is exactly bars[73].start_ns. Removing that
+    # next bar must not move the half-open endpoint out of bars[72].
+    direct = build_direct_opportunity_lattice(bars[:73] + bars[74:], structural)
+
+    assert target in {item.structural_anchor_key for item in direct.opportunities}
+    assert target not in direct.excluded_anchor_keys
+
+
+@pytest.mark.parametrize("horizon_seconds", DIRECT_TERMINAL_HORIZONS_SECONDS)
+def test_any_failed_direct_terminal_horizon_excludes_the_whole_anchor(
+    horizon_seconds: int,
+) -> None:
+    bars, structural, target = _direct_terminal_liveness_case(
+        horizon_seconds,
+        terminal_age_seconds=300,
+    )
+    direct = build_direct_opportunity_lattice(bars, structural)
+
+    assert target not in {item.structural_anchor_key for item in direct.opportunities}
+    assert target in direct.excluded_anchor_keys
+
+
+@pytest.mark.parametrize("break_kind", ("GAP", "LINEAGE"))
+def test_direct_terminal_liveness_requires_contiguous_same_lineage_5m_coverage(
+    break_kind: str,
+) -> None:
+    bars = list(_bars(300, 100))
+    dates = tuple(sorted({item.bar.source_date for item in bars}))
+    structural = build_structural_eligibility_lattice(
+        bars,
+        decision_dates=dates,
+        allowed_tail_end_ns=bars[-1].bar.end_ns,
+    )
+    target = structural.eligible_anchor_keys[0]
+    if break_kind == "GAP":
+        direct_bars = bars[:12] + bars[13:]
+    else:
+        crossed = bars[12]
+        bars[12] = BarWithOutcomeSpan(
+            replace(crossed.bar, contract="6EM2"),
+            crossed.outcome_span_id,
+        )
+        direct_bars = bars
+
+    direct = build_direct_opportunity_lattice(direct_bars, structural)
+
+    assert target in direct.excluded_anchor_keys
+    assert target not in {item.structural_anchor_key for item in direct.opportunities}
+    assert direct.opportunity_count + len(direct.excluded_anchor_keys) == (
+        direct.structural_anchor_count
     )
 
 

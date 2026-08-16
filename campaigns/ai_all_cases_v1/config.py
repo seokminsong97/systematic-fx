@@ -33,10 +33,10 @@ from scripts.ai_pattern_holdout_config import (
 )
 
 AI_ALL_CASES_CAMPAIGN_DESIGN_ID: Final = "ai_all_cases_v1"
-AI_ALL_CASES_CONFIG_ID: Final = "ai_all_cases_v1_attempt3"
-AI_ALL_CASES_CONFIG_SCHEMA: Final = "systematic_fx.ai_all_cases_config.v3"
-AI_ALL_CASES_CONFIG_RELATIVE_PATH: Final = Path("configs/research/ai_all_cases_v1_attempt3.toml")
-AI_ALL_CASES_RUN_RELATIVE_ROOT: Final = Path("data/derived/bar_patterns/ai_all_cases_v1_attempt3")
+AI_ALL_CASES_CONFIG_ID: Final = "ai_all_cases_v1_attempt4"
+AI_ALL_CASES_CONFIG_SCHEMA: Final = "systematic_fx.ai_all_cases_config.v4"
+AI_ALL_CASES_CONFIG_RELATIVE_PATH: Final = Path("configs/research/ai_all_cases_v1_attempt4.toml")
+AI_ALL_CASES_RUN_RELATIVE_ROOT: Final = Path("data/derived/bar_patterns/ai_all_cases_v1_attempt4")
 AI_ALL_CASES_AUTHORITY: Final = "UNSEALED_LOCAL_AI_ALL_CASES_RESEARCH"
 CAMPAIGN_PACKAGE_RELATIVE_PATH: Final = Path("campaigns/ai_all_cases_v1")
 TRUSTED_BOOTSTRAP_RELATIVE_PATH: Final = CAMPAIGN_PACKAGE_RELATIVE_PATH / "bootstrap.py"
@@ -1464,90 +1464,170 @@ def _static_contract() -> dict[str, object]:
         or gate_identity != _PREDECESSOR_GATE_IDENTITY_SHA256
         or cost_identity != _PREDECESSOR_COST_IDENTITY_SHA256
     ):
-        raise AllCasesConfigError("attempt-3 catalogs, gates, or costs drifted")
+        raise AllCasesConfigError("attempt-4 catalogs, gates, or costs drifted")
     current_scientific_identity = _scientific_section_sha256(contract)
     if current_scientific_identity != _PREDECESSOR_SCIENTIFIC_SECTION_SHA256:
-        raise AllCasesConfigError("attempt-3 scientific contract drifted")
+        raise AllCasesConfigError("attempt-4 scientific contract drifted")
     contract["recovery"] = {
-        "attempt_number": 3,
+        "attempt_number": 4,
         "catalog_identity_sha256": catalog_identity,
         "catalogs_unchanged": True,
         "cost_identity_sha256": cost_identity,
         "costs_unchanged": True,
         "current_scientific_section_sha256": current_scientific_identity,
+        "direct_liveness_diagnostic_checked_coordinate_count": 246_576,
+        "direct_liveness_diagnostic_false_negative_count": 0,
+        "direct_liveness_diagnostic_false_positive_count": 0,
+        "direct_liveness_diagnostic_exact_300_second_count": 0,
+        "direct_liveness_diagnostic_feature_commitment_sha256": (
+            "922abd762e3d10f91f5307c1fdc2a0f3b9614a14623397adb262b082020d2801"
+        ),
+        "direct_liveness_diagnostic_invalid_row_id_sha256": (
+            "3df3f35437baccc90d24b4e4aa4c7271d0cfaeeedafdf7c2c5d80ddbab05c392"
+        ),
+        "direct_liveness_diagnostic_missing_coordinate_count": 0,
+        "direct_liveness_diagnostic_omitted_lineage_count": 0,
+        "direct_liveness_diagnostic_schema": (
+            "systematic_fx.ai_all_cases_direct_terminal_liveness_audit.v1"
+        ),
+        "direct_liveness_diagnostic_sha256": (
+            "8bd23a22a06ad8ecb361fbcb2bfa60810c30e0cad5d127a6610df68a65ed5291"
+        ),
+        "direct_liveness_diagnostic_stale_age_seconds": 317,
+        "direct_liveness_diagnostic_stale_coordinate_count": 1,
+        "direct_liveness_diagnostic_stale_horizon_seconds": 21_600,
+        "direct_liveness_diagnostic_stale_timeframe_seconds": 300,
+        "direct_liveness_expected_feature_commitment_sha256": (
+            "b83f8b9443049390232423220f9e913e5eabbf14f4b45bd5f063c165ab15c24f"
+        ),
+        "direct_liveness_expected_lattice_sha256": (
+            "dac23dd944b9ba34f28671beca6489a72fdc38febe5d6183adfcdf8bcc1f3a97"
+        ),
+        "direct_liveness_predecessor_raw_opportunity_count": 69_594,
+        "direct_liveness_expected_raw_exclusion_count": 9,
+        "direct_liveness_expected_raw_opportunity_count": 69_585,
+        "direct_liveness_expected_retained_rows_canonical_json": (
+            '{"300":65728,"1800":10969,"3600":5494}'
+        ),
+        "direct_liveness_replay_status": "FEATURE_ONLY_EQUIVALENCE_AUDIT_PASSED",
+        "direct_liveness_fixed_horizons_seconds": [3_600, 10_800, 21_600],
+        "direct_liveness_method": (
+            "CANDIDATE_INDEPENDENT_PRE_OUTCOME_ALL_ANCHOR_ALL_FIXED_HORIZON_5M_TIMESTAMP_PROOF"
+        ),
+        "direct_liveness_one_second_end_formula": "FLOOR_TRADE_NS_TO_1S_PLUS_1S",
+        "direct_liveness_path_predicate": (
+            "LATEST_SAME_LINEAGE_5M_START_LT_CAP_LTE_END_BOUNDARY_BINDS_PRIOR;"
+            "CONTAINING_FIRST_SECOND_END_LTE_CAP_ELSE_IMMEDIATE_PREVIOUS_CONTIGUOUS_"
+            "SAME_LINEAGE_LAST_SECOND_END"
+        ),
+        "direct_liveness_validity_predicate": (
+            "TERMINAL_SECOND_END_LTE_CAP_AND_CAP_MINUS_TERMINAL_SECOND_END_STRICTLY_LT_300S"
+        ),
         "embargo_opened": False,
-        "failure_boundary": "AFTER_STAGE_A_TOP256_BEFORE_STAGE_B_PLAN_FROZEN",
+        "failure_boundary": "AFTER_SYMBOLIC_TOP24_BEFORE_DIRECT_ML_CHUNK_0_PUBLICATION",
         "failure_cause": (
-            "CONTROL_OPPORTUNITY_CHRONOLOGICAL_ROWS_NOT_CANONICAL_UINT64_SEGMENT_ORDER"
+            "OFFSET_ENTRY_EXACT_TERMINAL_STRICT_LT_300S_NOT_IMPLIED_BY_"
+            "CONTIGUOUS_NONEMPTY_5M_STRUCTURAL_RUN"
         ),
         "failure_outcomes_opened": True,
         "gate_identity_sha256": gate_identity,
         "gates_unchanged": True,
         "holdout_opened": False,
         "implementation_delta": (
-            "CONTROL_OPPORTUNITY_ROWS_SORTED_BY_EXISTING_TYPED_CANONICAL_KEY_"
-            "BEFORE_HASH_AND_DATACLASS_VALIDATION"
+            "PRE_OUTCOME_SAME_LINEAGE_5M_FIRST_LAST_TRADE_TERMINAL_LIVENESS_"
+            "FILTER_ALL_FIXED_DIRECT_HORIZONS_BEFORE_DIRECT_FEATURE_COMMITMENT"
         ),
-        "predecessor_code_commit": "5de31e9c303a0b0bbcdb1151b01a49f1a41d4efc",
-        "predecessor_config_commit": "f771e06da3987d5ebe1b1731f4a6fa278421a907",
+        "predecessor_code_commit": "8377464e6c7afdb24981c4faf1bd417439fd5df9",
+        "predecessor_config_commit": "586aa6ecd2002d47ddb105d6a5589d4a895512b8",
         "predecessor_config_file_sha256": (
-            "b2286a3135effd0dd3a244efdc4893e959b88e071e4ab84fb0bddfc960d6ed92"
+            "3e14ee274bb41bbf0463c325406df2e9200656e74eb521dbe611f28b9a191a58"
         ),
-        "predecessor_config_id": "ai_all_cases_v1_attempt2",
-        "predecessor_config_relative_path": "configs/research/ai_all_cases_v1_attempt2.toml",
+        "predecessor_config_id": "ai_all_cases_v1_attempt3",
+        "predecessor_config_relative_path": "configs/research/ai_all_cases_v1_attempt3.toml",
         "predecessor_config_semantic_sha256": (
-            "c5632c024cc66902cb18b719194c81cde1090a9ee3716c7f1b8e2cd7ee845be5"
+            "88a4acaab50e8f9d077ab947ba521b754f5dc064dd7cfea7acb87d39c9f156cc"
         ),
+        "predecessor_dependency_lock_sha256": (
+            "d5192590f9c80d3c2f23f65323d4963ee3fb9aa209301770651f4376c491bd1b"
+        ),
+        "predecessor_direct_ml_chunk_count": 0,
         "predecessor_failed_event_sha256": (
-            "841f1235337a7be50599340acc4c98067bf423f98f3c4c62fa354a055d851cef"
+            "6a8a3cce997ae7aaf9471ae374cdc2c3d46acee6d960e32daaeb4ab68803e9f3"
         ),
-        "predecessor_failure_code": "INTEGRITY_3AEE38A737287C9DFCEA7ED2",
+        "predecessor_failure_code": "INTEGRITY_810C7D62D9905A2670EF404C",
+        "predecessor_guard_config_ids": [
+            "ai_all_cases_v1",
+            "ai_all_cases_v1_attempt2",
+            "ai_all_cases_v1_attempt3",
+        ],
         "predecessor_implementation_sha256": (
-            "4de206f40842fec44591679f11b5c638db2ddb6e7e2ffaf8b12357495d917de3"
+            "5e6da55dab68e82307e1ceaca3635ff924c601fd8d87a7b226d441e4b1bbee42"
         ),
-        "predecessor_internal_search_event_count": 65,
+        "predecessor_internal_search_event_count": 131,
         "predecessor_internal_search_head_sha256": (
-            "7692322614884f8d52f7be1279944ced04f53b63a7d15c5ea59d3631ebb68af6"
+            "3337c8b9597a247ded3c8c37856771028449e27fd757d1ca918fcdb421953a13"
         ),
+        "predecessor_meta_ml_chunk_count": 0,
+        "predecessor_meta_plan_frozen": False,
+        "predecessor_next_internal_chunk_index": 0,
+        "predecessor_next_internal_phase": "DIRECT_ML_CHUNKS",
+        "predecessor_next_internal_sequence": 132,
         "predecessor_outer_event_count": 3,
         "predecessor_precommitted_event_sha256": (
-            "9e5ef8bcab21614bed30d11a40504398b2b530f3ba46ee4a66677bef7ea23822"
+            "4d33ebf2c3680cf65ea45e3c988e1a8a70b697630d5a1141b6e2e3a0bfaee587"
         ),
         "predecessor_request_sha256": (
-            "6b8eef5a9746aaf8bba00e9513b9659a84ccdf039c6995e13315191d032aed0b"
+            "8244e68b2e7191acbf2a804ee26f68387d818470d427d0b2efae2da046b1e6b0"
         ),
         "predecessor_root_directory_count": 14,
         "predecessor_root_evidence_manifest_kind": "CANONICAL_NORMALIZED_TREE_ROWS",
         "predecessor_root_evidence_manifest_sha256": (
-            "62fe4e87a2df0e23068685e6b0cc15b8816f459e7bebed6c404c0ec499d93c70"
+            "f99a43c29acd87e5c6cc73aef36c41276c33476b112de5c8fbdcca8fbae3f5a9"
         ),
-        "predecessor_root_file_bytes": 6_259_097_194,
-        "predecessor_root_file_count": 200,
-        "predecessor_run_relative_root": "data/derived/bar_patterns/ai_all_cases_v1_attempt2",
+        "predecessor_root_file_bytes": 9_815_674_432,
+        "predecessor_root_file_count": 332,
+        "predecessor_root_row_count": 346,
+        "predecessor_run_relative_root": "data/derived/bar_patterns/ai_all_cases_v1_attempt3",
         "predecessor_runtime_identity_sha256": (
             "bdc98c52f9e92550473b77785c9fa1e00845d5ea7fc51257e2a9f85f0b5de141"
         ),
         "predecessor_scientific_section_sha256": (_PREDECESSOR_SCIENTIFIC_SECTION_SHA256),
+        "predecessor_search_result_released": False,
         "predecessor_search_universe_artifact_sha256": (
-            "09941411919c5c17ccefac46541e7c98148fdd018c7f81744cce4e9a8e8a210f"
+            "345bd2ab16947aff89a5f000efd353aa71ffcb78e3f08dfa71c8b4df9e2729b8"
         ),
         "predecessor_search_universe_event_sha256": (
-            "df770ca628496ebcd80908925530722c25c200d0fd47db0d0608ec52130bed01"
+            "52a653ae4b943efd357f8e9196d3b588745c530814e1216fa9426534c6ad10b6"
         ),
         "predecessor_search_universe_frozen": True,
         "predecessor_stage_a_score_chunk_count": 64,
         "predecessor_stage_a_top256_artifact_sha256": (
-            "5f2830da226dc53aa3cfaeea0fa781a9ec07b7ed7e5579c590d4be5a99cfb446"
+            "1006aa680131bb77b9a1f9378217d0a537061a290ed518cd5921731b4c9ef3bb"
         ),
         "predecessor_stage_a_top256_complete": True,
-        "predecessor_stage_b_plan_frozen": False,
+        "predecessor_stage_b_plan_artifact_sha256": (
+            "d438fd84f1003f31343ed9e8bdd021a4c03323377a113457c3d83c152845f724"
+        ),
+        "predecessor_stage_b_plan_frozen": True,
+        "predecessor_stage_b_raw_chunk_count": 64,
+        "predecessor_stage_b_raw_final_artifact_sha256": (
+            "66e0ed5f4c76fe51b52232e0d5b6c99300937c01bcc17aed31b7cf8f9a79661d"
+        ),
+        "predecessor_symbolic_top24_artifact_sha256": (
+            "d60490551ee36f518000700e281b6816295f053ef8b0366438b2d3ab95bf9f30"
+        ),
+        "predecessor_symbolic_top24_complete": True,
         "predecessor_universe_leaf_count": 64,
         "predecessor_universe_root_sha256": (
-            "3b303a00e55b8b294d773439dc47c802343224b463d49a692994b2933c3ea1b1"
+            "855676270531f8ebdc79375b5ee8bcdf7d0dfc4649dd745f6d8742ca6d941e7e"
         ),
         "scientific_contract_equality_claim": True,
         "scientific_delta": "NONE",
         "search_1s_opened": True,
+        "terminal_liveness_filter_outcome_free": True,
+        "terminal_liveness_strict_300_second_rule_preserved": True,
+        "terminal_post_freeze_failure_policy_preserved": True,
+        "terminal_post_freeze_row_policy": "FATAL_NO_ROW_EXCLUSION",
         "walk_forward_opened": False,
     }
     return contract
@@ -2810,6 +2890,483 @@ def verify_failed_attempt2_predecessor(project_root: Path | str) -> None:
             raise AllCasesConfigError("attempt-2 predecessor mutated during read-only audit")
 
 
+_ATTEMPT3_CONFIG_RELATIVE_PATH: Final = Path("configs/research/ai_all_cases_v1_attempt3.toml")
+_ATTEMPT3_RUN_RELATIVE_ROOT: Final = Path("data/derived/bar_patterns/ai_all_cases_v1_attempt3")
+_ATTEMPT3_CODE_COMMIT: Final = "8377464e6c7afdb24981c4faf1bd417439fd5df9"
+_ATTEMPT3_CONFIG_COMMIT: Final = "586aa6ecd2002d47ddb105d6a5589d4a895512b8"
+_ATTEMPT3_CONFIG_FILE_SHA256: Final = (
+    "3e14ee274bb41bbf0463c325406df2e9200656e74eb521dbe611f28b9a191a58"
+)
+_ATTEMPT3_CONFIG_SEMANTIC_SHA256: Final = (
+    "88a4acaab50e8f9d077ab947ba521b754f5dc064dd7cfea7acb87d39c9f156cc"
+)
+_ATTEMPT3_DEPENDENCY_LOCK_SHA256: Final = (
+    "d5192590f9c80d3c2f23f65323d4963ee3fb9aa209301770651f4376c491bd1b"
+)
+_ATTEMPT3_IMPLEMENTATION_SHA256: Final = (
+    "5e6da55dab68e82307e1ceaca3635ff924c601fd8d87a7b226d441e4b1bbee42"
+)
+_ATTEMPT3_RUNTIME_IDENTITY_SHA256: Final = (
+    "bdc98c52f9e92550473b77785c9fa1e00845d5ea7fc51257e2a9f85f0b5de141"
+)
+_ATTEMPT3_REQUEST_SHA256: Final = "8244e68b2e7191acbf2a804ee26f68387d818470d427d0b2efae2da046b1e6b0"
+_ATTEMPT3_UNIVERSE_ARTIFACT_SHA256: Final = (
+    "345bd2ab16947aff89a5f000efd353aa71ffcb78e3f08dfa71c8b4df9e2729b8"
+)
+_ATTEMPT3_UNIVERSE_ROOT_SHA256: Final = (
+    "855676270531f8ebdc79375b5ee8bcdf7d0dfc4649dd745f6d8742ca6d941e7e"
+)
+_ATTEMPT3_OUTER_EVENT_SHA256S: Final = (
+    "4d33ebf2c3680cf65ea45e3c988e1a8a70b697630d5a1141b6e2e3a0bfaee587",
+    "52a653ae4b943efd357f8e9196d3b588745c530814e1216fa9426534c6ad10b6",
+    "6a8a3cce997ae7aaf9471ae374cdc2c3d46acee6d960e32daaeb4ab68803e9f3",
+)
+_ATTEMPT3_FAILURE_CODE: Final = "INTEGRITY_810C7D62D9905A2670EF404C"
+_ATTEMPT3_INTERNAL_HEAD_SHA256: Final = (
+    "3337c8b9597a247ded3c8c37856771028449e27fd757d1ca918fcdb421953a13"
+)
+_ATTEMPT3_TOP256_ARTIFACT_SHA256: Final = (
+    "1006aa680131bb77b9a1f9378217d0a537061a290ed518cd5921731b4c9ef3bb"
+)
+_ATTEMPT3_STAGE_B_PLAN_ARTIFACT_SHA256: Final = (
+    "d438fd84f1003f31343ed9e8bdd021a4c03323377a113457c3d83c152845f724"
+)
+_ATTEMPT3_STAGE_B_FINAL_RAW_ARTIFACT_SHA256: Final = (
+    "66e0ed5f4c76fe51b52232e0d5b6c99300937c01bcc17aed31b7cf8f9a79661d"
+)
+_ATTEMPT3_SYMBOLIC_TOP24_ARTIFACT_SHA256: Final = (
+    "d60490551ee36f518000700e281b6816295f053ef8b0366438b2d3ab95bf9f30"
+)
+_ATTEMPT3_TREE_MANIFEST_SHA256: Final = (
+    "f99a43c29acd87e5c6cc73aef36c41276c33476b112de5c8fbdcca8fbae3f5a9"
+)
+_ATTEMPT3_REQUEST_RELATIVE_PATH: Final = (
+    f"artifacts/all-cases-request-{_ATTEMPT3_REQUEST_SHA256}.json"
+)
+_ATTEMPT3_UNIVERSE_RELATIVE_PATH: Final = (
+    f"artifacts/search-universe-{_ATTEMPT3_UNIVERSE_ARTIFACT_SHA256}.json"
+)
+
+
+def _attempt3_tree_manifest(
+    run_root: Path,
+) -> tuple[dict[str, object], dict[str, str]]:
+    paths = (run_root, *sorted(run_root.rglob("*")))
+    rows: list[dict[str, object]] = []
+    file_sha_by_relative: dict[str, str] = {}
+    file_count = 0
+    directory_count = 0
+    file_bytes = 0
+    for path in paths:
+        metadata = path.lstat()
+        relative = "." if path == run_root else path.relative_to(run_root).as_posix()
+        kind = (
+            "DIRECTORY"
+            if stat.S_ISDIR(metadata.st_mode)
+            else "FILE"
+            if stat.S_ISREG(metadata.st_mode)
+            else "OTHER"
+        )
+        if (
+            path.is_symlink()
+            or kind == "OTHER"
+            or metadata.st_uid != os.geteuid()
+            or metadata.st_nlink < 1
+            or (kind == "DIRECTORY" and stat.S_IMODE(metadata.st_mode) != 0o755)
+            or (
+                kind == "FILE"
+                and stat.S_IMODE(metadata.st_mode)
+                != (0o600 if relative == ".mutation.lock" else 0o444)
+            )
+            or (kind == "FILE" and metadata.st_nlink != 1)
+        ):
+            raise AllCasesConfigError("attempt-3 predecessor tree metadata differs")
+        sha256 = None
+        if kind == "FILE":
+            file_count += 1
+            file_bytes += metadata.st_size
+            sha256 = _streaming_file_sha256(path)
+            file_sha_by_relative[relative] = sha256
+        else:
+            directory_count += 1
+        rows.append(
+            {
+                "kind": kind,
+                "mode": stat.S_IMODE(metadata.st_mode),
+                "nlink": metadata.st_nlink,
+                "relative_path": relative,
+                "sha256": sha256,
+                "size": metadata.st_size,
+            }
+        )
+    document: dict[str, object] = {
+        "root_relative_path": _ATTEMPT3_RUN_RELATIVE_ROOT.as_posix(),
+        "rows": rows,
+        "schema": "systematic_fx.ai_all_cases_predecessor_tree_manifest.v1",
+    }
+    if (
+        len(rows) != 346
+        or file_count != 332
+        or directory_count != 14
+        or file_bytes != 9_815_674_432
+        or _canonical_sha256(document) != _ATTEMPT3_TREE_MANIFEST_SHA256
+    ):
+        raise AllCasesConfigError("attempt-3 predecessor tree manifest differs")
+    for relative in (
+        "internal/search/staging",
+        "internal/universe-staging",
+        "ledger/staging",
+        "staging/artifacts",
+    ):
+        if any((run_root / relative).iterdir()):
+            raise AllCasesConfigError("attempt-3 predecessor staging is not empty")
+    return document, file_sha_by_relative
+
+
+def _verify_attempt3_config(project_root: Path) -> tuple[bytes, dict[str, object]]:
+    relative = _ATTEMPT3_CONFIG_RELATIVE_PATH.as_posix()
+    path = _safe_project_descendant(
+        project_root,
+        project_root / _ATTEMPT3_CONFIG_RELATIVE_PATH,
+        directory=False,
+    )
+    raw = path.read_bytes()
+    if (
+        path.is_symlink()
+        or stat.S_IMODE(path.stat().st_mode) != 0o644
+        or path.stat().st_nlink != 1
+        or path.stat().st_uid != os.geteuid()
+        or hashlib.sha256(raw).hexdigest() != _ATTEMPT3_CONFIG_FILE_SHA256
+        or _git(project_root, "cat-file", "-t", _ATTEMPT3_CONFIG_COMMIT).strip() != b"commit"
+        or _git(project_root, "show", f"{_ATTEMPT3_CONFIG_COMMIT}:{relative}") != raw
+        or _git(project_root, "show", f"HEAD:{relative}") != raw
+        or _git(project_root, "show", f":{relative}") != raw
+        or _git(project_root, "rev-parse", f"{_ATTEMPT3_CONFIG_COMMIT}^").decode("ascii").strip()
+        != _ATTEMPT3_CODE_COMMIT
+    ):
+        raise AllCasesConfigError("attempt-3 predecessor config bytes or commit differs")
+    changed = tuple(
+        line
+        for line in _git(
+            project_root,
+            "diff-tree",
+            "--no-commit-id",
+            "--name-status",
+            "-r",
+            _ATTEMPT3_CONFIG_COMMIT,
+        )
+        .decode("utf-8")
+        .splitlines()
+        if line
+    )
+    history = tuple(
+        line
+        for line in _git(
+            project_root,
+            "log",
+            "--first-parent",
+            "--reverse",
+            "--format=%H",
+            "HEAD",
+            "--",
+            relative,
+        )
+        .decode("ascii")
+        .splitlines()
+        if line
+    )
+    if (
+        changed != (f"A\t{relative}",)
+        or history != (_ATTEMPT3_CONFIG_COMMIT,)
+        or _git(
+            project_root,
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=all",
+            "--",
+            relative,
+        )
+        != b""
+    ):
+        raise AllCasesConfigError("attempt-3 predecessor config provenance differs")
+    _git(project_root, "merge-base", "--is-ancestor", _ATTEMPT3_CONFIG_COMMIT, "HEAD")
+    try:
+        parsed = tomllib.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, tomllib.TOMLDecodeError) as error:  # pragma: no cover
+        raise AllCasesConfigError("attempt-3 predecessor config cannot be decoded") from error
+    if (
+        not isinstance(parsed, dict)
+        or parsed.get("schema_version") != "systematic_fx.ai_all_cases_config.v3"
+        or parsed.get("campaign_design_id") != AI_ALL_CASES_CAMPAIGN_DESIGN_ID
+        or parsed.get("config_id") != "ai_all_cases_v1_attempt3"
+        or parsed.get("code_commit") != _ATTEMPT3_CODE_COMMIT
+        or parsed.get("dependency_lock_sha256") != _ATTEMPT3_DEPENDENCY_LOCK_SHA256
+        or parsed.get("implementation_sha256") != _ATTEMPT3_IMPLEMENTATION_SHA256
+        or _canonical_sha256(parsed) != _ATTEMPT3_CONFIG_SEMANTIC_SHA256
+        or _scientific_section_sha256(parsed) != _PREDECESSOR_SCIENTIFIC_SECTION_SHA256
+    ):
+        raise AllCasesConfigError("attempt-3 predecessor config semantic identity differs")
+    bindings = parsed.get("bindings")
+    execution = parsed.get("execution")
+    if (
+        not isinstance(bindings, dict)
+        or not isinstance(execution, dict)
+        or _canonical_sha256({key: bindings[key] for key in _CATALOG_IDENTITY_BINDING_KEYS})
+        != _PREDECESSOR_CATALOG_IDENTITY_SHA256
+        or _selected_contract_sha256(parsed, _GATE_SECTION_KEYS)
+        != _PREDECESSOR_GATE_IDENTITY_SHA256
+        or _canonical_sha256({key: execution[key] for key in _COST_FIELD_KEYS})
+        != _PREDECESSOR_COST_IDENTITY_SHA256
+    ):
+        raise AllCasesConfigError("attempt-3 predecessor catalogs, gates, or costs differ")
+    return raw, parsed
+
+
+def _attempt3_json(path: Path, *, label: str) -> dict[str, object]:
+    raw = path.read_bytes()
+    try:
+        value = json.loads(raw)
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:  # pragma: no cover
+        raise AllCasesConfigError(f"attempt-3 {label} is invalid JSON") from error
+    if not isinstance(value, dict) or _canonical_json_bytes(value) != raw:
+        raise AllCasesConfigError(f"attempt-3 {label} bytes are not canonical")
+    return value
+
+
+def _verify_attempt3_outer_evidence(
+    run_root: Path,
+    predecessor_config: dict[str, object],
+) -> dict[str, object]:
+    request_path = run_root / _ATTEMPT3_REQUEST_RELATIVE_PATH
+    universe_path = run_root / _ATTEMPT3_UNIVERSE_RELATIVE_PATH
+    request = _attempt3_json(request_path, label="request")
+    universe = _attempt3_json(universe_path, label="Search universe")
+    event_paths = tuple(run_root / f"ledger/events/event-{index:08d}.json" for index in range(1, 4))
+    events = tuple(
+        _attempt3_json(path, label=f"outer event {index}")
+        for index, path in enumerate(event_paths, start=1)
+    )
+    if (
+        _canonical_json_bytes(request.get("config")) != _canonical_json_bytes(predecessor_config)
+        or request.get("artifact_schema") != "systematic_fx.ai_all_cases_request.v1"
+        or request.get("authority") != AI_ALL_CASES_AUTHORITY
+        or request.get("config_file_sha256") != _ATTEMPT3_CONFIG_FILE_SHA256
+        or request.get("config_semantic_sha256") != _ATTEMPT3_CONFIG_SEMANTIC_SHA256
+        or request.get("runtime_identity_sha256") != _ATTEMPT3_RUNTIME_IDENTITY_SHA256
+        or _canonical_sha256(request.get("runtime_identity")) != _ATTEMPT3_RUNTIME_IDENTITY_SHA256
+    ):
+        raise AllCasesConfigError("attempt-3 predecessor request binding differs")
+    expected_keys = {
+        "artifact_schema",
+        "event_type",
+        "payload",
+        "predecessor_sha256",
+        "recorded_at_utc",
+        "request_sha256",
+        "sequence",
+    }
+    if (
+        any(set(event) != expected_keys for event in events)
+        or any(
+            event.get("artifact_schema") != "systematic_fx.ai_all_cases_event.v1"
+            for event in events
+        )
+        or any(
+            hashlib.sha256(path.read_bytes()).hexdigest() != expected
+            for path, expected in zip(event_paths, _ATTEMPT3_OUTER_EVENT_SHA256S, strict=True)
+        )
+    ):
+        raise AllCasesConfigError("attempt-3 predecessor outer event bytes differ")
+    first, second, third = events
+    request_artifact = {
+        "artifact_type": "AI_ALL_CASES_REQUEST",
+        "byte_size": 75_861,
+        "relative_path": _ATTEMPT3_REQUEST_RELATIVE_PATH.removeprefix("artifacts/"),
+        "sha256": _ATTEMPT3_REQUEST_SHA256,
+    }
+    universe_artifact = {
+        "artifact_type": "AI_ALL_CASES_SEARCH_FEATURE_EVENT_UNIVERSE",
+        "byte_size": 14_727,
+        "relative_path": _ATTEMPT3_UNIVERSE_RELATIVE_PATH.removeprefix("artifacts/"),
+        "sha256": _ATTEMPT3_UNIVERSE_ARTIFACT_SHA256,
+    }
+    if (
+        tuple(event.get("event_type") for event in events)
+        != ("PRECOMMITTED", "SEARCH_UNIVERSE_FROZEN", "FAILED")
+        or tuple(event.get("sequence") for event in events) != (1, 2, 3)
+        or tuple(event.get("request_sha256") for event in events) != (_ATTEMPT3_REQUEST_SHA256,) * 3
+        or first.get("predecessor_sha256") is not None
+        or second.get("predecessor_sha256") != _ATTEMPT3_OUTER_EVENT_SHA256S[0]
+        or third.get("predecessor_sha256") != _ATTEMPT3_OUTER_EVENT_SHA256S[1]
+        or first.get("payload") != {"request_artifact": request_artifact}
+        or second.get("payload")
+        != {
+            "universe_artifact": universe_artifact,
+            "universe_root_sha256": _ATTEMPT3_UNIVERSE_ROOT_SHA256,
+        }
+        or third.get("payload") != {"failure_code": _ATTEMPT3_FAILURE_CODE}
+    ):
+        raise AllCasesConfigError("attempt-3 predecessor outer boundary differs")
+    if (
+        universe.get("artifact_schema") != "systematic_fx.ai_all_cases_search_universe.v1"
+        or universe.get("authority") != AI_ALL_CASES_AUTHORITY
+        or universe.get("config_semantic_sha256") != _ATTEMPT3_CONFIG_SEMANTIC_SHA256
+        or not isinstance(universe.get("payload"), dict)
+        or universe["payload"].get("schema")
+        != "systematic_fx.ai_all_cases_search_universe_payload.v1"
+        or universe["payload"].get("universe_root_sha256") != _ATTEMPT3_UNIVERSE_ROOT_SHA256
+    ):
+        raise AllCasesConfigError("attempt-3 predecessor universe binding differs")
+    return universe["payload"]
+
+
+def _attempt3_phase_coordinate(index: int) -> tuple[str, int]:
+    if 1 <= index <= 64:
+        return "STAGE_A_SCORE_CHUNKS", index - 1
+    if index == 65:
+        return "STAGE_A_TOP256", 0
+    if index == 66:
+        return "STAGE_B_PLAN_FROZEN", 0
+    if 67 <= index <= 130:
+        return "STAGE_B_RAW_CHUNKS", index - 67
+    if index == 131:
+        return "SYMBOLIC_TOP24", 0
+    raise AllCasesConfigError("attempt-3 predecessor internal coordinate differs")
+
+
+def _verify_attempt3_internal_evidence(
+    run_root: Path,
+    universe: dict[str, object],
+    file_sha_by_relative: dict[str, str],
+) -> None:
+    universe_rows = universe.get("feature_mask_chunk_artifacts")
+    if not isinstance(universe_rows, list) or len(universe_rows) != 64:
+        raise AllCasesConfigError("attempt-3 predecessor universe leaf family differs")
+    expected_universe_paths: set[str] = set()
+    for index, row in enumerate(universe_rows):
+        if not isinstance(row, dict) or set(row) != {
+            "artifact_sha256",
+            "chunk_index",
+            "relative_path",
+        }:
+            raise AllCasesConfigError("attempt-3 predecessor universe leaf schema differs")
+        digest = row["artifact_sha256"]
+        filename = row["relative_path"]
+        relative = f"internal/universe/{filename}"
+        if (
+            row["chunk_index"] != index
+            or not isinstance(digest, str)
+            or _SHA256.fullmatch(digest) is None
+            or filename != f"universe-{index:03d}-{digest}.json"
+            or file_sha_by_relative.get(relative) != digest
+        ):
+            raise AllCasesConfigError("attempt-3 predecessor universe leaf identity differs")
+        expected_universe_paths.add(relative)
+    observed_universe_paths = {
+        relative for relative in file_sha_by_relative if relative.startswith("internal/universe/")
+    }
+    if observed_universe_paths != expected_universe_paths:
+        raise AllCasesConfigError("attempt-3 predecessor universe closure differs")
+
+    event_paths = tuple(
+        run_root / f"internal/search/events/event-{index:08d}.json" for index in range(1, 132)
+    )
+    expected_artifact_paths: set[str] = set()
+    predecessor_sha256: str | None = None
+    for index, path in enumerate(event_paths, start=1):
+        event = _attempt3_json(path, label=f"internal event {index}")
+        raw_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
+        phase, chunk_index = _attempt3_phase_coordinate(index)
+        artifact_sha256 = event.get("artifact_sha256")
+        artifact_filename = event.get("artifact_relative_path")
+        artifact_relative = f"internal/search/artifacts/{artifact_filename}"
+        if (
+            set(event)
+            != {
+                "artifact_relative_path",
+                "artifact_schema",
+                "artifact_sha256",
+                "chunk_index",
+                "phase",
+                "predecessor_sha256",
+                "recorded_at_utc",
+                "sequence",
+            }
+            or event.get("artifact_schema")
+            != "systematic_fx.ai_all_cases_search_subledger_event.v1"
+            or event.get("sequence") != index
+            or event.get("phase") != phase
+            or event.get("chunk_index") != chunk_index
+            or event.get("predecessor_sha256") != predecessor_sha256
+            or not isinstance(artifact_sha256, str)
+            or _SHA256.fullmatch(artifact_sha256) is None
+            or artifact_filename != f"{phase.lower()}-{chunk_index:06d}-{artifact_sha256}.json"
+            or file_sha_by_relative.get(artifact_relative) != artifact_sha256
+        ):
+            raise AllCasesConfigError("attempt-3 predecessor internal chain differs")
+        expected_artifact_paths.add(artifact_relative)
+        predecessor_sha256 = raw_sha256
+    observed_event_paths = {
+        relative
+        for relative in file_sha_by_relative
+        if relative.startswith("internal/search/events/")
+    }
+    observed_artifact_paths = {
+        relative
+        for relative in file_sha_by_relative
+        if relative.startswith("internal/search/artifacts/")
+    }
+    required_artifacts = {
+        "stage_a_top256-000000": _ATTEMPT3_TOP256_ARTIFACT_SHA256,
+        "stage_b_plan_frozen-000000": _ATTEMPT3_STAGE_B_PLAN_ARTIFACT_SHA256,
+        "stage_b_raw_chunks-000063": _ATTEMPT3_STAGE_B_FINAL_RAW_ARTIFACT_SHA256,
+        "symbolic_top24-000000": _ATTEMPT3_SYMBOLIC_TOP24_ARTIFACT_SHA256,
+    }
+    if (
+        predecessor_sha256 != _ATTEMPT3_INTERNAL_HEAD_SHA256
+        or observed_event_paths
+        != {f"internal/search/events/event-{index:08d}.json" for index in range(1, 132)}
+        or observed_artifact_paths != expected_artifact_paths
+        or any(
+            file_sha_by_relative.get(f"internal/search/artifacts/{prefix}-{digest}.json") != digest
+            for prefix, digest in required_artifacts.items()
+        )
+        or any(
+            marker in relative
+            for relative in file_sha_by_relative
+            for marker in ("direct_ml_chunks", "meta_plan_frozen", "meta_ml_chunks", "final_max12")
+        )
+    ):
+        raise AllCasesConfigError("attempt-3 predecessor internal boundary differs")
+
+
+def verify_failed_attempt3_predecessor(project_root: Path | str) -> None:
+    """Read-only exact audit of attempt 3 through SYMBOLIC_TOP24 and terminal failure."""
+
+    root = Path(project_root).expanduser().resolve(strict=True)
+    run_root = _safe_project_descendant(
+        root,
+        root / _ATTEMPT3_RUN_RELATIVE_ROOT,
+        directory=True,
+    )
+    config_path = root / _ATTEMPT3_CONFIG_RELATIVE_PATH
+    before = _predecessor_lstat_snapshot(run_root)
+    config_before = _predecessor_config_snapshot(config_path)
+    try:
+        _raw, predecessor_config = _verify_attempt3_config(root)
+        _manifest, file_sha_by_relative = _attempt3_tree_manifest(run_root)
+        universe = _verify_attempt3_outer_evidence(run_root, predecessor_config)
+        _verify_attempt3_internal_evidence(run_root, universe, file_sha_by_relative)
+    finally:
+        try:
+            after = _predecessor_lstat_snapshot(run_root)
+            config_after = _predecessor_config_snapshot(config_path)
+        except OSError as error:  # pragma: no cover - adversarial concurrent mutation
+            raise AllCasesConfigError("attempt-3 predecessor changed during audit") from error
+        if after != before or config_after != config_before:
+            raise AllCasesConfigError("attempt-3 predecessor mutated during read-only audit")
+
+
 @dataclass(frozen=True, slots=True)
 class AllCasesConfig:
     path: Path
@@ -2906,5 +3463,6 @@ __all__ = [
     "render_ai_all_cases_toml_template",
     "verify_committed_all_cases_implementation",
     "verify_failed_attempt2_predecessor",
+    "verify_failed_attempt3_predecessor",
     "verify_failed_predecessor_attempt",
 ]
