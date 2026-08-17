@@ -4370,7 +4370,7 @@ def _normalized_indexes(indexes: Sequence[int], row_count: int) -> tuple[int, ..
     return selected
 
 
-def _randomization_identity(candidate_id: str) -> str:
+def _permutation_seed_identity(candidate_id: str) -> str:
     direct = DIRECT_CANDIDATE_BY_ID.get(candidate_id)
     if direct is not None:
         return direct_fit_recipe_id(direct)
@@ -4385,6 +4385,7 @@ def _circular_group_mapping(
     group: tuple[int, ...],
     *,
     candidate_id: str,
+    seed_identity: str,
     fold_key: str,
 ) -> dict[int, int]:
     if len(group) < 2:
@@ -4407,7 +4408,7 @@ def _circular_group_mapping(
         )
     preferred = (
         maximum_span_count
-        if _seed(candidate_id, "CIRCULAR_TARGET", fold_key, "ROTATION_SIDE") % 2 == 0
+        if _seed(seed_identity, "CIRCULAR_TARGET", fold_key, "ROTATION_SIDE") % 2 == 0
         else len(group) - maximum_span_count
     )
     shifts = tuple(dict.fromkeys((preferred, maximum_span_count, len(group) - maximum_span_count)))
@@ -4451,6 +4452,7 @@ def _matched_group_mapping(
     group: tuple[int, ...],
     *,
     candidate_id: str,
+    seed_identity: str,
     fold_key: str,
 ) -> dict[int, int]:
     """Build an O(N log N) stratum-aware span-block derangement."""
@@ -4481,7 +4483,9 @@ def _matched_group_mapping(
     def seeded(index: int, purpose: str) -> str:
         return canonical_sha256(
             {
-                "candidate_id": candidate_id,
+                # Preserve the committed seed domain while keeping public
+                # ineligibility evidence bound to the catalog candidate ID.
+                "candidate_id": seed_identity,
                 "fold_key": fold_key,
                 "purpose": purpose,
                 "row_id": matrix.row_ids[index],
@@ -4617,7 +4621,7 @@ def target_permutation_indexes(
         raise AllCasesMLError("unknown null world") from error
     if len(candidate_id) != 64 or not fold_key:
         raise AllCasesMLError("null permutation identity differs")
-    randomization_identity = _randomization_identity(candidate_id)
+    seed_identity = _permutation_seed_identity(candidate_id)
     if normalized_world is NullWorld.REAL:
         return selected
 
@@ -4632,14 +4636,16 @@ def target_permutation_indexes(
             _circular_group_mapping(
                 matrix,
                 group,
-                candidate_id=randomization_identity,
+                candidate_id=candidate_id,
+                seed_identity=seed_identity,
                 fold_key=fold_key,
             )
             if normalized_world is NullWorld.CIRCULAR_TARGET
             else _matched_group_mapping(
                 matrix,
                 group,
-                candidate_id=randomization_identity,
+                candidate_id=candidate_id,
+                seed_identity=seed_identity,
                 fold_key=fold_key,
             )
         )
@@ -4660,7 +4666,7 @@ def target_permutation_indexes(
             matrix,
             selected,
             world=NullWorld.CIRCULAR_TARGET,
-            candidate_id=randomization_identity,
+            candidate_id=candidate_id,
             fold_key=fold_key,
         )
         if sources == circular:

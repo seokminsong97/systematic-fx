@@ -689,6 +689,22 @@ def _validate_ml_ineligibility(ml: object, value: object, candidate_id: str) -> 
         raise AllCasesPipelineError("Search-prefix ML ineligibility differs")
 
 
+def _candidate_ineligibility_document(
+    ml: object,
+    error: object,
+    candidate_id: str,
+) -> dict[str, object]:
+    """Bind durable candidate-local evidence to its public catalog identity."""
+
+    observed_candidate_id = getattr(error, "candidate_id", None)
+    if observed_candidate_id not in {None, candidate_id}:
+        raise AllCasesPipelineError("ML ineligibility candidate binding differs")
+    document = error.as_dict()
+    document["candidate_id"] = candidate_id
+    _validate_ml_ineligibility(ml, document, candidate_id)
+    return document
+
+
 def _validate_null_feasibility(ml: object, value: object, candidate: object, *, meta: bool) -> None:
     top_keys = (
         {"candidate_id", "records", "report_sha256", "schema", "search_block_plan_sha256"}
@@ -5308,7 +5324,9 @@ def _ensure_direct_ml_search(
                 "final_model_sha256_by_world": [],
                 "frozen_model_artifact": None,
                 "gate": None,
-                "ineligibility": error.as_dict(),
+                "ineligibility": _candidate_ineligibility_document(
+                    ml, error, candidate.candidate_id
+                ),
                 "null_feasibility": None,
                 "schema": "systematic_fx.ai_all_cases_direct_search_candidate.v1",
                 "search_controls": None,
@@ -6161,8 +6179,6 @@ def _ensure_meta_ml_search(
                 "training_rows_sha256_by_world_and_fold": training_rows,
             }
         except ml.MLCandidateIneligible as error:
-            if error.candidate_id is None:
-                error.candidate_id = candidate.candidate_id
             return {
                 "candidate": candidate.as_dict(),
                 "control_alignment": None,
@@ -6170,7 +6186,9 @@ def _ensure_meta_ml_search(
                 "final_model_sha256_by_world": [],
                 "frozen_model_artifact": None,
                 "gate": None,
-                "ineligibility": error.as_dict(),
+                "ineligibility": _candidate_ineligibility_document(
+                    ml, error, candidate.candidate_id
+                ),
                 "null_feasibility": None,
                 "schema": "systematic_fx.ai_all_cases_meta_search_candidate.v1",
                 "search_controls": None,

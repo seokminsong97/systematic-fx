@@ -1091,12 +1091,26 @@ def test_public_entry_points_are_root_only_and_have_no_service_injection() -> No
         assert tuple(inspect.signature(function).parameters) == ("project_root",)
 
 
-def test_attempt4_identity_is_fixed_and_triple_predecessor_guards_precede_root_creation(
+def test_ledger_post_append_replay_bypass_is_reserved_for_completed(tmp_path: Path) -> None:
+    ledger = _Ledger(tmp_path / "ledger", create=True)
+
+    with pytest.raises(AllCasesIntegrityError, match="reserved for final COMPLETED"):
+        ledger.append(
+            "PRECOMMITTED",
+            "a" * 64,
+            {},
+            verify_after_append=False,
+        )
+
+    assert ledger.verify() == ()
+
+
+def test_attempt5_identity_is_fixed_and_four_predecessor_guards_precede_root_creation(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     assert DEFAULT_AI_ALL_CASES_ROOT == AI_ALL_CASES_RUN_RELATIVE_ROOT
-    assert DEFAULT_AI_ALL_CASES_ROOT.as_posix().endswith("ai_all_cases_v1_attempt4")
+    assert DEFAULT_AI_ALL_CASES_ROOT.as_posix().endswith("ai_all_cases_v1_attempt5")
     config = _config(tmp_path)
     expected_root = tmp_path / DEFAULT_AI_ALL_CASES_ROOT
     calls: list[str] = []
@@ -1129,14 +1143,19 @@ def test_attempt4_identity_is_fixed_and_triple_predecessor_guards_precede_root_c
         assert not expected_root.exists()
         calls.append("attempt3")
 
+    def predecessor4(_root: Path) -> None:
+        assert not expected_root.exists()
+        calls.append("attempt4")
+
     def fixed(_root: Path, *, create: bool) -> Path:
         assert create is True
-        calls.append("create_attempt4")
+        calls.append("create_attempt5")
         return expected_root
 
     monkeypatch.setattr(run_module, "verify_failed_predecessor_attempt", predecessor1)
     monkeypatch.setattr(run_module, "verify_failed_attempt2_predecessor", predecessor2)
     monkeypatch.setattr(run_module, "verify_failed_attempt3_predecessor", predecessor3)
+    monkeypatch.setattr(run_module, "verify_failed_attempt4_predecessor", predecessor4)
     monkeypatch.setattr(run_module, "_fixed_run_root", fixed)
 
     assert run_module._prepare_mutation(tmp_path) == (tmp_path, config, expected_root)
@@ -1147,17 +1166,18 @@ def test_attempt4_identity_is_fixed_and_triple_predecessor_guards_precede_root_c
         "attempt1",
         "attempt2",
         "attempt3",
-        "create_attempt4",
+        "attempt4",
+        "create_attempt5",
     ]
 
 
-def test_attempt3_guard_failure_prevents_attempt4_root_creation_or_cross_resume(
+def test_attempt4_guard_failure_prevents_attempt5_root_creation_or_cross_resume(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     config = _config(tmp_path)
     expected_root = tmp_path / DEFAULT_AI_ALL_CASES_ROOT
-    predecessor_root = tmp_path / "data/derived/bar_patterns/ai_all_cases_v1_attempt3"
+    predecessor_root = tmp_path / "data/derived/bar_patterns/ai_all_cases_v1_attempt4"
     calls: list[str] = []
     monkeypatch.setattr(run_module, "_project_root", lambda _value: tmp_path)
     monkeypatch.setattr(run_module, "_require_trusted_bootstrap_runtime", lambda _root: None)
@@ -1174,26 +1194,32 @@ def test_attempt3_guard_failure_prevents_attempt4_root_creation_or_cross_resume(
         lambda _root: calls.append("attempt2"),
     )
 
-    def reject_attempt3(_root: Path) -> None:
-        calls.append("attempt3")
-        raise RuntimeError("attempt3 guard failed")
+    monkeypatch.setattr(
+        run_module,
+        "verify_failed_attempt3_predecessor",
+        lambda _root: calls.append("attempt3"),
+    )
+
+    def reject_attempt4(_root: Path) -> None:
+        calls.append("attempt4")
+        raise RuntimeError("attempt4 guard failed")
 
     def forbidden_root(_root: Path, *, create: bool) -> Path:
         calls.append(f"root:{create}")
-        raise AssertionError("attempt4 root opened after failed predecessor guard")
+        raise AssertionError("attempt5 root opened after failed predecessor guard")
 
-    monkeypatch.setattr(run_module, "verify_failed_attempt3_predecessor", reject_attempt3)
+    monkeypatch.setattr(run_module, "verify_failed_attempt4_predecessor", reject_attempt4)
     monkeypatch.setattr(run_module, "_fixed_run_root", forbidden_root)
 
-    with pytest.raises(RuntimeError, match="attempt3 guard failed"):
+    with pytest.raises(RuntimeError, match="attempt4 guard failed"):
         run_module._prepare_mutation(tmp_path)
 
-    assert calls == ["attempt1", "attempt2", "attempt3"]
+    assert calls == ["attempt1", "attempt2", "attempt3", "attempt4"]
     assert expected_root != predecessor_root
     assert not expected_root.exists()
 
 
-def test_fresh_public_verify_guards_all_predecessors_before_attempt4_root_open(
+def test_fresh_public_verify_guards_all_predecessors_before_attempt5_root_open(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1234,6 +1260,11 @@ def test_fresh_public_verify_guards_all_predecessors_before_attempt4_root_open(
     )
     monkeypatch.setattr(
         run_module,
+        "verify_failed_attempt4_predecessor",
+        lambda _root: calls.append("attempt4"),
+    )
+    monkeypatch.setattr(
+        run_module,
         "_fixed_run_root",
         lambda _root, *, create: calls.append(f"root:{create}") or run_root,
     )
@@ -1256,6 +1287,7 @@ def test_fresh_public_verify_guards_all_predecessors_before_attempt4_root_open(
         "attempt1",
         "attempt2",
         "attempt3",
+        "attempt4",
         "root:False",
         "services:True",
         "verify",
@@ -2703,6 +2735,230 @@ def test_search_prefix_rejects_boolean_final_candidate_id() -> None:
         )
 
 
+def test_candidate_ineligibility_document_rebinds_none_or_catalog_id_and_rejects_recipe_id() -> (
+    None
+):
+    from campaigns.ai_all_cases_v1 import ml
+
+    candidate_id = "a" * 64
+    for observed in (None, candidate_id):
+        error = ml.MLCandidateIneligible(
+            ml.MLIneligibilityReason.NULL_DERANGEMENT_INFEASIBLE,
+            "fixture ineligibility",
+            candidate_id=observed,
+            scope_key="B3",
+        )
+        document = pipeline_module._candidate_ineligibility_document(ml, error, candidate_id)
+        assert document["candidate_id"] == candidate_id
+        assert document["reason"] == "NULL_DERANGEMENT_INFEASIBLE"
+
+    recipe_id = "b" * 64
+    error = ml.MLCandidateIneligible(
+        ml.MLIneligibilityReason.NULL_DERANGEMENT_INFEASIBLE,
+        "fixture ineligibility",
+        candidate_id=recipe_id,
+        scope_key="B3",
+    )
+    with pytest.raises(AllCasesPipelineError, match="candidate binding"):
+        pipeline_module._candidate_ineligibility_document(ml, error, candidate_id)
+
+
+@pytest.mark.parametrize("barrier", ("semantic", "internal-release"))
+def test_search_result_release_waits_for_complete_semantic_and_internal_preflight(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    barrier: str,
+) -> None:
+    run_root = _root(tmp_path)
+    barrier_calls = 0
+
+    def semantic_barrier(
+        _root: Path,
+        _config: AllCasesConfig,
+        _universe: Mapping[str, object],
+    ) -> None:
+        nonlocal barrier_calls
+        barrier_calls += 1
+        if barrier_calls == 2:
+            raise AllCasesIntegrityError("synthetic pre-release semantic mismatch")
+
+    def internal_barrier(
+        _root: Path,
+        _config: AllCasesConfig,
+        _search: Mapping[str, object],
+    ) -> None:
+        nonlocal barrier_calls
+        barrier_calls += 1
+        raise AllCasesIntegrityError("synthetic pre-release internal mismatch")
+
+    if barrier == "semantic":
+        monkeypatch.setattr(run_module, "_verify_search_prefix_semantics", semantic_barrier)
+        message = "pre-release semantic mismatch"
+        expected_calls = 2
+    else:
+        monkeypatch.setattr(run_module, "_verify_internal_search_release", internal_barrier)
+        message = "pre-release internal mismatch"
+        expected_calls = 1
+
+    with pytest.raises(AllCasesIntegrityError, match=message):
+        _run_with_services(
+            tmp_path,
+            _config(tmp_path),
+            run_root,
+            _services([], search_selection_count=0, walk_finalist_count=0),
+        )
+
+    assert barrier_calls == expected_calls
+    assert _event_types(run_root) == (
+        "PRECOMMITTED",
+        "SEARCH_UNIVERSE_FROZEN",
+        "FAILED",
+    )
+
+
+def test_terminal_search_semantic_failure_occurs_before_completed_publication(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run_root = _root(tmp_path)
+    semantic_calls = 0
+
+    def semantic_barrier(
+        _root: Path,
+        _config: AllCasesConfig,
+        _universe: Mapping[str, object],
+    ) -> None:
+        nonlocal semantic_calls
+        semantic_calls += 1
+        if semantic_calls == 3:
+            raise AllCasesIntegrityError("synthetic terminal semantic mismatch")
+
+    monkeypatch.setattr(run_module, "_verify_search_prefix_semantics", semantic_barrier)
+
+    with pytest.raises(AllCasesIntegrityError, match="terminal semantic mismatch"):
+        _run_with_services(
+            tmp_path,
+            _config(tmp_path),
+            run_root,
+            _services([], search_selection_count=0, walk_finalist_count=0),
+        )
+
+    event_types = _event_types(run_root)
+    assert semantic_calls == 3
+    assert "SEARCH_RESULTS_RELEASED" in event_types
+    assert event_types[-1] == "FAILED"
+    assert "COMPLETED" not in event_types
+    assert not tuple((run_root / "artifacts").glob("all-cases-report-*.json"))
+
+
+def test_terminal_resource_failure_discards_report_orphan_and_appends_failed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run_root = _root(tmp_path)
+    original_check = run_module._RunResourceGuard.check
+
+    def fail_before_completed(
+        self: object,
+        boundary: str,
+    ) -> None:
+        if boundary == "BEFORE_COMPLETED":
+            raise AllCasesIntegrityError("synthetic terminal resource mismatch")
+        original_check(self, boundary)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(run_module._RunResourceGuard, "check", fail_before_completed)
+
+    with pytest.raises(AllCasesIntegrityError, match="terminal resource mismatch"):
+        _run_with_services(
+            tmp_path,
+            _config(tmp_path),
+            run_root,
+            _services([], search_selection_count=0, walk_finalist_count=0),
+        )
+
+    events = _Ledger(run_root / "ledger", create=False).verify()
+    assert events[-1].event_type == "FAILED"
+    assert all(event.event_type != "COMPLETED" for event in events)
+    assert not tuple((run_root / "artifacts").glob("all-cases-report-*.json"))
+    assert {path.name for path in (run_root / "artifacts").iterdir()} == set(
+        run_module._artifact_relative_paths(events)
+    )
+
+
+def test_completed_append_is_followed_by_no_throwable_validation_or_replay(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run_root = _root(tmp_path)
+    completed_published = False
+    original_append = _Ledger.append
+
+    def observed_append(
+        self: _Ledger,
+        event_type: str,
+        request_sha256: str,
+        payload: Mapping[str, object],
+        *,
+        enforce_resources: bool = True,
+        verify_after_append: bool = True,
+    ) -> object:
+        nonlocal completed_published
+        event = original_append(
+            self,
+            event_type,
+            request_sha256,
+            payload,
+            enforce_resources=enforce_resources,
+            verify_after_append=verify_after_append,
+        )
+        if event_type == "COMPLETED":
+            assert verify_after_append is False
+            completed_published = True
+        return event
+
+    monkeypatch.setattr(_Ledger, "append", observed_append)
+
+    guarded = (
+        (run_module, "AllCasesRun"),
+        (run_module, "_run_value"),
+        (run_module, "_verify_artifact"),
+        (run_module, "_verify_outer_artifact_leaf_set"),
+        (run_module, "_verify_run_root_tree"),
+        (run_module, "_verify_search_prefix_semantics"),
+        (run_module, "_verify_terminal_internal_prefixes"),
+        (_Ledger, "verify"),
+        (run_module._RunResourceGuard, "check"),
+        (run_module._RunResourceGuard, "check_terminal_bytes"),
+    )
+    for owner, name in guarded:
+        original = getattr(owner, name)
+
+        def reject_after_completed(
+            *args: object,
+            _original: object = original,
+            _name: str = name,
+            **kwargs: object,
+        ) -> object:
+            if completed_published:
+                raise AssertionError(f"{_name} ran after COMPLETED")
+            return _original(*args, **kwargs)  # type: ignore[operator]
+
+        monkeypatch.setattr(owner, name, reject_after_completed)
+
+    result = _run_with_services(
+        tmp_path,
+        _config(tmp_path),
+        run_root,
+        _services([], search_selection_count=0, walk_finalist_count=0),
+    )
+
+    assert completed_published is True
+    assert result.status == "COMPLETED"
+    assert result.event_count == 6
+    completed_published = False
+    assert _event_types(run_root)[-1] == "COMPLETED"
+
+
 @pytest.mark.parametrize("failed_terminal", (False, True))
 def test_public_prefix_paths_run_outcome_free_search_semantics_before_any_service(
     tmp_path: Path,
@@ -3579,7 +3835,7 @@ def test_released_production_universe_requires_internal_leaves_before_search_out
     assert verify_calls == []
 
 
-def test_released_production_search_requires_internal_closure_before_walk_forward(
+def test_production_search_internal_closure_failure_is_failed_before_public_release(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -3619,15 +3875,20 @@ def test_released_production_search_requires_internal_closure_before_walk_forwar
         "freeze_search_features_events_catalog",
         "open_search_outcomes_train_select",
     ]
+    assert _event_types(run_root) == (
+        "PRECOMMITTED",
+        "SEARCH_UNIVERSE_FROZEN",
+        "FAILED",
+    )
     verify_calls: list[str] = []
-    with pytest.raises(AllCasesIntegrityError, match="internal Search release"):
-        _verify_with_services(
-            tmp_path,
-            _production_identity_config(tmp_path),
-            run_root,
-            _services(verify_calls, search_selection_count=4, walk_finalist_count=2),
-        )
-    assert verify_calls == []
+    verified = _verify_with_services(
+        tmp_path,
+        _production_identity_config(tmp_path),
+        run_root,
+        _services(verify_calls, search_selection_count=4, walk_finalist_count=2),
+    )
+    assert verified.status == "FAILED"
+    assert verify_calls == ["freeze_search_features_events_catalog"]
 
 
 def test_fresh_verify_requires_the_exact_empty_mode_0600_mutation_lock(

@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import copy
 import json
+import os
+import subprocess
+import sys
 from dataclasses import replace
 from datetime import date, timedelta
 from fractions import Fraction
 from itertools import islice
+from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
@@ -1854,6 +1858,201 @@ def test_null_target_maps_are_training_only_bijections_and_deterministic() -> No
             fold_key="B3",
         ),
     )
+
+
+def test_shared_fit_recipe_siblings_preserve_committed_null_permutation_plans() -> None:
+    matrix = _matrix(row_count=42)
+    training = tuple(range(36))
+    sibling_groups = (
+        (
+            (
+                _direct_candidate(rate=Fraction(1, 20)),
+                _direct_candidate(rate=Fraction(1, 10)),
+            ),
+            ml.direct_fit_recipe_id,
+            {
+                "CIRCULAR_TARGET": (
+                    "8a85587d5d7d789200e8804d9ea946301ef14c681aa2f9274f188c7714a1d31b",
+                    "8ed7facf585a5d366240040b51288fa88ce3f242ade49e7ea8c9acb3aad2135d",
+                ),
+                "MATCHED_TARGET": (
+                    "ca207fbb5f840ddada14b0b4588f72e0f7bf33d09351479e616f189ffcdaca60",
+                    "b681eb99ab0933796959a607fd205b962ba8703596b0eedc45e6d48d1b8a9659",
+                ),
+            },
+        ),
+        (
+            (
+                _meta_candidate(rate=Fraction(3, 10)),
+                _meta_candidate(rate=Fraction(1, 2)),
+            ),
+            ml.meta_fit_recipe_id,
+            {
+                "CIRCULAR_TARGET": (
+                    "ef43f5170ac75ea560c66d204a77814bb3a296d86729534b878dbfde2257eeb8",
+                    "cfdd0cbddd36ac93e0fc9d674c4d81665a94e64ebdc69636a23d47ecc3f54088",
+                ),
+                "MATCHED_TARGET": (
+                    "8ca6fe8fbf35a9be52500779450ada8cbb5f275435f9e085a440e009515299a3",
+                    "8caa07330dbd9d9e40a835a1eacfc86592873a99c4c3d9e935040500746fa578",
+                ),
+            },
+        ),
+    )
+    for siblings, fit_recipe_id, committed_plan_sha256s in sibling_groups:
+        seed_identities = tuple(fit_recipe_id(candidate) for candidate in siblings)
+        assert len(set(seed_identities)) == 1
+        assert seed_identities[0] not in {candidate.candidate_id for candidate in siblings}
+        for world in (ml.NullWorld.CIRCULAR_TARGET, ml.NullWorld.MATCHED_TARGET):
+            plans = tuple(
+                ml.target_permutation_plan(
+                    matrix,
+                    training,
+                    world=world,
+                    candidate_id=candidate.candidate_id,
+                    fold_key="B3",
+                )
+                for candidate in siblings
+            )
+            assert plans[0].source_indexes == plans[1].source_indexes
+            assert tuple(plan.candidate_id for plan in plans) == tuple(
+                candidate.candidate_id for candidate in siblings
+            )
+            assert tuple(plan.sha256 for plan in plans) == committed_plan_sha256s[world.value]
+
+
+@pytest.mark.parametrize(
+    "candidate",
+    (
+        _direct_candidate(rate=Fraction(1, 20)),
+        _direct_candidate(rate=Fraction(1, 10)),
+        _meta_candidate(rate=Fraction(3, 10)),
+        _meta_candidate(rate=Fraction(1, 2)),
+    ),
+    ids=("direct-5", "direct-10", "meta-30", "meta-50"),
+)
+@pytest.mark.parametrize("world", (ml.NullWorld.CIRCULAR_TARGET, ml.NullWorld.MATCHED_TARGET))
+def test_impossible_null_permutation_reports_public_catalog_candidate_id(
+    candidate: ml.DirectCandidate | ml.MetaCandidate,
+    world: ml.NullWorld,
+) -> None:
+    matrix = replace(
+        _matrix(row_count=4),
+        contracts=("6E",) * 4,
+        outcome_span_ids=np.asarray((1, 1, 1, 2), dtype=np.int64),
+    )
+    with pytest.raises(ml.MLCandidateIneligible) as raised:
+        ml.target_permutation_indexes(
+            matrix,
+            tuple(range(4)),
+            world=world,
+            candidate_id=candidate.candidate_id,
+            fold_key="SEARCH_FINAL",
+        )
+    assert raised.value.reason is ml.MLIneligibilityReason.NULL_DERANGEMENT_INFEASIBLE
+    assert raised.value.candidate_id == candidate.candidate_id
+    assert raised.value.as_dict()["candidate_id"] == candidate.candidate_id
+
+
+@pytest.mark.parametrize(
+    ("candidate", "seed_identity"),
+    (
+        (
+            _direct_candidate(rate=Fraction(1, 10)),
+            ml.direct_fit_recipe_id(_direct_candidate(rate=Fraction(1, 10))),
+        ),
+        (
+            _meta_candidate(rate=Fraction(1, 2)),
+            ml.meta_fit_recipe_id(_meta_candidate(rate=Fraction(1, 2))),
+        ),
+    ),
+    ids=("direct", "meta"),
+)
+def test_matched_to_circular_check_preserves_public_candidate_id(
+    monkeypatch: pytest.MonkeyPatch,
+    candidate: ml.DirectCandidate | ml.MetaCandidate,
+    seed_identity: str,
+) -> None:
+    observed: list[tuple[str, str, str]] = []
+
+    def reject_circular(
+        matrix: ml.TrainingMatrix,
+        group: tuple[int, ...],
+        *,
+        candidate_id: str,
+        seed_identity: str,
+        fold_key: str,
+    ) -> dict[int, int]:
+        del matrix, group
+        observed.append((candidate_id, seed_identity, fold_key))
+        raise ml.MLCandidateIneligible(
+            ml.MLIneligibilityReason.NULL_DERANGEMENT_INFEASIBLE,
+            "forced circular failure after matched mapping",
+            candidate_id=candidate_id,
+            scope_key=fold_key,
+        )
+
+    monkeypatch.setattr(ml, "_circular_group_mapping", reject_circular)
+    with pytest.raises(ml.MLCandidateIneligible) as raised:
+        ml.target_permutation_indexes(
+            _matrix(row_count=42),
+            tuple(range(36)),
+            world=ml.NullWorld.MATCHED_TARGET,
+            candidate_id=candidate.candidate_id,
+            fold_key="B3",
+        )
+    assert observed == [(candidate.candidate_id, seed_identity, "B3")]
+    assert raised.value.candidate_id == candidate.candidate_id
+
+
+def test_shared_recipe_null_permutations_are_python_hashseed_deterministic() -> None:
+    test_path = str(Path(__file__).resolve())
+    project_root = str(Path(__file__).resolve().parents[2])
+    script = f"""
+import json
+import runpy
+from fractions import Fraction
+from campaigns.ai_all_cases_v1 import ml
+
+helpers = runpy.run_path({test_path!r})
+matrix = helpers["_matrix"](row_count=42)
+training = tuple(range(36))
+candidates = (
+    helpers["_direct_candidate"](rate=Fraction(1, 20)),
+    helpers["_direct_candidate"](rate=Fraction(1, 10)),
+    helpers["_meta_candidate"](rate=Fraction(3, 10)),
+    helpers["_meta_candidate"](rate=Fraction(1, 2)),
+)
+payload = {{
+    candidate.candidate_id: {{
+        world.value: ml.target_permutation_plan(
+            matrix,
+            training,
+            world=world,
+            candidate_id=candidate.candidate_id,
+            fold_key="B3",
+        ).as_dict()
+        for world in (ml.NullWorld.CIRCULAR_TARGET, ml.NullWorld.MATCHED_TARGET)
+    }}
+    for candidate in candidates
+}}
+print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
+"""
+    outputs = []
+    for hashseed in ("0", "1", "4294967295"):
+        environment = dict(os.environ)
+        environment["PYTHONHASHSEED"] = hashseed
+        completed = subprocess.run(
+            (sys.executable, "-B", "-c", script),
+            check=True,
+            capture_output=True,
+            cwd=project_root,
+            env=environment,
+            stdin=subprocess.DEVNULL,
+            text=True,
+        )
+        outputs.append(completed.stdout)
+    assert len(set(outputs)) == 1
 
 
 @pytest.mark.parametrize("indexes", ([False, True], [0.9, 1.9], ["0", "1"]))

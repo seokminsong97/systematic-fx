@@ -39,6 +39,7 @@ from .config import (
     load_ai_all_cases_config,
     verify_failed_attempt2_predecessor,
     verify_failed_attempt3_predecessor,
+    verify_failed_attempt4_predecessor,
     verify_failed_predecessor_attempt,
 )
 
@@ -1200,7 +1201,12 @@ class _Ledger:
         payload: Mapping[str, object],
         *,
         enforce_resources: bool = True,
+        verify_after_append: bool = True,
     ) -> AllCasesLedgerEvent:
+        if type(verify_after_append) is not bool or (
+            not verify_after_append and event_type != "COMPLETED"
+        ):
+            raise AllCasesIntegrityError("ledger replay bypass is reserved for final COMPLETED")
         events = self.verify()
         _require_transition(events[-1].event_type if events else None, event_type)
         event = AllCasesLedgerEvent(
@@ -1248,7 +1254,7 @@ class _Ledger:
                 pass
             else:
                 _fsync_directory(self.staging_root)
-        if self.verify()[-1].sha256 != event.sha256:
+        if verify_after_append and self.verify()[-1].sha256 != event.sha256:
             raise AllCasesIntegrityError("ledger append did not replay exactly")
         return event
 
@@ -3624,6 +3630,12 @@ def _run_with_services(
                 search, _evaluated, selected = _validate_search_result(
                     services.train_select_search(root, config, universe), universe, config
                 )
+            # The complete internal Search prefix now exists, but no public
+            # outcome-bearing Search event does.  Authenticate both its
+            # scientific semantics and its exact release closure before the
+            # outer ledger can cross SEARCH_RESULTS_RELEASED.
+            _verify_search_prefix_semantics(root, config, universe)
+            _verify_internal_search_release(root, config, search)
             resources.check("AFTER_SEARCH_RESULTS")
             events = _append_enveloped_event(
                 ledger,
@@ -4007,6 +4019,16 @@ def _complete(
     resources = resources if resources is not None else ledger.resources
     existing = _find_event(events, "COMPLETED")
     if existing is None:
+        run_root = ledger.root.parent
+        # This is the terminal validation barrier.  Every replay, source
+        # semantic check, request/artifact closure, and terminal-internal
+        # assertion that can fail runs while FAILED is still a legal next
+        # event.  COMPLETED is never used as a promise to validate later.
+        prefix_result = _run_value(config, run_root, events)
+        _verify_terminal_internal_prefixes(_project_root_from_run_root(run_root), config)
+        _verify_outer_artifact_leaf_set(artifacts_root, events, allow_one_orphan=False)
+        if resources is not None:
+            resources.check("BEFORE_COMPLETION_REPORT")
         report = _report_document(events, final_status, config)
         identity = _publish_envelope(
             artifacts_root,
@@ -4018,12 +4040,42 @@ def _complete(
             referenced_relative_paths=_artifact_relative_paths(events),
             resources=resources,
         )
+        expected_report_bytes = _canonical_json_bytes(
+            _envelope(
+                config,
+                schema="systematic_fx.ai_all_cases_report_envelope.v1",
+                payload=report,
+            )
+        )
+        _verify_artifact(artifacts_root, identity, expected_bytes=expected_report_bytes)
+        orphan = _verify_outer_artifact_leaf_set(
+            artifacts_root,
+            events,
+            allow_one_orphan=True,
+        )
+        if orphan != identity.relative_path:
+            raise AllCasesIntegrityError("completion report is not the sole bounded orphan")
+        if resources is not None:
+            resources.check("BEFORE_COMPLETED")
+            resources.check_terminal_bytes("BEFORE_COMPLETED_TERMINAL")
+        completed_result = AllCasesRun(
+            config=config,
+            status="COMPLETED",
+            request_artifact=prefix_result.request_artifact,
+            evidence_artifacts=(*prefix_result.evidence_artifacts, identity),
+            finalist_candidate_ids=prefix_result.finalist_candidate_ids,
+            root=run_root,
+            event_count=len(events) + 1,
+        )
         ledger.append(
             "COMPLETED",
             request_sha256,
             {"final_status": final_status, "report_artifact": identity.as_dict()},
+            verify_after_append=False,
         )
-        events = ledger.verify()
+        # No semantic, source, request, artifact, report, resource, or ledger
+        # replay follows the final durable lifecycle publication.
+        return completed_result
     elif existing.payload["final_status"] != final_status:
         raise AllCasesIntegrityError("completed status differs from replay")
     _verify_outer_artifact_leaf_set(artifacts_root, events, allow_one_orphan=False)
@@ -4056,6 +4108,7 @@ def _prepare_mutation(project_root: Path | str) -> tuple[Path, AllCasesConfig, P
     verify_failed_predecessor_attempt(root)
     verify_failed_attempt2_predecessor(root)
     verify_failed_attempt3_predecessor(root)
+    verify_failed_attempt4_predecessor(root)
     run_root = _fixed_run_root(root, create=True)
     return root, config, run_root
 
@@ -4550,6 +4603,7 @@ def verify_ai_all_cases(project_root: Path | str) -> AllCasesRun:
     verify_failed_predecessor_attempt(root)
     verify_failed_attempt2_predecessor(root)
     verify_failed_attempt3_predecessor(root)
+    verify_failed_attempt4_predecessor(root)
     run_root = _fixed_run_root(root, create=False)
     return _verify_with_services(
         root,
