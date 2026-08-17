@@ -1,0 +1,446 @@
+authority = "UNSEALED_LOCAL_AI_ALL_CASES_RESEARCH"
+campaign_design_id = "ai_all_cases_v1"
+code_commit = "49cef9c35558bf8b5b17e8e3fa364652e8d04ac9"
+config_id = "ai_all_cases_v1_attempt5"
+dependency_lock_sha256 = "d5192590f9c80d3c2f23f65323d4963ee3fb9aa209301770651f4376c491bd1b"
+implementation_sha256 = "672581be9f40bafc4bcd32f692605910facc53713c62be4c9e8652b94506da20"
+precommitted_at_utc = "2026-08-17T06:33:37Z"
+schema_version = "systematic_fx.ai_all_cases_config.v5"
+
+[bindings]
+anchor_policy_recipe_sha256 = "f4ca07e8b5d2468ff41ebfedf42ef4dd894f08080294e4738c23f696136830fd"
+catalog_summaries_canonical_json = "{\"base_event\":{\"candidate_count\":1740,\"catalog_sha256\":\"d9d09d524f9e2be2427a1243fbb391dcb6c74b3072942e0e4b555563734c1909\"},\"context\":{\"candidate_count\":13,\"catalog_sha256\":\"0c841f2f00201fc13bb349a4c27c75b7b1eee806a9f53c7b604275f3d4644fef\"},\"delay\":{\"candidate_count\":6,\"catalog_sha256\":\"4e15608da834278faf7f9ac290eab0fd64b4bb0f338fc80bb3c7fcfdd2de1b15\"},\"direct_model\":{\"candidate_count\":288,\"catalog_sha256\":\"8c3a81a9e9a5429e6c08d8cb6fe6b18718f62d7ee285e67858f79fdfa052b8b0\"},\"entry\":{\"candidate_count\":9,\"catalog_sha256\":\"e5719ceb390f3d71e218e7d1726d60336c8baab44b5022fa7a0be69224fc64f5\"},\"exit\":{\"candidate_count\":85,\"catalog_sha256\":\"1f49ea3d10dc191e04ecb571aa591983681d16edc82686ed8f6e1a28fbfe8815\"},\"meta_model\":{\"candidate_count\":192,\"catalog_sha256\":\"154ba02db47b32af25e167c575217661606c055807d5136ac354908ba6cf1818\"},\"time_filter\":{\"candidate_count\":14,\"catalog_sha256\":\"7c87e4ca19be14012a1322abffd1e0bb211a67397692930ea6ff0e00a7cde1c5\"}}"
+catalog_summaries_sha256 = "1423f4207669c0d3c46cd407f89b2b6f3217dec11dfeb01b93f397ff3192479d"
+complete_strategy_recipe_sha256 = "087acf54de64ac42d790f0b1906b784933393969318390b257aae0b9f8652e2b"
+direct_catalog_sha256 = "8c3a81a9e9a5429e6c08d8cb6fe6b18718f62d7ee285e67858f79fdfa052b8b0"
+entry_catalog_sha256 = "e5719ceb390f3d71e218e7d1726d60336c8baab44b5022fa7a0be69224fc64f5"
+exit_catalog_sha256 = "1f49ea3d10dc191e04ecb571aa591983681d16edc82686ed8f6e1a28fbfe8815"
+meta_catalog_sha256 = "154ba02db47b32af25e167c575217661606c055807d5136ac354908ba6cf1818"
+ml_contract_canonical_json = "{\"admission\":{\"direct\":\"TRAIN_ONLY_ABSOLUTE_SCORE_QUANTILE_THEN_EXPECTED_GROSS_TICKS_GT_14\",\"meta\":\"TRAIN_ONLY_POSITIVE_PROBABILITY_QUANTILE\",\"quantile_method\":\"NUMPY_HIGHER\",\"tie_policy\":\"ADMIT_ALL_EQUAL_TO_THRESHOLD\",\"world_policy\":\"EACH_WORLD_OWN_TRAIN_ONLY_THRESHOLD_BEFORE_CONTROL_ALIGNMENT\"},\"catalogs\":{\"direct_count\":288,\"direct_sha256\":\"8c3a81a9e9a5429e6c08d8cb6fe6b18718f62d7ee285e67858f79fdfa052b8b0\",\"meta_count\":192,\"meta_sha256\":\"154ba02db47b32af25e167c575217661606c055807d5136ac354908ba6cf1818\"},\"compute_caps\":{\"direct_fits\":3024,\"hgb_max_leaf_nodes\":15,\"hgb_max_nodes_per_tree\":29,\"hgb_max_trees\":200,\"linear_max_iterations\":50000,\"maximum_raw_features\":221,\"maximum_search_model_fits\":5040,\"maximum_training_rows_per_model\":110000,\"maximum_transformed_features\":442,\"meta_fits\":2016,\"wf_holdout_fits\":0},\"compute_feasibility\":{\"benchmark_date\":\"2026-08-15\",\"benchmark_environment\":{\"machine\":\"arm64\",\"numpy\":\"2.5.1\",\"operating_system\":\"macOS-26.5.1-arm64-arm-64bit\",\"python\":\"3.12.13\",\"sklearn\":\"1.9.0\",\"thread_environment\":{\"MKL_NUM_THREADS\":\"1\",\"NUMEXPR_NUM_THREADS\":\"1\",\"OMP_NUM_THREADS\":\"1\",\"OPENBLAS_NUM_THREADS\":\"1\",\"VECLIB_MAXIMUM_THREADS\":\"1\"}},\"benchmark_sha256\":\"db1e46ee350bd3ab7a6b12dd748258d9109109ae237d9afeae293719399a09b5\",\"cache_retention_benchmark\":{\"cache_final_state_count\":0,\"cache_peak_retained_bytes\":123170964,\"cache_peak_state_count\":21,\"measurement\":\"CPYTHON_REACHABLE_SIZE_HGB15_200_TREE_STATE_WITH_110000_UNIQUE_FLOAT_SCORES\",\"single_state_retained_bytes\":5865284,\"validation\":\"SECOND_RATE_HIT_OR_TYPED_ONE_SIDED_DISCARD_EVICTION_BEFORE_NEXT_FIT_RECIPE;TERMINAL_FINAL_ZERO_AND_24_CHUNK_AGGREGATE\"},\"execution_path\":\"SEQUENTIAL_ONE_FIT_AT_A_TIME_NO_WORKER_DIVISOR\",\"extrapolation\":{\"cached_training_matrix_auxiliary_reserve_bytes\":2147483648,\"cached_training_matrix_lifetime\":\"DIRECT_PHASE_GLOBAL_MAX_36_KEYS_META_CHUNK_LOCAL_CLEAR_MAX_2_KEYS_42_MATRICES\",\"cached_training_matrix_value_bytes_upper\":8020320000,\"combined_transient_plus_live_cache_peak_bytes\":15281508432,\"feature_bar_and_artifact_reserve_bytes\":2147483648,\"maximum_search_model_fits\":5040,\"memory_cap_bytes\":34359738368,\"memory_safety_factor_denominator\":1,\"memory_safety_factor_numerator\":2,\"orchestration_and_io_reserve_seconds\":10000,\"peak_measured_resident_bytes\":2848915456,\"safety_adjusted_peak_resident_bytes\":30563016864,\"safety_adjusted_sequential_ml_seconds\":116522,\"sequential_ml_seconds\":77681,\"symbolic_phase_reserve_seconds\":36440,\"time_safety_factor_denominator\":2,\"time_safety_factor_numerator\":3,\"total_campaign_projected_seconds\":162962,\"wall_cap_seconds\":172800,\"within_memory_cap\":true,\"within_wall_cap\":true,\"worst_live_meta_training_matrix_count\":42},\"measurements\":[{\"benchmark_random_state\":20860815,\"candidate_kind\":\"DIRECT\",\"dataset_generation_milliseconds\":83,\"dataset_recipe\":{\"feature_generator\":\"NUMPY_PCG64_STANDARD_NORMAL_FLOAT64\",\"feature_seed\":20860815,\"missingness\":\"RAW_DIAGONAL_FIRST_221_ONE_NAN_PER_COLUMN\",\"raw_feature_count\":221,\"row_count\":110000,\"target\":\"0.5*X0-0.25*X1+0.125*X2+PCG64_NEXT_NORMAL*0.1_BEFORE_MISSINGNESS\"},\"dataset_recipe_sha256\":\"460be44ee2bf5b8ea84769814acd1f1b24ff8602a522cccf36ecd8428fb81fbf\",\"fit_milliseconds\":126,\"learner_id\":\"ENET_A\",\"learner_recipe_sha256\":\"1ecf3e340adde98573f82bdd99786be51b31afd8fc37d09c711ab6763c10764d\",\"maximum_observed_leaf_count\":0,\"maximum_resident_bytes\":2848915456,\"preprocess_milliseconds\":584,\"process_wall_milliseconds\":793,\"raw_feature_count\":221,\"row_count\":110000,\"scale_features\":true,\"thread_count\":1,\"transformed_feature_count\":442,\"tree_count\":0},{\"benchmark_random_state\":20860815,\"candidate_kind\":\"DIRECT\",\"dataset_generation_milliseconds\":83,\"dataset_recipe\":{\"feature_generator\":\"NUMPY_PCG64_STANDARD_NORMAL_FLOAT64\",\"feature_seed\":20860815,\"missingness\":\"RAW_DIAGONAL_FIRST_221_ONE_NAN_PER_COLUMN\",\"raw_feature_count\":221,\"row_count\":110000,\"target\":\"0.5*X0-0.25*X1+0.125*X2+PCG64_NEXT_NORMAL*0.1_BEFORE_MISSINGNESS\"},\"dataset_recipe_sha256\":\"460be44ee2bf5b8ea84769814acd1f1b24ff8602a522cccf36ecd8428fb81fbf\",\"fit_milliseconds\":117,\"learner_id\":\"ENET_B\",\"learner_recipe_sha256\":\"4a5caa088083d22f2455b984f602433f319891bf8383b13020fc4043407cb89e\",\"maximum_observed_leaf_count\":0,\"maximum_resident_bytes\":2848915456,\"preprocess_milliseconds\":584,\"process_wall_milliseconds\":784,\"raw_feature_count\":221,\"row_count\":110000,\"scale_features\":true,\"thread_count\":1,\"transformed_feature_count\":442,\"tree_count\":0},{\"benchmark_random_state\":20860815,\"candidate_kind\":\"DIRECT\",\"dataset_generation_milliseconds\":84,\"dataset_recipe\":{\"feature_generator\":\"NUMPY_PCG64_STANDARD_NORMAL_FLOAT64\",\"feature_seed\":20860815,\"missingness\":\"RAW_DIAGONAL_FIRST_221_ONE_NAN_PER_COLUMN\",\"raw_feature_count\":221,\"row_count\":110000,\"target\":\"0.5*X0-0.25*X1+0.125*X2+PCG64_NEXT_NORMAL*0.1_BEFORE_MISSINGNESS\"},\"dataset_recipe_sha256\":\"460be44ee2bf5b8ea84769814acd1f1b24ff8602a522cccf36ecd8428fb81fbf\",\"fit_milliseconds\":24734,\"learner_id\":\"HGB_7\",\"learner_recipe_sha256\":\"86c913888ef535c100dc5e22dfdf3adfa87813978a4d71bc474880eac20c90da\",\"maximum_observed_leaf_count\":7,\"maximum_resident_bytes\":1347682304,\"preprocess_milliseconds\":478,\"process_wall_milliseconds\":25296,\"raw_feature_count\":221,\"row_count\":110000,\"scale_features\":false,\"thread_count\":1,\"transformed_feature_count\":442,\"tree_count\":200},{\"benchmark_random_state\":20860815,\"candidate_kind\":\"DIRECT\",\"dataset_generation_milliseconds\":82,\"dataset_recipe\":{\"feature_generator\":\"NUMPY_PCG64_STANDARD_NORMAL_FLOAT64\",\"feature_seed\":20860815,\"missingness\":\"RAW_DIAGONAL_FIRST_221_ONE_NAN_PER_COLUMN\",\"raw_feature_count\":221,\"row_count\":110000,\"target\":\"0.5*X0-0.25*X1+0.125*X2+PCG64_NEXT_NORMAL*0.1_BEFORE_MISSINGNESS\"},\"dataset_recipe_sha256\":\"460be44ee2bf5b8ea84769814acd1f1b24ff8602a522cccf36ecd8428fb81fbf\",\"fit_milliseconds\":28976,\"learner_id\":\"HGB_15\",\"learner_recipe_sha256\":\"73c79466c0a75b0023767bc2ba3eb24d71dc1f23609ccbd9c690e7bd1f865e96\",\"maximum_observed_leaf_count\":15,\"maximum_resident_bytes\":1366048768,\"preprocess_milliseconds\":471,\"process_wall_milliseconds\":29529,\"raw_feature_count\":221,\"row_count\":110000,\"scale_features\":false,\"thread_count\":1,\"transformed_feature_count\":442,\"tree_count\":200},{\"benchmark_random_state\":20860815,\"candidate_kind\":\"META\",\"dataset_generation_milliseconds\":83,\"dataset_recipe\":{\"feature_generator\":\"NUMPY_PCG64_STANDARD_NORMAL_FLOAT64\",\"feature_seed\":20860815,\"missingness\":\"RAW_DIAGONAL_FIRST_221_ONE_NAN_PER_COLUMN\",\"raw_feature_count\":221,\"row_count\":110000,\"target\":\"INT8[(0.5*X0-0.25*X1+0.125*X2+PCG64_NEXT_NORMAL*0.1)>0]_BEFORE_MISSINGNESS\"},\"dataset_recipe_sha256\":\"a14bfd4e98c6e60044b23bf06f00475f71b29c21c1ba0d8e885c7307e46254f8\",\"fit_milliseconds\":5833,\"learner_id\":\"META_ENET\",\"learner_recipe_sha256\":\"9f9b2cec421ae2b5bf0d75db9aa4c62c2f52fc74d98c05d759574f02c6ebcb01\",\"maximum_observed_leaf_count\":0,\"maximum_resident_bytes\":2848915456,\"preprocess_milliseconds\":584,\"process_wall_milliseconds\":6500,\"raw_feature_count\":221,\"row_count\":110000,\"scale_features\":true,\"thread_count\":1,\"transformed_feature_count\":442,\"tree_count\":0},{\"benchmark_random_state\":20860815,\"candidate_kind\":\"META\",\"dataset_generation_milliseconds\":84,\"dataset_recipe\":{\"feature_generator\":\"NUMPY_PCG64_STANDARD_NORMAL_FLOAT64\",\"feature_seed\":20860815,\"missingness\":\"RAW_DIAGONAL_FIRST_221_ONE_NAN_PER_COLUMN\",\"raw_feature_count\":221,\"row_count\":110000,\"target\":\"INT8[(0.5*X0-0.25*X1+0.125*X2+PCG64_NEXT_NORMAL*0.1)>0]_BEFORE_MISSINGNESS\"},\"dataset_recipe_sha256\":\"a14bfd4e98c6e60044b23bf06f00475f71b29c21c1ba0d8e885c7307e46254f8\",\"fit_milliseconds\":27722,\"learner_id\":\"META_HGB_7\",\"learner_recipe_sha256\":\"e783f1a4b08c48e78dd26f1feab26b96d00e87481e8b719a078653de31fa223d\",\"maximum_observed_leaf_count\":7,\"maximum_resident_bytes\":1349992448,\"preprocess_milliseconds\":455,\"process_wall_milliseconds\":28261,\"raw_feature_count\":221,\"row_count\":110000,\"scale_features\":false,\"thread_count\":1,\"transformed_feature_count\":442,\"tree_count\":200}],\"null_permutation_benchmark\":{\"circular_wall_milliseconds\":38,\"matched_wall_milliseconds\":439,\"maximum_resident_bytes\":351272960,\"row_count\":110000,\"scenario\":\"ONE_CONTRACT_UNEVEN_FEASIBLE_OUTCOME_SPANS_EXACT_BIJECTION\",\"validation\":\"NO_ROW_DROP_NO_SAME_SPAN_SOURCE_DISTINCT_WORLD_MAPPINGS\"},\"raw_feature_count\":221,\"row_count\":110000,\"schema\":\"systematic_fx.ai_all_cases_ml_compute_feasibility.v2\",\"thread_count_each_fit\":1,\"transformed_feature_count\":442,\"workload_projection\":[{\"candidate_kind\":\"DIRECT\",\"fit_recipe_catalog_sha256\":\"0c9265fd8b1159ee40c0097170a26116befa0666b666c6a901b98e62a83fd531\",\"fit_recipe_count\":36,\"learner_id\":\"ENET_A\",\"maximum_raw_feature_count\":213,\"maximum_training_rows\":110000,\"maximum_transformed_feature_count\":426,\"measured_max_shape_process_wall_milliseconds\":793,\"projected_sequential_seconds\":600,\"scope_keys\":[\"B3\",\"B4\",\"B5\",\"B6\",\"B7\",\"B8\",\"SEARCH_FINAL\"],\"search_fit_count\":756,\"worlds\":[\"REAL\",\"CIRCULAR_TARGET\",\"MATCHED_TARGET\"]},{\"candidate_kind\":\"DIRECT\",\"fit_recipe_catalog_sha256\":\"0c9265fd8b1159ee40c0097170a26116befa0666b666c6a901b98e62a83fd531\",\"fit_recipe_count\":36,\"learner_id\":\"ENET_B\",\"maximum_raw_feature_count\":213,\"maximum_training_rows\":110000,\"maximum_transformed_feature_count\":426,\"measured_max_shape_process_wall_milliseconds\":784,\"projected_sequential_seconds\":593,\"scope_keys\":[\"B3\",\"B4\",\"B5\",\"B6\",\"B7\",\"B8\",\"SEARCH_FINAL\"],\"search_fit_count\":756,\"worlds\":[\"REAL\",\"CIRCULAR_TARGET\",\"MATCHED_TARGET\"]},{\"candidate_kind\":\"DIRECT\",\"fit_recipe_catalog_sha256\":\"0c9265fd8b1159ee40c0097170a26116befa0666b666c6a901b98e62a83fd531\",\"fit_recipe_count\":36,\"learner_id\":\"HGB_7\",\"maximum_raw_feature_count\":213,\"maximum_training_rows\":110000,\"maximum_transformed_feature_count\":426,\"measured_max_shape_process_wall_milliseconds\":25296,\"projected_sequential_seconds\":19124,\"scope_keys\":[\"B3\",\"B4\",\"B5\",\"B6\",\"B7\",\"B8\",\"SEARCH_FINAL\"],\"search_fit_count\":756,\"worlds\":[\"REAL\",\"CIRCULAR_TARGET\",\"MATCHED_TARGET\"]},{\"candidate_kind\":\"DIRECT\",\"fit_recipe_catalog_sha256\":\"0c9265fd8b1159ee40c0097170a26116befa0666b666c6a901b98e62a83fd531\",\"fit_recipe_count\":36,\"learner_id\":\"HGB_15\",\"maximum_raw_feature_count\":213,\"maximum_training_rows\":110000,\"maximum_transformed_feature_count\":426,\"measured_max_shape_process_wall_milliseconds\":29529,\"projected_sequential_seconds\":22324,\"scope_keys\":[\"B3\",\"B4\",\"B5\",\"B6\",\"B7\",\"B8\",\"SEARCH_FINAL\"],\"search_fit_count\":756,\"worlds\":[\"REAL\",\"CIRCULAR_TARGET\",\"MATCHED_TARGET\"]},{\"candidate_kind\":\"META\",\"fit_recipe_catalog_sha256\":\"a62f2ecc05817240d02ef43f93a1308b600353eb0b88f2d8db567d6ce17ece32\",\"fit_recipe_count\":48,\"learner_id\":\"META_ENET\",\"maximum_raw_feature_count\":221,\"maximum_training_rows\":110000,\"maximum_transformed_feature_count\":442,\"measured_max_shape_process_wall_milliseconds\":6500,\"projected_sequential_seconds\":6552,\"scope_keys\":[\"B3\",\"B4\",\"B5\",\"B6\",\"B7\",\"B8\",\"SEARCH_FINAL\"],\"search_fit_count\":1008,\"worlds\":[\"REAL\",\"CIRCULAR_TARGET\",\"MATCHED_TARGET\"]},{\"candidate_kind\":\"META\",\"fit_recipe_catalog_sha256\":\"a62f2ecc05817240d02ef43f93a1308b600353eb0b88f2d8db567d6ce17ece32\",\"fit_recipe_count\":48,\"learner_id\":\"META_HGB_7\",\"maximum_raw_feature_count\":221,\"maximum_training_rows\":110000,\"maximum_transformed_feature_count\":442,\"measured_max_shape_process_wall_milliseconds\":28261,\"projected_sequential_seconds\":28488,\"scope_keys\":[\"B3\",\"B4\",\"B5\",\"B6\",\"B7\",\"B8\",\"SEARCH_FINAL\"],\"search_fit_count\":1008,\"worlds\":[\"REAL\",\"CIRCULAR_TARGET\",\"MATCHED_TARGET\"]}]},\"control_alignment\":{\"controls\":\"TOP_SCORE_WITHOUT_REPLACEMENT_FROM_INDEPENDENTLY_REQUESTED_POOL\",\"count_key\":\"DECISION_DATE_PLUS_PREDICTED_OR_BASE_DIRECTION\",\"direct_count_target\":\"REAL_POST_GLOBAL_OCCUPANCY_MASK\",\"distinctness\":\"REAL_CIRCULAR_MATCHED_ALIGNED_MASKS_PAIRWISE_DISTINCT\",\"failure\":\"CANDIDATE_LOCAL_INELIGIBLE_NO_ROW_DROP\",\"meta_count_target\":\"REAL_ANCHOR_GATE_BEFORE_SYMBOLIC_PATH_EXECUTION\",\"proof\":\"SOURCE_AND_ALIGNED_MASK_SHA_COUNTS_AND_SELECTED_ROW_IDS\",\"scope\":\"SEARCH_OOF_AND_EACH_WF_OR_HOLDOUT_PARTITION\"},\"cost_ticks\":14,\"cross_validation\":{\"block_sizes\":[59,59,59,59,59,58,58,58],\"decision_date_count\":469,\"final_refit_key\":\"SEARCH_FINAL\",\"outer_fold_keys\":[\"B3\",\"B4\",\"B5\",\"B6\",\"B7\",\"B8\"],\"outer_policy\":\"EXPANDING_PRIOR_BLOCKS_VALIDATE_NEXT_B3_THROUGH_B8\",\"purge\":\"DROP_TRAIN_LABEL_EXIT_NS_GTE_FIRST_VALIDATION_ENTRY_NS\",\"score_artifact_binding\":\"CANDIDATE_TASK_TIMEFRAME_HORIZON_PLUS_EXACT_ROW_ENTRY_EXIT_AND_PER_FOLD_OUTCOME_LINEAGE_OPPORTUNITY_LATTICE_ENTRY_SCHEDULE_SOURCE_MATRIX_AND_EXACT_OUTCOME_VALUES_SHA256\",\"selection_evidence\":\"CONCATENATED_OUTER_VALIDATION_ONLY\"},\"direct_row_execution\":{\"decision_date\":\"VERIFIED_NATIVE_BAR_SOURCE_DATE\",\"decision_ns\":\"EXACT_FEATURE_CUTOFF_CLOCK_COMPLETED_NATIVE_BAR_END\",\"economics\":{\"allocated_fixed_cost_ticks\":5,\"entry_adverse_ticks\":2,\"exit_adverse_ticks\":2,\"total_friction_ticks\":14,\"variable_cost_ticks\":5},\"eligibility\":\"ONE_STRUCTURALLY_ELIGIBLE_COMPLETED_NATIVE_TIMEFRAME_BAR\",\"entry\":\"FLOOR_NEXT_EXACT_SAME_LINEAGE_5M_FIRST_TRADE_NS_TO_ONE_SECOND;DECISION_NS_LTE_ENTRY_NS_LT_DECISION_NS_PLUS_300S\",\"entry_price\":\"EXACT_NEXT_SAME_LINEAGE_5M_OPEN_TICKS\",\"entry_schedule_proof\":\"RUNNER_BINDS_ROW_DECISION_ENTRY_NEXT5M_LINEAGE_SHA_BEFORE_1S;LATER_1S_STREAM_MUST_VALIDATE_SCHEDULED_INTERVAL_AND_OPEN\",\"exact_evaluation_response\":\"CALLER_SUPPLIED_SIGNED_INT64_TERMINAL_MOVE_TICKS;DIRECTION_TIMES_MOVE_MINUS_14\",\"path\":\"EXACT_SAME_CONTRACT_OUTCOME_SPAN_SEGMENT_FULL_1H_3H_6H\",\"post_freeze_invalid_no_fill_shortened_censored_or_cross_lineage\":\"FATAL_INTEGRITY_FAILURE_NEVER_ROW_EXCLUSION\",\"target\":\"EXACT_SIGNED_TERMINAL_MOVE_TICKS_DIV_CAUSAL_NATIVE_ATR20_TICKS\"},\"feature_engine\":{\"alignment\":\"LATEST_COMPLETED_BAR_AT_OR_BEFORE_DECISION_NS_COMPATIBLE_WITH_CONTRACT_SPAN_AND_SAME_DATE_SEGMENT_OR_ADJACENT_DATE_96H_BRIDGE\",\"artifact\":\"FROZEN_TYPED_ROWS_SHA256_OVER_SOURCE_INPUT_COMMITMENT_EXACT_FLOAT_HEX_VALUES_NATIVE_ATR_FULL_ROW_LINEAGE_RETAINED_INDEXES_ALIGNED_BAR_INDEXES_AND_EXPERT_SHA\",\"atr\":\"SIMPLE_ROLLING_MEAN_TRUE_RANGE_20\",\"bollinger\":\"CURRENT_MINUS_ROLLING_MEAN_DIV_POPULATION_STD_ZERO_TO_ZERO\",\"buy_sell_missing\":\"AVAILABILITY_ZERO_AND_IMBALANCE_ZERO_IF_WINDOW_INCOMPLETE\",\"close_location_and_channel_zero_range\":\"ONE_HALF\",\"continuity\":\"SAME_DATE_EXACT_TIMEFRAME_ADJACENCY_AND_SAME_CONTRACT_SPAN_SEGMENT;SAME_DATE_SAME_CONTRACT_SPAN_SEGMENT_TRANSITION_EXACT_ONE_HOUR_CLOSED_INTERVAL_BRIDGE;CROSS_DATE_SAME_CONTRACT_SPAN_ADJACENT_STAGE_RANK_GAP_LTE_96H;FEATURE_HISTORY_ONLY_NO_ANCHOR_ALIGNMENT_STRUCTURAL_LATTICE_OR_EXECUTION_AUTHORIZATION;RESET_ALL_ROLLING_AND_EMA_AT_EVERY_BREAK_AND_STAGE\",\"cross_agreement\":\"PRODUCT_OF_TERNARY_SIGNS\",\"ema\":\"ADJUST_FALSE_ALPHA_2_DIV_SPAN_PLUS_1_SEEDED_FIRST_CLOSE\",\"expert_8\":\"TYPED_SYMBOLIC_CAUSAL_EXPERT_ARTIFACTS_ONLY_EXACT_RATIONAL_TO_FLOAT64_WITH_ORDER_ANCHOR_POLICY_RECIPE_FORMULA_AND_ARTIFACT_SHA_BINDING\",\"expert_8_formula_sha256\":\"40e0268b60a31b9fd8629f85bdef7266a25b0be225069c5527ab4a544e7cb61c\",\"minimum_completed_bars_each_timeframe\":50,\"normalizer\":\"SAME_TIMEFRAME_CAUSAL_ATR20_TICKS_NO_TICK_SIZE_RECONVERSION\",\"ohlc_input_units\":\"VERIFIED_TRADE_BAR_INTEGER_TICKS_REPRESENTED_AS_FLOAT64\",\"rsi\":\"SIMPLE_ROLLING_GAIN_LOSS_MEAN_ZERO_ZERO_TO_50\",\"stochastic_d\":\"SIMPLE_MEAN_LAST_3_K\",\"time\":\"DECISION_NS_UTC_SECOND_OF_DAY_AND_MONDAY_ZERO_WEEKDAY\",\"time_feature_clock\":\"DECISION_NS_ONLY_NEVER_SCHEDULED_ENTRY_NS\",\"volume_z\":\"CURRENT_MINUS_ROLLING_MEAN_DIV_POPULATION_STD_ZERO_TO_ZERO\",\"vwap_price\":\"HLC3_WEIGHTED_BY_VOLUME_ZERO_VOLUME_TO_HLC3_MEAN\"},\"feature_sets\":{\"FLOW_TIME_REGIME_90\":{\"count\":90,\"ordered_names_sha256\":\"49421439466685938c69282c5b936d0c32f0b30fd59180321660d98a657a5ad9\"},\"FULL_MTF_213\":{\"count\":213,\"ordered_names_sha256\":\"7078d76ff6672fdc0e48f3483d5fa3ba9293c43b948ff505980c70aeb9bdc757\"},\"FULL_MTF_PLUS_EXPERT_221\":{\"count\":221,\"ordered_names_sha256\":\"9f8c3cb8c4a77ca53d133f9873679ca792437174ad7010f38d64622b7067c6be\"},\"PRICE_GEOMETRY_36\":{\"count\":36,\"ordered_names_sha256\":\"178066bad780ac165d4526027ba0e2a1284003e4fe187bb942b9364e40d30078\"},\"TECHNICAL_STATE_159\":{\"count\":159,\"ordered_names_sha256\":\"68be5fe013789ad94bd60f52685aad0739c8885b62b8bf96d2852033e29d552b\"}},\"fit_recipe_sharing\":{\"cache_key\":\"FIT_RECIPE_ID_WORLD_FOLD_TRAINING_ROWS_SHA256\",\"chunk_policy\":\"ONE_FRESH_CACHE_PER_FIXED_CHUNK_RESUME_SAFE\",\"direct_recipe_count\":144,\"direct_recipe_sha256\":\"0c9265fd8b1159ee40c0097170a26116befa0666b666c6a901b98e62a83fd531\",\"eviction\":\"SECOND_RATE_VARIANT_HIT_IMMEDIATELY_POPS_STATE;ONE_SIDED_RATE_EARLY_EXIT_REQUIRES_EXPLICIT_TYPED_DISCARD_BEFORE_TERMINAL_PROOF\",\"meta_recipe_count\":96,\"meta_recipe_sha256\":\"a62f2ecc05817240d02ef43f93a1308b600353eb0b88f2d8db567d6ce17ece32\",\"policy\":\"RATE_VARIANTS_SHARE_PREPROCESSOR_PREDICTOR_AND_TRAINING_SCORES\",\"rate_specific_state\":\"TRAIN_SCORE_QUANTILE_THRESHOLD_AND_CANDIDATE_ARTIFACT_ONLY\",\"schedule_evidence\":{\"asymmetric_early_exit_policy\":\"DISCARD_LEFTOVER_STATES_BEFORE_NEXT_FIT_RECIPE_AND_AT_CHUNK_TERMINUS;TYPED_DISCARDED_STATE_COUNT_PLUS_FINAL_ZERO\",\"direct\":{\"cache_hits\":3024,\"candidate_count\":288,\"candidate_kind\":\"DIRECT\",\"eviction_count\":3024,\"final_state_count\":0,\"fit_count\":3024,\"peak_state_count\":21,\"rate_variants_per_fit_recipe\":2},\"fit_order\":[{\"fold_key\":\"B3\",\"null_world\":\"REAL\"},{\"fold_key\":\"B4\",\"null_world\":\"REAL\"},{\"fold_key\":\"B5\",\"null_world\":\"REAL\"},{\"fold_key\":\"B6\",\"null_world\":\"REAL\"},{\"fold_key\":\"B7\",\"null_world\":\"REAL\"},{\"fold_key\":\"B8\",\"null_world\":\"REAL\"},{\"fold_key\":\"B3\",\"null_world\":\"CIRCULAR_TARGET\"},{\"fold_key\":\"B4\",\"null_world\":\"CIRCULAR_TARGET\"},{\"fold_key\":\"B5\",\"null_world\":\"CIRCULAR_TARGET\"},{\"fold_key\":\"B6\",\"null_world\":\"CIRCULAR_TARGET\"},{\"fold_key\":\"B7\",\"null_world\":\"CIRCULAR_TARGET\"},{\"fold_key\":\"B8\",\"null_world\":\"CIRCULAR_TARGET\"},{\"fold_key\":\"B3\",\"null_world\":\"MATCHED_TARGET\"},{\"fold_key\":\"B4\",\"null_world\":\"MATCHED_TARGET\"},{\"fold_key\":\"B5\",\"null_world\":\"MATCHED_TARGET\"},{\"fold_key\":\"B6\",\"null_world\":\"MATCHED_TARGET\"},{\"fold_key\":\"B7\",\"null_world\":\"MATCHED_TARGET\"},{\"fold_key\":\"B8\",\"null_world\":\"MATCHED_TARGET\"},{\"fold_key\":\"SEARCH_FINAL\",\"null_world\":\"REAL\"},{\"fold_key\":\"SEARCH_FINAL\",\"null_world\":\"CIRCULAR_TARGET\"},{\"fold_key\":\"SEARCH_FINAL\",\"null_world\":\"MATCHED_TARGET\"}],\"meta\":{\"cache_hits\":2016,\"candidate_count\":192,\"candidate_kind\":\"META\",\"eviction_count\":2016,\"final_state_count\":0,\"fit_count\":2016,\"peak_state_count\":21,\"rate_variants_per_fit_recipe\":2},\"schedule_sha256\":\"2a12ed74f842bf1137ff071196107bc9e85ceb4e2e6a703e94aa30b624c035c8\",\"schema\":\"systematic_fx.ai_all_cases_shared_fit_cache_schedule.v1\",\"total_cache_hits\":5040,\"total_fit_count\":5040},\"terminal_proof\":\"24_TYPED_CHUNK_EVIDENCE_RECORDS_AGGREGATE_FITS_HITS_DISCARDS_EVICTIONS_FINAL_ZERO_AND_PEAK_LTE_21\"},\"ineligibility\":{\"allowed_candidate_local_reasons\":[\"INSUFFICIENT_FOLD_ROWS\",\"NULL_DERANGEMENT_INFEASIBLE\",\"ALL_MISSING_TRAINING_COLUMN\",\"SINGLE_CLASS_TRAINING_TARGET\",\"MODEL_NONCONVERGENCE\",\"REAL_MASK_EMPTY\",\"CONTROL_ALIGNMENT_INSUFFICIENT\",\"CONTROL_MASKS_NOT_DISTINCT\",\"INSUFFICIENT_BASE_STRATEGY_RANK\"],\"handling\":\"RECORD_REASON_AND_CONTINUE_ALL_480_FIXED_CANDIDATES\",\"integrity_schema_hash_lineage_or_roundtrip_errors\":\"FATAL_NEVER_BLANKET_CAUGHT\"},\"learners\":{\"ENET_A\":{\"alpha_hex\":\"0x1.0624dd2f1a9fcp-10\",\"fit_intercept\":true,\"l1_ratio_hex\":\"0x1.999999999999ap-4\",\"max_iter\":50000,\"selection\":\"cyclic\",\"tol_hex\":\"0x1.5798ee2308c3ap-27\"},\"ENET_B\":{\"alpha_hex\":\"0x1.47ae147ae147bp-7\",\"fit_intercept\":true,\"l1_ratio_hex\":\"0x1.0000000000000p-1\",\"max_iter\":50000,\"selection\":\"cyclic\",\"tol_hex\":\"0x1.5798ee2308c3ap-27\"},\"HGB_15\":{\"early_stopping\":false,\"l2_regularization_hex\":\"0x1.0000000000000p+0\",\"learning_rate_hex\":\"0x1.999999999999ap-5\",\"loss\":\"squared_error\",\"max_bins\":255,\"max_iter\":200,\"max_leaf_nodes\":15,\"min_samples_leaf\":40},\"HGB_7\":{\"early_stopping\":false,\"l2_regularization_hex\":\"0x1.0000000000000p+0\",\"learning_rate_hex\":\"0x1.999999999999ap-5\",\"loss\":\"squared_error\",\"max_bins\":255,\"max_iter\":200,\"max_leaf_nodes\":7,\"min_samples_leaf\":40},\"META_ENET\":{\"C_hex\":\"0x1.999999999999ap-4\",\"class_weight\":\"balanced\",\"fit_intercept\":true,\"max_iter\":50000,\"n_jobs\":1,\"penalty\":\"l2\",\"solver\":\"liblinear\",\"tol_hex\":\"0x1.5798ee2308c3ap-27\"},\"META_HGB_7\":{\"early_stopping\":false,\"l2_regularization_hex\":\"0x1.0000000000000p+0\",\"learning_rate_hex\":\"0x1.999999999999ap-5\",\"loss\":\"log_loss\",\"max_bins\":255,\"max_iter\":200,\"max_leaf_nodes\":7,\"min_samples_leaf\":40}},\"libraries\":{\"numpy\":\"2.5.1\",\"scipy\":\"1.18.0\",\"sklearn\":\"1.9.0\",\"sklearn_required\":\"1.9.0\"},\"master_seed\":\"ai-all-cases-v1\",\"match_strata\":{\"coarse\":\"DECISION_TIMEFRAME_PLUS_DECISION_NS_UTC_4H_BUCKET\",\"exact\":\"COARSE_PLUS_DECISION_DATE_WEEKDAY_PLUS_NATIVE_ATR20_FLOOR_LOG2_TICK_BIN\",\"source\":\"PURE_CAUSAL_FEATURE_ROWS_NO_TARGETS_OR_GLOBAL_QUANTILES\"},\"meta_oos_execution\":{\"decision_ns\":\"ANCHOR_RECORD_ANCHOR_NS_EQUALS_ANCHOR_KEY_INDEX_3\",\"forbidden_pre_freeze_fields\":[\"ACTUAL_ENTRY_NS\",\"ENTRY_FILL_TICKS\",\"ACTUAL_EXIT_NS\",\"REALIZED_NET_TICKS\"],\"gate\":\"SEARCH_FINAL_PROBABILITY_OVER_FROZEN_SYMBOLIC_ORDER_ID_AT_ANCHOR\",\"recipe_binding\":\"TYPED_COMPLETE_STRATEGY_RECIPE_ENTRY_ORDER_BATCH_AND_FORMULA_BOUND_EXPERT_ARTIFACTS_MUST_MATCH_CERTIFIED_ANCHOR_ENTRY_EXIT_POLICY_IDS\",\"routing\":\"ALIGNED_GATE_FILTER_THEN_SHARED_SYMBOLIC_PATH_EVALUATOR\"},\"nulls\":{\"algorithmic_complexity\":\"O_N_LOG_N_TIME_AND_O_N_MEMORY_NO_RECURSIVE_MATCHING\",\"circular\":\"SAME_CONTRACT_CHRONOLOGICAL_ROTATION_BY_MAXIMUM_SPAN_COUNT_OR_COMPLEMENT_WITH_CANONICAL_SPAN_BLOCK_FALLBACK\",\"matched\":\"SAME_CONTRACT_SPAN_BLOCK_ORDER_BY_COARSE_STRATUM_EXACT_STRATUM_SEEDED_ROW_HASH_THEN_SPAN_SAFE_MAXIMUM_COUNT_ROTATION_WITH_CANONICAL_SAME_SPAN_SWAP_OR_UNIQUE_SPAN_ROTATION_IF_EQUAL_TO_CIRCULAR\",\"matched_distinct_failure\":\"CANDIDATE_LOCAL_NULL_DERANGEMENT_INFEASIBLE\",\"matched_fallback_counts\":\"REALIZED_EXACT_COARSE_SAME_CONTRACT_ANY_COUNTS_COMMITTED\",\"order\":[\"REAL\",\"CIRCULAR_TARGET\",\"MATCHED_TARGET\"],\"per_fold_refit\":true,\"pre_fit_probe\":\"B3_THROUGH_B8_PURGED_PREFIXES_AND_SEARCH_FINAL_BOTH_NULLS\",\"row_policy\":\"EXACT_BIJECTION_NO_CARDINALITY_CHANGE_OR_SILENT_DROP\",\"same_outcome_span_source\":\"PROHIBITED\",\"seed_derivation\":\"UINT32_FIRST_8_HEX_SHA256_CANONICAL_JSON_OF_MASTER_IDENTITY_WORLD_FOLD_PURPOSE\",\"target_source_scope\":\"TRAINING_PREFIX_ONLY\"},\"occupancy\":{\"direct_application\":\"ONCE_AFTER_CHRONOLOGICAL_B3_THROUGH_B8_CONCATENATION_OR_PARTITION_MASK\",\"equality_rule\":\"ENTRY_AT_PREVIOUS_EXIT_IS_ALLOWED\",\"meta_application\":\"ANCHOR_GATE_FILTERS_FROZEN_SYMBOLIC_ORDER_IDS_THEN_SHARED_SYMBOLIC_ENGINE_RESOLVES_FILL_EXIT_AND_GLOBAL_OCCUPANCY\",\"position_limit\":\"ONE_GLOBAL_POSITION_PER_CANDIDATE_MASK\",\"reset\":\"NEVER_AT_FOLD_CONTRACT_SPAN_SEGMENT_OR_DATE_BOUNDARY\",\"signal_accounting\":\"RAW_SIGNAL_COUNT_AND_DAYS_FROM_REQUESTED_PRE_OCCUPANCY;FILLS_DAYS_AND_PNL_FROM_POST_OCCUPANCY_ADMITTED\"},\"oos_prediction_freeze\":{\"direct_input\":\"TYPED_CAUSAL_FEATURE_ROWS_ONLY;VALUES_AND_NATIVE_TIMEFRAME_ATR_DERIVED_INTERNALLY;RAW_ARRAY_OR_REVERSED_SIDE_CHANNEL_UNREPRESENTABLE\",\"schedule_binding\":\"EXACT_CANDIDATE_FEATURE_SET_TASK_TIMEFRAME_HORIZON_STAGE_ROW_DATE_DECISION_ENTRY_CONTRACT_SPAN_SEGMENT_ENTRY_SCHEDULE_AND_CAUSAL_FEATURE_ROWS_SHA\",\"scheduled_exit\":\"ENTRY_NS_PLUS_EXACT_CANDIDATE_HORIZON_NS\",\"stage_date_domain\":\"TYPED_STAGE_PARTITION_DATE_CERTIFICATE_WITH_DERIVED_UPSTREAM_PLAN_SHA_AND_ARTIFACT_SHA;ECONOMICS_EMITS_EXPLICIT_ZERO_FOR_EVERY_CERTIFIED_DATE\"},\"opportunity_lattice\":{\"binding\":\"SHA256_IN_TRAINING_MATRIX_SCHEDULE_MASK_AND_OUTCOME_ROWS\",\"coverage\":\"EVERY_5M_BAR_END_DECISION_PLUS_300S_THROUGH_PLUS_25200S\",\"freeze\":\"CANDIDATE_INDEPENDENT_FEATURE_ONLY_BEFORE_ANY_1S_OUTCOME_OPEN\",\"horizon\":\"UNIFORM_7H_SAME_LINEAGE_5M_COMPLETE_CASE_COVERS_MAXIMUM_DIRECT_6H\",\"post_freeze_missing_or_cross_lineage\":\"FATAL_INTEGRITY_FAILURE\",\"row_cardinality\":\"RAW_ANCHORS_AND_ELIGIBILITY_BITS_COMMITTED;ONLY_PRE_OUTCOME_ELIGIBLE_SUBSET_ALLOWED;NO_OUTCOME_DEPENDENT_ROW_DROP\",\"schedule_identity_check\":\"EVERY_FEATURE_ROW_ID_MUST_EQUAL_LATTICE_DECISION_ENTRY_SOURCE_DATE_CONTRACT_OUTCOME_SPAN_SEGMENT_AND_ELIGIBLE_TRUE\"},\"portable_model_artifact\":{\"deep_freeze\":\"CANDIDATE_LEARNER_RECIPE_AND_PREDICTOR_NESTED_JSON_IMMUTABLE\",\"hgb_validation\":\"EXACTLY_200_TREES_AND_CANDIDATE_SPECIFIC_7_OR_15_LEAF_CAP\",\"learner_identity\":\"EXACT_SERIALIZED_PARAMETER_DOCUMENT_SHA_BOUND_INSIDE_PREDICTOR_DISTINGUISHES_ENET_A_ENET_B_HGB_7_HGB_15_AND_META_LEARNERS\"},\"preprocessing\":{\"all_missing_training_column\":\"MODEL_INELIGIBLE_FAIL_CLOSED\",\"imputation\":\"TRAIN_ONLY_COLUMN_MEDIAN\",\"missing_indicators\":\"ONLY_COLUMNS_MISSING_IN_TRAINING\",\"scaling\":\"TRAIN_ONLY_STANDARD_SCALER_LINEAR_MODELS_ONLY\"},\"schema\":\"systematic_fx.ai_all_cases_ml_contract.v1\",\"search_economics_and_selection\":{\"daily_domain\":\"EVERY_FROZEN_DECISION_DATE_WITH_EXPLICIT_ZERO\",\"direct_family\":\"DECISION_TIMEFRAME_SECONDS_PLUS_FEATURE_SET_ID\",\"diversity\":{\"action_identity\":\"ROW_ID_PLUS_DIRECTION_POST_GLOBAL_OCCUPANCY\",\"daily_pnl_rule\":\"25_TIMES_COVARIANCE_NUMERATOR_SQUARED_LT_16_TIMES_VARIANCE_PRODUCT\",\"jaccard_rule\":\"5_TIMES_INTERSECTION_LT_4_TIMES_UNION\",\"policy\":\"GREEDY_IN_FROZEN_ECONOMIC_RANK_ORDER\",\"zero_variance\":\"FAIL_CLOSED_PAIR_REJECTED\"},\"exact_arithmetic\":\"INT64_INPUT_TICKS_INTEGER_AGGREGATES_AND_FRACTION_EV\",\"family_maximum\":2,\"gates\":{\"active_entry_days_minimum\":30,\"active_signal_days_minimum\":40,\"fills_each_outer_minimum\":5,\"fills_minimum\":48,\"positive_outer_minimum\":4,\"positive_reporting_minimum\":3,\"profit_factor_minimum\":\"21/20\",\"raw_signals_each_outer_minimum\":6,\"raw_signals_each_reporting_minimum\":6,\"raw_signals_minimum\":60,\"real_net_strictly_above_both_controls\":true,\"standard_and_18_tick_stress_net_strictly_positive\":true},\"meta_family\":\"INHERITED_PREFIX_OR_SEARCH_FINAL_BASE_TRIGGER_FAMILY\",\"ranking\":[\"POSITIVE_OUTER_VALIDATION_COUNT_DESC\",\"WORST_OUTER_VALIDATION_EV_DESC\",\"STRESS_18_TICK_NET_DESC\",\"MEDIAN_OUTER_VALIDATION_EV_DESC\",\"MAXIMUM_DRAWDOWN_ASC\",\"CANONICAL_CANDIDATE_ID_ASC\"],\"selection_direct_maximum\":4,\"selection_meta_maximum\":4,\"selection_total_maximum\":8},\"seed_derivation_example_real_b3\":4178228316,\"symbolic_meta_rank\":{\"certificate\":\"TYPED_WORLD_FOLD_EXACT_TRAIN_DATE_DOMAIN_ORDERED_ZERO_TO_24_STRATEGIES_WITH_EXACT_BASE_CONTEXT_TIME_FILTER_DELAY_ANCHOR_ENTRY_EXIT_POLICY_IDS_CATALOG_REDERIVATION_TRIGGER_FAMILY_AND_DERIVED_STRATEGY_ID\",\"expert_rebuild\":\"REBUILD_EACH_EXPERT_ARTIFACT_FROM_CERTIFIED_CATALOG_POLICY_ORDER_AND_EXIT;PLUS_EXPERT_LAST_EIGHT_FLOAT_HEX_MUST_EQUAL_EXACT_RATIONAL_CONVERSION\",\"final\":\"FULL_SEARCH_RERANK_THEN_FIT_AND_FREEZE_AVAILABLE_STRATEGY_SLOTS\",\"missing_rank\":\"CANDIDATE_LOCAL_INSUFFICIENT_BASE_STRATEGY_RANK\",\"outer\":\"RERANK_COMPLETE_SYMBOLIC_STRATEGIES_USING_PRIOR_OUTER_TRAIN_ONLY\",\"rank_slot_count\":24,\"world\":\"RERUN_SYMBOLIC_RANK_PREPROCESS_AND_FIT_INDEPENDENTLY_FOR_EACH_NULL_WORLD\"},\"thread_environment\":{\"MKL_NUM_THREADS\":\"1\",\"NUMEXPR_NUM_THREADS\":\"1\",\"OMP_NUM_THREADS\":\"1\",\"OPENBLAS_NUM_THREADS\":\"1\",\"VECLIB_MAXIMUM_THREADS\":\"1\"},\"typed_continuous_validation\":{\"policy\":\"RAW_CONTINUOUS_ARRAYS_REQUIRE_SIGNED_UNSIGNED_OR_FLOATING_NUMPY_DTYPE;BOOL_STRING_AND_OBJECT_COERCION_PROHIBITED\",\"scope\":\"CAUSAL_BARS_FEATURE_ARTIFACTS_TRAINING_MATRICES_AND_ATR_INPUTS\"},\"typed_integer_validation\":{\"direct_outcome_inputs\":\"RAW_FILL_EXIT_SPAN_SEGMENT_ENTRY_AND_TERMINAL_ARRAYS_MUST_HAVE_SIGNED_OR_UNSIGNED_INTEGER_DTYPE;BOOL_FLOAT_AND_STRING_COERCION_PROHIBITED\",\"meta_outcome_inputs\":\"RAW_BASE_ENTRY_LABEL_EXIT_SPAN_SEGMENT_AND_DIRECTION_ARRAYS_REQUIRE_INTEGER_DTYPE;DIRECTIONS_EXACTLY_PLUS_OR_MINUS_ONE;BOOL_FLOAT_STRING_REJECTED\",\"outcome_free_sources\":\"BAR_END_DECISION_ENTRY_SPAN_SEGMENT_AND_STAGE_RANK_ARRAYS_REQUIRE_RAW_SIGNED_OR_UNSIGNED_INTEGER_DTYPE;BOOL_FLOAT_AND_STRING_REJECTED\"},\"wf_holdout\":{\"daily_domain\":\"FULL_VERIFIED_STAGE_DECISION_DATE_TUPLE_BOUND_IN_PRE_OUTCOME_SCHEDULE\",\"daily_output\":\"EXACT_INTEGER_NET_TICKS_ALL_DATES_EXPLICIT_ZERO_BY_WORLD\",\"mask_before_outcome\":true,\"model\":\"SEARCH_FINAL_FROZEN_CANONICAL_ARTIFACT_REOPENED_BYTE_EXACT\",\"refit\":false},\"wf_refit\":false}"
+ml_contract_sha256 = "69524458457b6c138cd60c95095933f709a6aafa8d76d07d7b383745619109c1"
+stage_a_chunk_plan_sha256 = "3f8f1769f7fc7e6531b7ec8928da06c069d9e7888301c3eb746f9100b19d2144"
+symbolic_contract_canonical_json = "{\"axes\":{\"anchor_policy_recipe_sha256\":\"f4ca07e8b5d2468ff41ebfedf42ef4dd894f08080294e4738c23f696136830fd\",\"base_event_catalog_sha256\":\"d9d09d524f9e2be2427a1243fbb391dcb6c74b3072942e0e4b555563734c1909\",\"base_event_count\":1740,\"complete_strategies_per_anchor\":765,\"complete_strategy_maximum\":195840,\"complete_strategy_recipe_sha256\":\"087acf54de64ac42d790f0b1906b784933393969318390b257aae0b9f8652e2b\",\"context_catalog_sha256\":\"0c841f2f00201fc13bb349a4c27c75b7b1eee806a9f53c7b604275f3d4644fef\",\"context_count\":13,\"delay_catalog_sha256\":\"4e15608da834278faf7f9ac290eab0fd64b4bb0f338fc80bb3c7fcfdd2de1b15\",\"delay_count\":6,\"entry_catalog_sha256\":\"e5719ceb390f3d71e218e7d1726d60336c8baab44b5022fa7a0be69224fc64f5\",\"entry_count\":9,\"exit_catalog_sha256\":\"1f49ea3d10dc191e04ecb571aa591983681d16edc82686ed8f6e1a28fbfe8815\",\"exit_count\":85,\"logical_anchor_policy_count\":1900080,\"reference_horizons_seconds\":[1800,3600,7200,10800,21600],\"reference_score_cell_count\":9500400,\"time_filter_catalog_sha256\":\"7c87e4ca19be14012a1322abffd1e0bb211a67397692930ea6ff0e00a7cde1c5\",\"time_filter_count\":14},\"causal_expert_features\":{\"formula_contract\":{\"allowed_inputs\":[\"BaseEventCandidate\",\"ContextSpec\",\"AnchorPolicy\",\"AnchorRecord\",\"FrozenEntryOrder\",\"ExitPolicy\"],\"decision_cutoff\":\"ANCHOR_NS_FEATURE_STATE_ONLY\",\"denominator_policy\":\"NORMALIZED_POSITIVE_EXACT_RATIONAL\",\"disallowed_inputs\":[\"EntryAttempt\",\"ExitOutcome\",\"OneSecondPath\",\"TradeBarOutcomeRows\",\"REALIZED_FILL_OR_EXIT\"],\"feature_names\":[\"expert_signal_strength\",\"expert_event_age_native_bars\",\"expert_context_relation\",\"expert_atr_ticks\",\"expert_signal_range_atr\",\"expert_time_to_entry_seconds\",\"expert_planned_entry_distance_atr\",\"expert_reward_risk_ratio\"],\"features\":[{\"formula\":\"direction_sign*(trigger_close_ticks-trigger_open_ticks)*atr_denominator/atr_sum_ticks;atr_sum_ticks=0=>0\",\"name\":\"expert_signal_strength\"},{\"formula\":\"(anchor_ns-trigger_end_ns)/(trigger_timeframe_seconds*1e9);require_nonnegative\",\"name\":\"expert_event_age_native_bars\"},{\"formula\":\"ANY=0;EMA_RELATION=relation;EFFICIENCY_TREND=1;EFFICIENCY_RANGE=-1;VOLATILITY_EXPANDING=1;VOLATILITY_CONTRACTING=-1\",\"name\":\"expert_context_relation\"},{\"formula\":\"atr_sum_ticks/atr_denominator\",\"name\":\"expert_atr_ticks\"},{\"formula\":\"(trigger_high_ticks-trigger_low_ticks)*atr_denominator/atr_sum_ticks;atr_sum_ticks=0=>0\",\"name\":\"expert_signal_range_atr\"},{\"formula\":\"(expires_ns-valid_from_ns)/1e9;opportunity_window_not_fill_latency\",\"name\":\"expert_time_to_entry_seconds\"},{\"formula\":\"MARKET=0;otherwise direction_sign*(order_ticks-trigger_close_ticks)*atr_denominator/atr_sum_ticks;atr_sum_ticks=0=>0\",\"name\":\"expert_planned_entry_distance_atr\"},{\"formula\":\"BRACKET=take_profit_atr/stop_loss_atr;TRAILING=activation_atr/trail_atr;BREAK_EVEN=activation_atr/initial_stop_atr;TERMINAL_OR_RULE=0\",\"name\":\"expert_reward_risk_ratio\"}],\"schema\":\"systematic_fx.ai_all_cases_causal_expert_features.v1\",\"value_representation\":\"NORMALIZED_INTEGER_NUMERATOR_DENOMINATOR\"},\"formula_sha256\":\"40e0268b60a31b9fd8629f85bdef7266a25b0be225069c5527ab4a544e7cb61c\",\"realized_execution_inputs\":\"PROHIBITED_BY_BUILDER_SIGNATURE\",\"value_count\":8,\"value_representation\":\"NORMALIZED_EXACT_RATIONAL\"},\"causality\":{\"completed_bars_only\":true,\"cross_date_carry\":\"same contract/outcome span, adjacent allowlisted active dates, gap <= 96h\",\"cross_stage_warmup\":\"PROHIBITED\",\"intra_date_continuity\":\"exact timeframe adjacency and lineage\",\"stage_or_fold_start\":\"RESET\"},\"deduplication\":{\"behavioral_key\":\"canonical ordered AnchorRecord tuple\",\"complete_behavioral_key\":\"ordered lineage path-outcome leaf SHA-256 tuple\",\"empty_masks\":\"collapse to earliest semantic rank\",\"outcome_access\":false,\"raw_gate_precedence\":\"RAW_GATE_ELIGIBLE_THEN_LOWEST_POLICY_RANK_WITH_RAW_MASK_SHA_BOUND\",\"representative\":\"raw-gate-eligible first, then lowest policy_rank\",\"stage_a_alias_evidence\":\"PREDECESSOR_HASH_CHAIN_IN_POLICY_RANK_ORDER\",\"stage_a_global_scope\":\"ALL_64_CHUNKS_BEFORE_OUTCOME_SELECTION\"},\"execution_boundary\":{\"direct_feature_entry_commitment\":\"decision_ns mapped to floor(exact next same-lineage 5m first_trade_ns,1s)/open_ticks\",\"direct_missing_next_5m\":\"EXCLUDED_AND_COMMITTED_BEFORE_OUTCOMES\",\"outcomes_in_signal_or_mask_api\":false,\"preoutcome_structural_complete_case\":\"candidate-independent exact same-lineage gap-free 7h 5m anchor lattice\",\"raw_and_evaluable_support_both_committed\":true,\"reference_friction_ticks\":14,\"reference_scoring_is_separate\":true,\"same_execution_segment\":true,\"unexpected_censor_after_complete_case\":\"FATAL_CANDIDATE_INELIGIBLE\"},\"feature_only_controls\":{\"circular\":\"deterministic rotation within date/contract/span/segment; saturated/singleton orbits copy identity rows with zero paired contrast; aggregate mask must differ\",\"circular_pair_evidence\":\"REAL_KEY_CONTROL_KEY_PRESERVED_LAG_NS_COMMITTED\",\"fallback_tier_counts\":\"DERIVED_EXACTLY_FROM_COMMITTED_MATCHED_PAIR_ROWS\",\"full_structural_path_seconds\":25200,\"master_seed\":\"ai-all-cases-v1\",\"matched_fallback_levels\":[\"L0 same group exact volatility/regime/ATR/stop-drift geometry exact 4h bucket\",\"L1 same group exact volatility/regime/ATR/stop-drift geometry adjacent cyclic 4h bucket\",\"L2 same group exact volatility/regime/ATR/stop-drift geometry any bucket\",\"L3 same group exact volatility/regime exact 4h bucket\",\"L4 same group exact volatility/regime same-or-adjacent cyclic 4h bucket\",\"L5 same group exact volatility/regime any bucket\",\"L6 same date/contract/span/segment any causal stratum\"],\"matched_sampling\":\"WITHOUT_REPLACEMENT_DETERMINISTIC_HASH_TIEBREAK\",\"matched_solver\":\"DETERMINISTIC_COMPLETE_MAXIMUM_BIPARTITE_MATCHING;INELIGIBLE_ONLY_IF_MAXIMUM_CARDINALITY_LT_REAL_SUPPORT\",\"missing_or_nonidentity_impossible\":\"SAMPLE_INELIGIBLE\",\"native_trigger_geometry\":\"EXACT_CANDIDATE_TF_OHLC_AND_ATR20\",\"per_group_cardinality\":\"EXACT\",\"preserved_real_lag\":\"CONTROL_TRIGGER_END=CONTROL_ANCHOR_NS-REAL_LAG_NS\",\"rule_exit_schedules\":\"SEPARATE_REAL_CIRCULAR_MATCHED_FEATURE_ONLY_COMMITMENTS\",\"signal_count_basis\":\"STRUCTURALLY_EVALUABLE_REAL_MASK_NOT_RAW_PRE_FILTER_MASK\"},\"indicators\":{\"atr_period\":20,\"ema_rounding\":\"ROUND_HALF_EVEN_FIXED_POINT_1E6_SMA_SEED\",\"integer_or_rational_comparisons\":true,\"signal_timeframes_seconds\":[300,1800,3600]},\"schema\":\"systematic_fx.ai_all_cases_symbolic_engine.v1\",\"stage_a_chunking\":{\"chunk_count\":64,\"chunk_plan_sha256\":\"3f8f1769f7fc7e6531b7ec8928da06c069d9e7888301c3eb746f9100b19d2144\",\"last_chunk_policy_count\":29673,\"policy_rows_per_chunk_maximum\":29689,\"resume_order\":\"LOWEST_INCOMPLETE_CHUNK_INDEX\",\"runtime_representation\":\"CANDIDATE_SHARED_INTEGER_BITSET_CUBE\",\"structural_filter_timing\":\"BEFORE_ANY_1S_OUTCOME_LOAD\"},\"stage_a_selection\":{\"active_signal_days_minimum\":40,\"family_direction_maximum\":8,\"family_maximum\":16,\"gate_support_basis\":\"RAW_PRE_STRUCTURAL_FILTER\",\"horizon_active_entry_days_minimum\":30,\"horizon_fill_count_minimum\":48,\"horizon_net_ticks_strictly_positive\":true,\"horizon_positive_reporting_groups_minimum\":2,\"maximum\":256,\"minimum_positive_horizons\":3,\"ordering\":[\"ROBUST_HORIZON_COUNT_DESC\",\"WORST_GROUP_EV_DESC\",\"MEDIAN_HORIZON_EV_DESC\",\"SUPPORT_DESC\",\"POLICY_RANK_ASC\"],\"outcome_and_behavior_basis\":\"STRUCTURALLY_EVALUABLE_MASK\",\"raw_signals_each_reporting_group_minimum\":6,\"raw_signals_minimum\":60,\"stage_b_pair_budget\":{\"application_order\":\"AFTER_GLOBAL_DEDUP_IN_FROZEN_MINIMAX_RANK_ORDER\",\"budget_decision_sha256_required\":true,\"maximum_real_circular_matched_anchor_entry_pairs\":100000,\"overflow\":\"REJECT_CANDIDATE_AND_CONTINUE_FROZEN_ORDER\",\"pair_cost_formula\":\"EVALUABLE_SUPPORT_COUNT*9_ENTRY_POLICIES*3_WORLDS\",\"world_count\":3},\"unexpected_censored_count_required\":0},\"stage_b_chunking\":{\"chunk_count\":64,\"empty_selection_chunk_bounds\":{\"count\":0,\"first\":1,\"last\":0},\"evaluation_microbatch_size\":64,\"recipe_rows_per_chunk_maximum\":3060,\"search_block_aggregates\":[\"B1\",\"B2\",\"B3\",\"B4\",\"B5\",\"B6\",\"B7\",\"B8\"],\"serialization\":\"FACTORED_COVERAGE_SHAPES_ONCE_PER_CHUNK;PER_STRATEGY_BEHAVIOR_LEAF_ROWS_HASH_REFERENCED;STRICT_FULL_EVALUATION_REPLAY\",\"streaming_reset_safety\":\"MERGE_REQUIRES_NONOVERLAPPING_PATH_INTERVALS;EVERY_FROZEN_ANCHOR_HAS_SAME_LINEAGE_7H_COVERAGE_SO_OCCUPANCY_END_LTE_CHUNK_END\"},\"stage_b_execution\":{\"allocated_fixed_cost_ticks\":5,\"atr_distance_rounding\":\"ROUND_HALF_EVEN_MINIMUM_ONE_TICK\",\"break_even_same_second\":\"INITIAL_STOP_BEFORE_ACTIVATION;ACTIVATION_ROW_EXACT_BREAK_EVEN;LATER_ROW_STOP_REFERENCE_APPLIES_ADVERSE_OPEN_GAP\",\"censored_or_unfilled_occupies\":false,\"entry_adverse_ticks\":2,\"entry_interval\":\"[ANCHOR_NS,TIF_EXPIRY_NS)\",\"exit_adverse_ticks\":2,\"friction_algebra\":\"direction*(exit_reference-entry_reference)-2_entry-2_exit-5_variable-5_fixed\",\"limit_fill\":\"LONG touch low<=limit reference=min(limit,open); SHORT touch high>=limit reference=max(limit,open)\",\"market_fill\":\"first observed 1s open in [anchor,anchor+300s)\",\"maximum_concurrent_positions_per_strategy\":1,\"maximum_required_path_seconds\":25200,\"no_shortened_horizon\":true,\"path_coverage\":\"LOADER_VERIFIED_FULL_INTERVAL_OR_CENSORED\",\"path_gap_handling\":\"LOCAL_CONTIGUOUS_INTERVAL_NO_BRIDGE\",\"rule_exit\":\"first observed 1s open at-or-after completed rule bar before cap\",\"same_entry_second\":\"ADVERSE_STOP_ELIGIBLE_FAVORABLE_EXIT_INELIGIBLE\",\"same_second_tp_sl\":\"STOP_FIRST\",\"standard_friction_ticks\":14,\"stop_fill\":\"LONG touch high>=stop reference=max(stop,open); SHORT touch low<=stop reference=min(stop,open)\",\"stress_friction_ticks\":18,\"take_profit_fill\":\"EXACT_TARGET_NO_FAVORABLE_GAP_CREDIT\",\"terminal_trade_staleness_seconds_strictly_less_than\":300,\"trailing_same_second\":\"PRIOR_STOP_FIRST_THEN_FAVORABLE_UPDATE_THEN_UPDATED_STOP\",\"variable_cost_ticks\":5},\"stage_b_lattice\":{\"entry\":{\"limit_atr_retrace_fractions\":[\"1/4\",\"1/2\"],\"market_variant_count\":1,\"stop_signal_extreme_buffer_ticks\":[1,4],\"time_in_force_seconds\":[1800,3600],\"variant_count\":9},\"exit\":{\"bracket\":{\"cap_seconds\":[3600,10800,21600],\"stop_loss_atr_fractions\":[\"1/2\",\"1\",\"3/2\",\"2\"],\"take_profit_atr_fractions\":[\"1/2\",\"1\",\"3/2\",\"2\",\"3\"],\"variant_count\":60},\"break_even\":{\"activation_atr_fractions\":[\"1/2\",\"1\"],\"cap_seconds\":[10800,21600],\"initial_stop_atr_fractions\":[\"1/2\",\"1\"],\"variant_count\":8},\"rule\":{\"cap_seconds\":[10800,21600],\"rules\":[\"OPPOSITE_TRIGGER\",\"CONTEXT_INVALID\"],\"variant_count\":4},\"terminal_horizons_seconds\":[1800,3600,7200,10800,21600],\"trailing\":{\"activation_atr_fractions\":[\"1/2\",\"1\"],\"cap_seconds\":[10800,21600],\"trail_atr_fractions\":[\"1/2\",\"1\"],\"variant_count\":8},\"variant_count\":85}},\"stage_b_search_gates\":{\"active_entry_days_minimum\":30,\"active_signal_days_minimum\":40,\"censored_count_required\":0,\"complete_fills_each_outer_validation_minimum\":5,\"complete_fills_minimum\":48,\"full_evaluable_mask_coverage_commitment_required_for_each_world\":true,\"minimum_positive_outer_validations\":4,\"minimum_positive_reporting_groups\":3,\"net_strictly_above_both_controls\":true,\"net_ticks_strictly_positive\":true,\"oof_block_keys\":[\"B3\",\"B4\",\"B5\",\"B6\",\"B7\",\"B8\"],\"profit_factor_minimum\":\"21/20\",\"raw_signals_each_outer_validation_minimum\":6,\"raw_signals_each_reporting_group_minimum\":6,\"raw_signals_minimum\":60,\"stress_18_tick_net_strictly_positive\":true},\"stage_b_vector_kernel\":{\"bounded_cache_release\":\"AFTER_EACH_MASK_ENTRY_85_RECIPE_BATCH\",\"budget_pair_scope\":\"AGGREGATE_FILLED_ANCHOR_ENTRY_PAIRS_ACROSS_ALL_WORLDS\",\"budget_projection_100k\":{\"artifact_sha256\":\"d544681e52cbe854135a5cdcb504d34d5d863bc213006a739a6da57d73809087\",\"cache_release_unit\":\"ONE_MASK_ONE_ENTRY_AFTER_85_RECIPES\",\"conservative_fixed_rows_per_second\":1000,\"conservative_numpy_bytes_per_second\":25000000,\"filled_anchor_entry_pairs\":100000,\"fixed_exit_outcome_rows\":8100000,\"loaded_one_second_row_count\":7573041,\"maximum_observed_rows_per_path\":21600,\"maximum_support_per_mask\":14842,\"peak_shared_kernel_cache_bytes_upper_bound\":1415564864,\"projected_seconds\":36440,\"python_full_path_iterations\":0,\"scanned_int64_bytes_upper_bound\":708480000000,\"schema\":\"systematic_fx.ai_all_cases_path_outcome.v1\",\"vector_passes_per_pair_upper_bound\":41,\"within_24h\":true},\"fixed_exit_variants_shared_per_anchor_order\":81,\"path_tensor\":\"NUMPY_INT64_START_OPEN_FAVORABLE_ADVERSE_PER_LINEAGE_DIRECTION\",\"public_batch_api\":\"SharedPathEvaluator.fixed_exit_outcome_batch\",\"python_full_path_loop_per_exit\":false,\"rule_exit_variants_logarithmic_query\":4},\"symbolic_meta_top24\":{\"final_symbolic_quota_applies\":false,\"rank_slot_count\":24,\"scope_keys\":[\"B3\",\"B4\",\"B5\",\"B6\",\"B7\",\"B8\",\"SEARCH_FINAL\"],\"training_prefix_only\":true}}"
+symbolic_contract_sha256 = "d9c81c606683eb8d9700dc216cd605a1f09388bd5aba07a8a7fea8096f79e0e3"
+
+[compute_caps]
+actual_model_fit_concurrency = 1
+artifact_bytes_maximum = 21474836480
+artifact_cap_enforcement_scope = "TOTAL_RUN_ROOT_UNIQUE_INODE_BYTES_PROJECTED_PREPUBLICATION_AND_POSTBOUNDARY_INCLUDING_PERMANENT_FAILED_EVENT_RESERVE"
+direct_candidate_chunk_count = 24
+direct_candidate_rows_per_chunk = 12
+feature_and_model_workers_maximum = 1
+mask_batch_default = 64
+mask_batch_maximum = 256
+meta_candidate_chunk_count = 24
+meta_candidate_rows_per_chunk = 8
+one_second_workers_maximum = 2
+resident_set_bytes_maximum = 34359738368
+resource_cap_enforcement_scope = "PER_PROCESS_INVOCATION_CHECKED_AT_GOVERNED_CHUNK_SERVICE_BOUNDARIES_AND_PRE_RELEASE_NOT_ASYNC_INTERRUPT_NOT_CUMULATIVE_ACROSS_PRE_AUTH_RESUME"
+search_fresh_campaign_projected_seconds = 162962
+search_source_replay_and_resume_multiplier_maximum = 2
+search_source_replay_and_resume_projected_seconds_maximum = 325924
+search_wall_seconds_maximum = 345600
+stage_a_chunk_count = 64
+stage_a_policy_rows_per_chunk_maximum = 29689
+stage_b_anchor_entry_world_pair_budget = 100000
+stage_b_chunk_count = 64
+stage_b_evaluation_microbatch_size = 64
+stage_b_recipe_rows_per_chunk_maximum = 3060
+verifier_wall_seconds_maximum = 172800
+
+[dataset]
+active_calendar_payload = "BARE_ORDERED_ISO_DATE_STRING_LIST"
+active_calendar_sha256 = "b414eae72afdb1c149977ff0ea5b672069380997d91e74adf0407e35836e8ac1"
+active_date_count = 1413
+active_date_end = "2026-07-31"
+active_date_start = "2022-01-03"
+available_timeframes_seconds = [1, 60, 300, 1800, 3600]
+consumed_timeframes_seconds = [1, 300, 1800, 3600]
+dataset_handoff_sha256 = "26b1bb96f7323cae13bbe5d670c12f3e85615bbb9aab56932ce6523e67af7b00"
+dataset_manifest_relative_path = "data/derived/bar_patterns/trade_bar_dataset_manifest/identity_sha256=b0ecab04cdd3626d3c488f9108c8e9184f5dd610f51950ab7e7f74a5b7524297/sha256=e2c066ce4c8a97c4059dd2499f881300f905f4bab589240f87532d5cc49599dc.json"
+dataset_manifest_sha256 = "e2c066ce4c8a97c4059dd2499f881300f905f4bab589240f87532d5cc49599dc"
+embargo_access = "PROHIBITED"
+source_manifest_sha256 = "14db710d8a522a83d495faeac1c05c9a0169f80f088dfbeb7a66b38f14b6e3de"
+split_plan_sha256 = "5594725f6769a706018d414a5b27e3903f1d7d1cc22c98e93b6e973ead1af043"
+timeframe_60_policy = "AVAILABLE_IN_MANIFEST_BUT_NOT_OPENED"
+
+[execution]
+allocated_fixed_cost_ticks = 5
+direct_ml_decision_anchor = "EXACT_FEATURE_CUTOFF_CLOCK_COMPLETED_NATIVE_BAR_END"
+direct_ml_entry_rule = "FLOOR_NEXT_EXACT_SAME_LINEAGE_5M_FIRST_TRADE_NS_TO_1S;ENTRY_TICKS_NEXT_5M_OPEN_TICKS"
+direct_ml_evaluation_response = "SIGNED_INT64_TERMINAL_MOVE_TICKS"
+direct_ml_feature_and_target_price_unit = "INTEGER_TICKS"
+direct_ml_feature_cutoff = "BAR_END_NS_LTE_DECISION_NS_NOT_ENTRY_NS"
+direct_ml_missing_next_5m_policy = "EXCLUDE_IN_FEATURE_ONLY_PRE_OUTCOME_OPPORTUNITY_LATTICE"
+direct_ml_post_freeze_invalid_path_policy = "FATAL_NO_ROW_EXCLUSION"
+direct_ml_training_target = "SIGNED_TERMINAL_MOVE_TICKS_DIV_CAUSAL_NATIVE_ATR20_TICKS"
+entry_adverse_ticks = 2
+entry_exit_recipe_sha256 = "087acf54de64ac42d790f0b1906b784933393969318390b257aae0b9f8652e2b"
+entry_lattice_canonical_json = "{\"limit\":{\"atr_retrace_fractions\":[\"1/4\",\"1/2\"],\"time_in_force_seconds\":[1800,3600]},\"market\":{\"variant_count\":1},\"stop\":{\"signal_extreme_buffer_ticks\":[1,4],\"time_in_force_seconds\":[1800,3600]}}"
+entry_variant_count = 9
+exit_lattice_canonical_json = "{\"bracket\":{\"cap_seconds\":[3600,10800,21600],\"stop_loss_atr_fractions\":[\"1/2\",\"1\",\"3/2\",\"2\"],\"take_profit_atr_fractions\":[\"1/2\",\"1\",\"3/2\",\"2\",\"3\"],\"variant_count\":60},\"break_even\":{\"activation_atr_fractions\":[\"1/2\",\"1\"],\"cap_seconds\":[10800,21600],\"initial_stop_atr_fractions\":[\"1/2\",\"1\"],\"variant_count\":8},\"rule\":{\"cap_seconds\":[10800,21600],\"rules\":[\"OPPOSITE_TRIGGER\",\"CONTEXT_INVALID\"],\"variant_count\":4},\"terminal\":{\"horizons_seconds\":[1800,3600,7200,10800,21600],\"variant_count\":5},\"trailing\":{\"activation_atr_fractions\":[\"1/2\",\"1\"],\"cap_seconds\":[10800,21600],\"trail_atr_fractions\":[\"1/2\",\"1\"],\"variant_count\":8}}"
+exit_variant_count = 85
+maximum_concurrent_positions_per_strategy = 1
+path_timeframe_seconds = 1
+standard_friction_ticks = 14
+stress_friction_ticks = 18
+structural_complete_case_anchor_lattice = "CANDIDATE_INDEPENDENT_7H_SAME_LINEAGE_5M_ONLY_PRE_OUTCOME"
+structural_complete_case_lookahead_seconds = 25200
+structural_complete_case_pre_filter_support_preserved = true
+structural_complete_case_unexpected_post_freeze_censor = "FAIL_CLOSED"
+structural_five_minute_gap_policy = "SPLIT_NONOVERLAPPING_LOCAL_INTERVALS_AND_CENSOR_CROSS_GAP_PATHS"
+terminal_adverse_ticks = 2
+variable_cost_ticks = 5
+
+[holdout_gates]
+active_entry_days_minimum = 18
+both_halves_net_ticks_strictly_positive = true
+contract_count_minimum = 2
+fills_minimum = 24
+holdout_halves_canonical_json = "[{\"day_count\":60,\"end_date\":\"2026-04-27\",\"half_key\":\"HOLDOUT_HALF_1\",\"start_date\":\"2026-02-16\"},{\"day_count\":60,\"end_date\":\"2026-07-08\",\"half_key\":\"HOLDOUT_HALF_2\",\"start_date\":\"2026-04-28\"}]"
+holm_alpha_denominator = 20
+holm_alpha_numerator = 1
+holm_family_maximum = 3
+holm_method = "HOLM_STEP_DOWN"
+net_over_maximum_drawdown_minimum_denominator = 4
+net_over_maximum_drawdown_minimum_numerator = 3
+net_ticks_strictly_positive = true
+null_deltas_strictly_positive = true
+profit_factor_minimum_denominator = 10
+profit_factor_minimum_numerator = 11
+terminal_fail_rule = "NO_PASS_AND_AT_LEAST_ONE_EVALUABLE_CANDIDATE_HARD_STATISTICAL_OR_ECONOMIC_FAIL"
+terminal_fail_status = "ONE_SHOT_UNSEALED_ALL_CASES_HOLDOUT_DIAGNOSTIC_FAIL"
+terminal_inconclusive_rule = "EVERY_AUTHORIZED_CANDIDATE_SAMPLE_INELIGIBLE_P_EQ_1"
+terminal_inconclusive_status = "ONE_SHOT_UNSEALED_ALL_CASES_HOLDOUT_DIAGNOSTIC_INCONCLUSIVE"
+terminal_pass_rule = "AT_LEAST_ONE_HOLM_REJECT_AND_ALL_GATES_PASS"
+terminal_pass_status = "ONE_SHOT_UNSEALED_ALL_CASES_HOLDOUT_DIAGNOSTIC_PASS"
+
+[lifecycle]
+artifact_publication = "CONTENT_ADDRESSED_CANONICAL_JSON_MODE_0444"
+candidate_or_recipe_change_after_precommit = "PROHIBITED"
+crash_policy = "OSERROR_RESUMABLE_VERIFIED_PREFIX_ONLY_BEFORE_HOLDOUT_AUTHORIZED"
+failed_branch = "DETERMINISTIC_INTEGRITY_ERROR_TO_FAILED_TERMINAL"
+holdout_masks_before_holdout_outcome_loader = true
+holdout_one_shot_error_policy = "ANY_EXCEPTION_AT_OR_AFTER_HOLDOUT_AUTHORIZED_TO_FAILED_TERMINAL_NO_RETRY"
+ledger = "ATOMIC_APPEND_ONLY_PREDECESSOR_HASHED_SINGLE_WRITER"
+partial_walk_forward_result_release = "PROHIBITED"
+search_outcomes_before_universe_freeze = "PROHIBITED"
+stage_order = ["PRECOMMITTED", "SEARCH_FEATURE_EVENT_UNIVERSE_AND_CATALOG_FROZEN", "SEARCH_TRAINING_SELECTION_AND_MODEL_ARTIFACTS_RELEASED_MAXIMUM_12", "WALK_FORWARD_MASKS_FROZEN_ALL_5_FOLDS", "WALK_FORWARD_RESULTS_RELEASED_ATOMIC_MAXIMUM_3", "HOLDOUT_AUTHORIZED", "HOLDOUT_MASKS_FROZEN", "HOLDOUT_RESULTS_RELEASED", "COMPLETED"]
+walk_forward_masks_before_any_walk_forward_outcome_loader = true
+zero_finalist_policy = "SKIP_ALL_LATER_FEATURE_AND_OUTCOME_PAYLOADS"
+
+[ml]
+direct_candidate_count = 288
+final_search_fold_key = "SEARCH_FINAL"
+hgb_maximum_leaves = 15
+hgb_maximum_nodes_per_tree = 29
+hgb_maximum_trees = 200
+linear_maximum_iterations = 50000
+maximum_raw_feature_count = 221
+maximum_raw_rows_per_model = 110000
+maximum_search_fit_count_after_rate_recipe_sharing = 5040
+maximum_transformed_feature_count = 442
+meta_candidate_count = 192
+null_world_order = ["REAL", "CIRCULAR_TARGET", "MATCHED_TARGET"]
+search_fit_fold_count = 7
+walk_forward_or_holdout_fit_count = 0
+
+[multiplicity]
+daily_grouping = "SIGNAL_ANCHOR_DECISION_DATE_NOT_EXIT_DATE"
+daily_vector_domain = "EVERY_FROZEN_DECISION_DATE_WITH_EXPLICIT_ZERO_FILL"
+holdout_economics_application = "AFTER_HOLM_REJECTION"
+holdout_family = "EVERY_FROZEN_WALK_FORWARD_FINALIST"
+holdout_method = "HOLM_STEP_DOWN"
+holdout_one_sided_alpha_denominator = 20
+holdout_one_sided_alpha_numerator = 1
+missing_or_error_p_value = 1
+multiplicity_comparison = "EXACT_FRACTION_LE_CRITICAL_VALUE"
+multiplicity_tie_break = "CANONICAL_CANDIDATE_ID_ASC"
+p_star = "MAX_SIGN_REAL_GT_ZERO_SIGN_REAL_MINUS_CIRCULAR_GT_ZERO_SIGN_REAL_MINUS_MATCHED_GT_ZERO"
+p_star_exact_test = "UPPER_TAIL_BINOMIAL_SIGN_TEST_WITH_RATIONAL_ARITHMETIC"
+p_star_no_nonzero_differences = "ONE"
+p_star_zero_differences = "EXCLUDED"
+search_alpha_or_significance_claim = "NONE_TRAINING_DEVELOPMENT_STAGE"
+search_descriptive_p_star_only = true
+search_method = "NO_INFERENTIAL_GATE"
+walk_forward_economics_application = "AFTER_BH_REJECTION"
+walk_forward_family = "EVERY_FROZEN_SEARCH_FINALIST_MAXIMUM_12"
+walk_forward_method = "BENJAMINI_HOCHBERG"
+walk_forward_one_sided_q_denominator = 20
+walk_forward_one_sided_q_numerator = 1
+
+[nulls]
+entire_ml_pipeline_refit_per_world = true
+master_seed = "ai-all-cases-v1"
+seed_derivation = "UINT32_FIRST8_HEX_SHA256_CANONICAL_JSON_MASTER_SEED_CANDIDATE_ID_WORLD_FOLD_KEY_PURPOSE"
+seed_type = "EXACT_UTF8_STRING"
+world_order = ["REAL", "CIRCULAR_TARGET", "MATCHED_TARGET"]
+
+[provenance]
+config_policy = "SOURCE_COMMIT_FIRST_THEN_DATA_ONLY_CONFIG_COMMIT"
+dependency_provisioning = "SEPARATE_UV_SYNC_LOCKED_OFFLINE_BEFORE_LAUNCH_UV_ABSENT_FROM_GOVERNED_EXEC_CHAIN"
+implementation_closure = "ENTIRE_CAMPAIGN_PACKAGE_ALL_SRC_SYSTEMATIC_FX_PY_ALL_SCRIPTS_PY_PROJECT_BLOBS"
+package_non_python_or_symlink_policy = "REJECT"
+production_launcher = "PINNED_USR_BIN_ENV_MINUS_SMALL_I_TO_PINNED_ABSOLUTE_CPYTHON_MINUS_SMALL_S_MINUS_CAPITAL_P_MINUS_B_MINUS_CAPITAL_S_ABSOLUTE_BOOTSTRAP_ONLY"
+production_launcher_argv_template = ["/usr/bin/env", "-i", "VIRTUAL_ENV=<PROJECT_ROOT>/.venv", "LC_ALL=C", "MKL_NUM_THREADS=1", "NUMEXPR_NUM_THREADS=1", "OMP_NUM_THREADS=1", "OPENBLAS_NUM_THREADS=1", "PYTHONHASHSEED=0", "PYTHONDONTWRITEBYTECODE=1", "TZ=UTC", "VECLIB_MAXIMUM_THREADS=1", "__CF_USER_TEXT_ENCODING=0x1F5:0x0:0x0", "/Users/seokminsong/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/bin/python3.12", "-s", "-P", "-B", "-S", "<PROJECT_ROOT>/campaigns/ai_all_cases_v1/bootstrap.py", "<ACTION>", "--project-root", "<PROJECT_ROOT>"]
+public_dependency_injection = "PROHIBITED"
+trusted_git = "ROOT_OWNED_ABSOLUTE_BINARY_EXACT_SHA_SIZE_VERSION_MINIMAL_ENV_EXPLICIT_GITDIR_NO_REPLACE_GRAFT_SHALLOW_ALTERNATE_LAZY_FETCH_OR_COMMIT_GRAPH"
+verification = "FRESH_PROCESS_READ_ONLY_EXACT_RECOMPUTATION"
+
+[recovery]
+attempt_number = 5
+catalog_identity_sha256 = "fcfd0dfcaacbcd630d340664a39e698f6528ef4f757f260bbbf77b5aea9dd155"
+catalogs_unchanged = true
+cost_identity_sha256 = "88849d988724ebc452d4ee9cc23fa85a917e64473f45c2f43fd6f0eda8f81070"
+costs_unchanged = true
+current_scientific_section_sha256 = "677248a6e59973445a08888ee2334e7a07095ee683803233542f349a9615bc04"
+embargo_opened = false
+failure_boundary = "AFTER_OUTER_COMPLETED_DURING_TERMINAL_SEARCH_PREFIX_SEMANTIC_REPLAY"
+failure_cause = "ML_INELIGIBILITY_PROVENANCE_BOUND_RECIPE_SEED_ID_INSTEAD_OF_PUBLIC_CANDIDATE_ID;COMPLETED_PRECEDED_TERMINAL_SEMANTIC_REPLAY"
+failure_class = "OUTER_COMPLETED_LEDGER_WITH_NONZERO_WRITER_EXIT"
+failure_outcomes_opened = true
+gate_identity_sha256 = "17230ab79eb75154084ed79bbbc2b95e917b44d07b6da4cccccbcea02b405e89"
+gates_unchanged = true
+holdout_opened = false
+implementation_delta = "SEPARATE_PUBLIC_ML_CANDIDATE_ID_FROM_SHARED_FIT_RECIPE_SEED_ID;SEARCH_SEMANTIC_PREFLIGHT_BEFORE_RELEASE;COMPLETION_PREFLIGHT_BEFORE_FINAL_EVENT"
+ml_ineligibility_candidate_binding_mismatch_count = 480
+ml_ineligibility_direct_binding_expected_sha256 = "65816380013ba7ac2e933d42f43c7675c5f3287b756ccca8c59ba5c1822394e8"
+ml_ineligibility_direct_binding_observed_sha256 = "1e11f58d64718fa6408adf727bfb682c1a8ba0e9e61a5706a1dd53ff2c0c8510"
+ml_ineligibility_direct_mismatch_count = 288
+ml_ineligibility_meta_binding_expected_sha256 = "9b7b6a3755c9427c9201d258cdc7377c5b9f598232ead886f52d675f95755b05"
+ml_ineligibility_meta_binding_observed_sha256 = "fd8b4ecae9f93c2d3b3b491a3cb1a019caed2f229307fe9fb2a8b0074bb79d76"
+ml_ineligibility_meta_mismatch_count = 192
+predecessor_code_commit = "d521b1c41e629e871377cd3b9b179d779b384f63"
+predecessor_completed_event_sha256 = "4d5ae8a1a119598c9ceab038962761d47739537290e37e9e8442ab310a7b8589"
+predecessor_config_commit = "0b0050ad250f4c9361691c1b1cecfbca34cb6dad"
+predecessor_config_file_sha256 = "badb3e2039b046af6542a550b68fec57cf672aed0ce0a45f5e111004e12996a1"
+predecessor_config_id = "ai_all_cases_v1_attempt4"
+predecessor_config_relative_path = "configs/research/ai_all_cases_v1_attempt4.toml"
+predecessor_config_semantic_sha256 = "3934c91ab1af257ee494e0cf590b94c3da3b1a1c93af0e42ff3604a82671c49d"
+predecessor_dependency_lock_sha256 = "d5192590f9c80d3c2f23f65323d4963ee3fb9aa209301770651f4376c491bd1b"
+predecessor_direct_ml_chunk_count = 24
+predecessor_failed_event_present = false
+predecessor_failure_code_present = false
+predecessor_final_status = "NO_WALK_FORWARD_FINALISTS_HOLDOUT_NOT_OPENED"
+predecessor_guard_config_ids = ["ai_all_cases_v1", "ai_all_cases_v1_attempt2", "ai_all_cases_v1_attempt3", "ai_all_cases_v1_attempt4"]
+predecessor_implementation_sha256 = "c4a7ba52f5995382daa2d0a38a304339736099ebff79a52109aa2fb41f947dbe"
+predecessor_internal_search_event_count = 181
+predecessor_internal_search_head_sha256 = "041436f4756d8fbb5d3ff8ac88e73a5027cef8e0f6a060a3060551135926d1b7"
+predecessor_meta_ml_chunk_count = 24
+predecessor_meta_plan_frozen = true
+predecessor_outer_event_count = 7
+predecessor_precommitted_event_sha256 = "a01fb98a0f0fb5b868399bae617563010985824bde2fbf24ac7b2000231dd950"
+predecessor_request_sha256 = "de6e926ee40d121e6d503eacd8644763be5e1264c9b7501c3f15e8238b19cd1e"
+predecessor_root_directory_count = 14
+predecessor_root_evidence_manifest_kind = "CANONICAL_NORMALIZED_TREE_ROWS"
+predecessor_root_evidence_manifest_sha256 = "37f21b0b1800a572e46945c31b3ab2e8b2f09fef136408239eef9d3f25c9fa48"
+predecessor_root_file_bytes = 9822771691
+predecessor_root_file_count = 441
+predecessor_root_row_count = 455
+predecessor_run_relative_root = "data/derived/bar_patterns/ai_all_cases_v1_attempt4"
+predecessor_runtime_identity_sha256 = "bdc98c52f9e92550473b77785c9fa1e00845d5ea7fc51257e2a9f85f0b5de141"
+predecessor_scientific_section_sha256 = "677248a6e59973445a08888ee2334e7a07095ee683803233542f349a9615bc04"
+predecessor_search_result_artifact_sha256 = "ccf12021acd804479e93d393fd27d03c640c1c7c7a9d0e7ee22e9476853a9ccd"
+predecessor_search_result_released = true
+predecessor_search_selected_candidate_count = 4
+predecessor_search_universe_artifact_sha256 = "b07fb4f0af4266fb22f3288a16e2dca0e9204eee38f3acbbada1eb803663280f"
+predecessor_search_universe_event_sha256 = "81d78c286433048f5c58b2046f9fd756ec0d5d0f86a96d31b87fd1aa04c210a9"
+predecessor_search_universe_frozen = true
+predecessor_stage_a_score_chunk_count = 64
+predecessor_stage_a_top256_artifact_sha256 = "b77ddc8690b8c4127b7efde6cd5df817214b760f6918aa4af80cf28c67025f26"
+predecessor_stage_a_top256_complete = true
+predecessor_stage_b_plan_artifact_sha256 = "7e66e3e885b27e3b40ff218b81164325b49e1ca95ae74d5fa92989457d16e832"
+predecessor_stage_b_plan_frozen = true
+predecessor_stage_b_raw_chunk_count = 64
+predecessor_stage_b_raw_final_artifact_sha256 = "4b0423036ab553b86af9646bb060b72c6b8b8eaad923c23690b384d3cd94cfd5"
+predecessor_symbolic_top24_artifact_sha256 = "425357b20810563ab32d048b42f3b77abc648bdc4ff10b75a6a90ec4cde9554c"
+predecessor_symbolic_top24_complete = true
+predecessor_universe_leaf_count = 64
+predecessor_universe_root_sha256 = "5a0106de341d810501d2ebdd3f727748c6644682448418dd2785d3ebf67ef076"
+predecessor_walk_forward_finalist_count = 0
+predecessor_writer_exit_code_observed = 1
+predecessor_writer_exit_evidence_scope = "EXTERNAL_GOVERNED_SESSION_OBSERVATION_NOT_TREE_REPLAYABLE"
+predecessor_writer_merged_output_byte_count_observed = 85
+predecessor_writer_merged_output_observed = "AI all-cases research failed closed: observed Search prefix semantic replay differs\r\n"
+predecessor_writer_merged_output_sha256_observed = "d8c1d8d82180b42ff929c2c7cfd4b926540ea5fc58a7c65fce0df1a7f0e39563"
+scientific_contract_equality_claim = true
+scientific_delta = "NONE"
+search_1s_opened = true
+terminal_post_freeze_failure_policy_preserved = true
+terminal_post_freeze_row_policy = "FATAL_NO_ROW_EXCLUSION"
+walk_forward_opened = true
+
+[runtime_environment]
+LC_ALL = "C"
+MKL_NUM_THREADS = "1"
+NUMEXPR_NUM_THREADS = "1"
+OMP_NUM_THREADS = "1"
+OPENBLAS_NUM_THREADS = "1"
+PATH = "/usr/bin:/bin"
+PYTHONDONTWRITEBYTECODE = "1"
+PYTHONHASHSEED = "0"
+TZ = "UTC"
+VECLIB_MAXIMUM_THREADS = "1"
+__CF_USER_TEXT_ENCODING = "0x1F5:0x0:0x0"
+launch_policy = "REQUIRE_PINNED_ENV_MINUS_SMALL_I_CLEAN_ENTRY_THEN_TRUSTED_SAFE_PATH_BOOTSTRAP_BEFORE_ANY_WORKSPACE_OR_NUMERICAL_IMPORT"
+local_bytecode_policy = "REJECT_ANY_PYC_PYO_OR_PYCACHE_BEFORE_FIRST_WORKSPACE_IMPORT"
+pycache_prefix_policy = "UNIQUE_EMPTY_EXTERNAL_DIRECTORY_OWNER_MODE_0700_REMOVED_AFTER_PROCESS"
+sys_path_policy = "EXACT_CAPTURED_STDLIB_PATHS_THEN_LOCKED_SITE_PACKAGES"
+trusted_env_path = "/usr/bin/env"
+trusted_env_sha256 = "6e506aec3c0cff703ac1e66cedc6f1945354ad41339a38db4425c7c88227128f"
+trusted_env_size = 102368
+trusted_git_path = "/usr/bin/git"
+trusted_git_sha256 = "179301dcb41ea78accc3fa0048a7e6f6710d891945a751a34addd622020c1818"
+trusted_git_size = 118928
+trusted_git_version = "git version 2.50.1 (Apple Git-155)"
+trusted_operator_uid = 501
+trusted_python_base_prefix = "/Users/seokminsong/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none"
+trusted_python_path = "/Users/seokminsong/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/bin/python3.12"
+trusted_python_sha256 = "f64cf6322e4f20cd0458aab89c0d332895817bb8f243b943109b6a957582fd5d"
+trusted_python_size = 18041104
+trusted_python_version = "3.12.13"
+
+[scope]
+holdout_evidence = "ONE_SHOT_UNSEALED_LOCAL_DIAGNOSTIC"
+physical_holdout_isolation = false
+search_claim = "RETROSPECTIVE_DEVELOPMENT_AND_TRAINING_NOT_OOS_EVIDENCE"
+strict_backtest_claim = false
+walk_forward_claim = "FIRST_OOS_EVIDENCE_IF_PRECOMMITTED_BEFORE_OPEN"
+
+[search_design]
+complete_symbolic_strategy_maximum = 195840
+direct_and_meta_candidate_count = 480
+entry_variant_count = 9
+exit_variant_count = 85
+logical_anchor_policy_count = 1900080
+maximum_complete_and_ml_candidates = 196320
+maximum_ml_candidate_world_units = 1440
+maximum_primary_hypothesis_units = 9696720
+maximum_real_and_control_scoring_units = 10089360
+maximum_stage_b_candidate_world_units = 587520
+outer_validation_block_keys = ["B3", "B4", "B5", "B6", "B7", "B8"]
+outer_validation_count = 6
+purge_active_days = 20
+reference_horizon_count = 5
+reference_score_cell_count = 9500400
+reporting_block_count = 4
+search_block_count = 8
+search_block_lengths = [59, 59, 59, 59, 59, 58, 58, 58]
+search_blocks_canonical_json = "[{\"block_key\":\"B1\",\"day_count\":59,\"end_date\":\"2022-03-11\",\"start_date\":\"2022-01-03\"},{\"block_key\":\"B2\",\"day_count\":59,\"end_date\":\"2022-05-22\",\"start_date\":\"2022-03-13\"},{\"block_key\":\"B3\",\"day_count\":59,\"end_date\":\"2022-07-29\",\"start_date\":\"2022-05-23\"},{\"block_key\":\"B4\",\"day_count\":59,\"end_date\":\"2022-10-06\",\"start_date\":\"2022-07-31\"},{\"block_key\":\"B5\",\"day_count\":59,\"end_date\":\"2022-12-14\",\"start_date\":\"2022-10-07\"},{\"block_key\":\"B6\",\"day_count\":58,\"end_date\":\"2023-02-24\",\"start_date\":\"2022-12-15\"},{\"block_key\":\"B7\",\"day_count\":58,\"end_date\":\"2023-05-03\",\"start_date\":\"2023-02-26\"},{\"block_key\":\"B8\",\"day_count\":58,\"end_date\":\"2023-07-10\",\"start_date\":\"2023-05-04\"}]"
+search_empty_symbolic_policy = "STAGE_B_64_EMPTY_RAW_CHUNKS_DIRECT_288_FULL_META_192_EXPLICIT_INELIGIBLE_CONTINUE_TO_FINAL12"
+search_final_refit = true
+search_internal_phase_order = ["STAGE_A_SCORE_CHUNKS", "STAGE_A_TOP256", "STAGE_B_PLAN_FROZEN", "STAGE_B_RAW_CHUNKS", "SYMBOLIC_TOP24", "DIRECT_ML_CHUNKS", "META_PLAN_FROZEN", "META_ML_CHUNKS", "FINAL_MAX12"]
+search_partial_chunk_policy = "RAW_OR_OOF_AGGREGATES_ONLY_NO_SELECTION_NO_EARLY_STOP"
+search_phase_chunk_counts_canonical_json = "{\"DIRECT_ML_CHUNKS\":24,\"FINAL_MAX12\":1,\"META_ML_CHUNKS\":24,\"META_PLAN_FROZEN\":1,\"STAGE_A_SCORE_CHUNKS\":64,\"STAGE_A_TOP256\":1,\"STAGE_B_PLAN_FROZEN\":1,\"STAGE_B_RAW_CHUNKS\":64,\"SYMBOLIC_TOP24\":1}"
+search_resume_policy = "VERIFY_SUBLEDGER_AND_RUN_LOWEST_INCOMPLETE_CHUNK"
+search_subledger = "ATOMIC_PREDECESSOR_HASHED_MODE_0444_ALL_LEAVES_IN_FINAL_CLOSURE"
+search_subledger_exact_event_count = 181
+stage_a_maximum_selection = 256
+stage_ranges_canonical_json = "[{\"active_day_count\":489,\"decision_day_count\":469,\"decision_end_date\":\"2023-07-10\",\"end_date\":\"2023-08-02\",\"stage_key\":\"SEARCH\",\"start_date\":\"2022-01-03\"},{\"active_day_count\":153,\"decision_day_count\":133,\"decision_end_date\":\"2024-01-09\",\"end_date\":\"2024-02-01\",\"stage_key\":\"WF1\",\"start_date\":\"2023-08-03\"},{\"active_day_count\":153,\"decision_day_count\":133,\"decision_end_date\":\"2024-07-10\",\"end_date\":\"2024-08-04\",\"stage_key\":\"WF2\",\"start_date\":\"2024-02-02\"},{\"active_day_count\":153,\"decision_day_count\":133,\"decision_end_date\":\"2025-01-06\",\"end_date\":\"2025-01-29\",\"stage_key\":\"WF3\",\"start_date\":\"2024-08-05\"},{\"active_day_count\":153,\"decision_day_count\":133,\"decision_end_date\":\"2025-07-06\",\"end_date\":\"2025-07-29\",\"stage_key\":\"WF4\",\"start_date\":\"2025-01-30\"},{\"active_day_count\":152,\"decision_day_count\":132,\"decision_end_date\":\"2025-12-30\",\"end_date\":\"2026-01-22\",\"stage_key\":\"WF5\",\"start_date\":\"2025-07-30\"},{\"active_day_count\":20,\"decision_day_count\":0,\"decision_end_date\":null,\"end_date\":\"2026-02-15\",\"stage_key\":\"EMBARGO\",\"start_date\":\"2026-01-23\"},{\"active_day_count\":120,\"decision_day_count\":120,\"decision_end_date\":\"2026-07-08\",\"end_date\":\"2026-07-08\",\"stage_key\":\"HOLDOUT\",\"start_date\":\"2026-02-16\"},{\"active_day_count\":20,\"decision_day_count\":0,\"decision_end_date\":null,\"end_date\":\"2026-07-31\",\"stage_key\":\"HOLDOUT_OUTCOME_TAIL\",\"start_date\":\"2026-07-09\"}]"
+standard_reporting_blocks_canonical_json = "[{\"block_key\":\"R1\",\"day_count\":118,\"end_date\":\"2022-05-22\",\"start_date\":\"2022-01-03\"},{\"block_key\":\"R2\",\"day_count\":117,\"end_date\":\"2022-10-05\",\"start_date\":\"2022-05-23\"},{\"block_key\":\"R3\",\"day_count\":117,\"end_date\":\"2023-02-23\",\"start_date\":\"2022-10-06\"},{\"block_key\":\"R4\",\"day_count\":117,\"end_date\":\"2023-07-10\",\"start_date\":\"2023-02-24\"}]"
+
+[search_gates]
+active_entry_days_minimum = 30
+active_signal_days_minimum = 40
+complete_fills_each_outer_validation_minimum = 5
+complete_fills_minimum = 48
+direct_family_key = "DECISION_TIMEFRAME_SECONDS_PLUS_FEATURE_SET_ID"
+diversity_anchor_action_identity = "ROW_ID_PLUS_DIRECTION"
+diversity_anchor_jaccard_rule = "5_TIMES_INTERSECTION_LT_4_TIMES_UNION"
+diversity_application = "GREEDY_IN_FROZEN_ECONOMIC_RANK_ORDER"
+diversity_daily_pnl_correlation_rule = "25_TIMES_COVARIANCE_NUMERATOR_SQUARED_LT_16_TIMES_VARIANCE_PRODUCT"
+diversity_zero_variance_policy = "FAIL_CLOSED_PAIR_REJECTED"
+family_selection_maximum = 2
+meta_family_key = "INHERIT_PREFIX_OR_FINAL_BASE_TRIGGER_FAMILY"
+minimum_positive_outer_validations = 4
+minimum_positive_reporting_blocks = 3
+net_ticks_strictly_positive = true
+null_real_oof_net_strictly_gt_both_controls = true
+outer_validation_count = 6
+profit_factor_minimum_denominator = 20
+profit_factor_minimum_numerator = 21
+ranking = ["POSITIVE_OUTER_VALIDATION_COUNT_DESC", "WORST_OUTER_VALIDATION_EV_DESC", "STRESS_18_TICK_NET_DESC", "MEDIAN_OUTER_VALIDATION_EV_DESC", "MAXIMUM_DRAWDOWN_ASC", "CANONICAL_CANDIDATE_ID_ASC"]
+raw_signals_each_outer_validation_minimum = 6
+raw_signals_each_reporting_block_minimum = 6
+raw_signals_minimum = 60
+search_bh_or_alpha_gate = false
+search_selection_maximum = 12
+selection_direct_maximum = 4
+selection_meta_maximum = 4
+selection_symbolic_maximum = 6
+stress_18_tick_net_strictly_positive = true
+symbolic_family_key = "BASE_EVENT_TRIGGER_FAMILY"
+
+[selection]
+holdout_family_maximum = 3
+search_selection_maximum = 12
+semantic_subset_order = "PRESERVE_FROZEN_ECONOMIC_RANK_ORDER"
+walk_forward_fold_keys = ["WF1", "WF2", "WF3", "WF4", "WF5"]
+walk_forward_selection_maximum = 3
+
+[stage_a_gates]
+active_signal_days_minimum = 40
+family_direction_maximum = 8
+family_maximum = 16
+horizon_active_entry_days_minimum = 30
+horizon_fills_minimum = 48
+horizon_net_ticks_strictly_positive = true
+horizon_positive_reporting_groups_minimum = 2
+minimum_robust_horizons = 3
+raw_signals_each_reporting_group_minimum = 6
+raw_signals_minimum = 60
+reference_entry = "FIRST_OBSERVED_1S_OPEN_IN_ANCHOR_TO_ANCHOR_PLUS_300S"
+reference_missing_or_shortened_path = "ABSENT_FROM_SURFACE_NEVER_SHORTENED"
+reference_path = "EXACT_FULL_SAME_LINEAGE_STRUCTURAL_5M_COVERAGE"
+reference_structural_lattice_freeze = "CANDIDATE_INDEPENDENT_7H_5M_ONLY_BEFORE_FIRST_SEARCH_1S_OPEN"
+reference_terminal = "LAST_1S_CLOSE_AT_EXACT_HORIZON_BOUNDARY_STALENESS_STRICTLY_LT_300S"
+selection_maximum = 256
+selection_pair_budget_formula = "SUM_EVALUABLE_SUPPORT_COUNT_TIMES_9_ENTRIES_TIMES_3_WORLDS_LE_100000"
+selection_pair_budget_maximum = 100000
+selection_pair_budget_policy = "GLOBAL_DEDUPLICATED_FROZEN_RANK_GREEDY_SKIP_IF_REMAINING_BUDGET_EXCEEDED_NO_EARLY_STOP"
+unexpected_censor_after_structural_lattice_freeze = "FAIL_CLOSED"
+
+[status]
+database_mutation = false
+network_access = false
+paper_live_or_promotion_authority = false
+physical_holdout_isolation = false
+strict_backtest_claim = false
+strict_sealed_holdout_claim = false
+
+[universe_counts]
+base_event_count = 1740
+context_count = 13
+delay_count = 6
+direct_ml_count = 288
+entry_variant_count = 9
+exit_variant_count = 85
+logical_anchor_policy_count = 1900080
+meta_ml_count = 192
+reference_horizon_count = 5
+reference_score_cell_count = 9500400
+time_filter_count = 14
+
+[walk_forward_gates]
+active_entry_days_each_fold_minimum = 10
+active_entry_days_minimum = 75
+bh_q_denominator = 20
+bh_q_numerator = 1
+contract_count_minimum = 5
+fills_each_fold_minimum = 12
+fills_minimum = 100
+maximum_finalists = 3
+minimum_positive_folds = 4
+model_refit_count = 0
+net_over_maximum_drawdown_minimum_denominator = 1
+net_over_maximum_drawdown_minimum_numerator = 1
+net_ticks_strictly_positive = true
+null_deltas_strictly_positive = true
+profit_factor_minimum_denominator = 10
+profit_factor_minimum_numerator = 11
+qualification = "BH_REJECT_AND_EVERY_SAMPLE_AND_ECONOMIC_GATE_PASS"
+ranking = ["P_STAR_ASC", "WORST_GROUP_EV_DESC", "AGGREGATE_EV_DESC", "PROFIT_FACTOR_DESC", "CATALOG_SELECTION_RANK_ASC", "CANONICAL_CANDIDATE_ID_ASC"]
+worst_fold_profit_factor_floor_denominator = 10
+worst_fold_profit_factor_floor_numerator = 7
+worst_loss_over_median_positive_maximum_denominator = 2
+worst_loss_over_median_positive_maximum_numerator = 3
