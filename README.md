@@ -157,10 +157,38 @@ finalists were all zero. Walk-forward and holdout payloads remained unopened,
 and a fresh locked/offline public verifier exited `0`. This unsealed screening
 result supplies no out-of-sample or alpha evidence.
 
+Retrospective all-cases v1 recovery attempt 5 completed the finite frozen
+symbolic/direct/meta design. Search enumerated 37,200 candidate identities and
+released four, all symbolic, into five walk-forward folds. The 480 direct/meta
+ML candidates were candidate-locally ineligible under the frozen null
+construction, with empty fit/result evidence; they were not economic losers.
+All four walk-forward candidates were sample-eligible but had negative fully
+loaded net ticks; none passed either the family-wide BH decision or the frozen
+economic gates. The five-fold stage is this campaign's first out-of-sample
+evidence, and it was negative with zero finalists. The terminal lifecycle
+therefore recorded `HOLDOUT_SKIPPED` without authorizing or opening holdout
+outcomes.
+Attempt 5 also corrected all 480 direct/meta public-candidate provenance
+bindings that invalidated attempt 4 while preserving its catalogs, costs,
+gates, selected strategies, and data lineage. A fresh pinned clean-environment
+verifier exited `0` and left the complete artifact tree byte-for-byte
+unchanged. This remains retrospective, unsealed local screening over a finite
+language—not sealed-holdout, alpha, strict-backtest, Paper, Live, or promotion
+evidence.
+
 ```bash
 uv run --locked --offline python -B -m scripts.run_ai_pattern_holdout verify --json
 uv run --locked --offline python -B -m scripts.run_ai_pattern_exhaustive_search verify --json
 uv run --locked --offline python -B -m scripts.run_ai_delayed_mtf verify --json
+all_cases_root="$(pwd -P)"
+/usr/bin/env -i \
+  VIRTUAL_ENV="${all_cases_root}/.venv" \
+  LC_ALL=C MKL_NUM_THREADS=1 NUMEXPR_NUM_THREADS=1 OMP_NUM_THREADS=1 \
+  OPENBLAS_NUM_THREADS=1 PYTHONHASHSEED=0 PYTHONDONTWRITEBYTECODE=1 \
+  TZ=UTC VECLIB_MAXIMUM_THREADS=1 __CF_USER_TEXT_ENCODING=0x1F5:0x0:0x0 \
+  /Users/seokminsong/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/bin/python3.12 \
+  -s -P -B -S "${all_cases_root}/campaigns/ai_all_cases_v1/bootstrap.py" \
+  verify --project-root "${all_cases_root}" --json
 ```
 
 Environment readiness is not research-data eligibility. All 1,434 source files

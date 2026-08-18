@@ -1,7 +1,7 @@
 # Phase 1 Research Execution Status
 
 - Started: 2026-08-03
-- Updated: 2026-08-13
+- Updated: 2026-08-18
 - Campaigns: `phase1_discovery_v1`, `phase1a_conservative_screening_v1`, and
   `bar_pattern_discovery_v1`; the completed state-model lineage is
   `bar_state_conditional_v2` -> `v2a` -> `v2b`
@@ -957,3 +957,143 @@ result and exited `0`. Terminal status is
 `UNSEALED_LOCAL_DELAYED_MTF_RESEARCH`. Search was retrospective screening, and
 the first out-of-sample stage was never opened; this result is therefore no
 out-of-sample, alpha, strict-backtest, paper/live, or promotion claim.
+
+## 20. Retrospective All-Cases V1 Search and Walk-Forward Completed With Zero Finalists
+
+The governed attempt 5 writer ran from late 2026-08-16 through 2026-08-17
+local time; fresh-verifier acceptance completed on 2026-08-18. Attempts 1
+through 4 remain immutable, unaccepted predecessors. Attempt 4 had opened the
+same Search and walk-forward outcome lineage, but its terminal semantic replay
+found 480 ML ineligibility records bound to shared fit-recipe seed identities
+instead of their 288 direct and 192 meta public candidate identities. Attempt
+5 separated those identities without changing the frozen catalogs, costs,
+gates, selected strategies, or data lineage. Its corrected 480 / 480 public-ID
+closure has audit SHA-256
+`0b8fccca166d1c781c5b80e11dbc40e23a2472eaa6eb44db251c35e728b1f7d3`.
+An independent released-identity comparison found zero A4/A5 divergence in
+evaluated IDs, selected order and kinds, strategy commitments, or walk-forward
+mask vectors. Because those Search and walk-forward outcomes had already
+opened, attempt 5 remains a retrospective governance recovery rather than a
+fresh preregistration.
+
+Evaluator source commit
+`49cef9c35558bf8b5b17e8e3fa364652e8d04ac9` and the following data-only
+configuration commit
+`dd91b54d80f53f11761ae8bb008f47504a03c423` froze implementation SHA-256
+`672581be9f40bafc4bcd32f692605910facc53713c62be4c9e8652b94506da20`
+and configuration semantic SHA-256
+`8f18a20632f122b97457a87ca639c5fb5ef11ffeea4fade273d8f17d3967b087`.
+The fixed Search enumerated 36,720 symbolic, 288 direct-ML, and 192 meta-ML
+candidates. All 480 ML candidates were candidate-locally ineligible under
+`NULL_DERANGEMENT_INFEASIBLE` / scope `B3`; all 480 had empty fit and result
+evidence. They are ineligible under this frozen null construction, not
+economic losers and not evidence that ML generally fails.
+
+Search released four candidates, all `SYMBOLIC`, and froze 20 masks for four
+candidates across `WF1` through `WF5`. All four candidates were sample-eligible
+in walk-forward, but all had negative fully loaded net ticks. One family-wide
+Benjamini-Hochberg decision at `q = 0.05` produced zero rejections. The frozen
+economic gates also produced zero passes and therefore zero finalists. Under
+the frozen design, this five-fold walk-forward stage is the campaign's first
+out-of-sample evidence. Because attempt 4 had already opened those outcomes,
+attempt 5 is a retrospective governance recovery of that negative evidence,
+not a fresh out-of-sample preregistration.
+
+```text
+Search candidates:                    37,200
+symbolic / direct / meta:       36,720 / 288 / 192
+ML public-ID bindings:                 480 / 480
+ML candidate-local ineligible:         480 / 480
+Search-selected candidates:              4
+selected kinds:                    SYMBOLIC 4
+walk-forward folds / frozen masks:      5 / 20
+walk-forward sample-eligible:            4 / 4
+fully loaded net ticks range:       -2,067 to -1,274
+BH rejections at q = 0.05:               0 / 4
+economic-gate passes:                     0 / 4
+walk-forward finalists:                   0 / 4
+holdout evaluations:                      0
+```
+
+The selected family and exact walk-forward net ticks were:
+
+```text
+5d38fa1621bde11e9bf65cbc5e9f5d9e3e3a08b21f268ef647dc3e7156ee7798
+  COMPRESSION_BREAKOUT rank 21162; folds -319,-191,-335,-293,-513;
+  total -1,651 ticks; 108 fills; PF 423/2074; max drawdown 1,681 ticks
+69a14414de3325f2f65e2d5491393a4436f214fd93560c44aa98b81cfe758615
+  SWING_FAILURE rank 4651; folds -17,-407,-322,-245,-283;
+  total -1,274 ticks; 115 fills; PF 90/181; max drawdown 1,318 ticks
+0d83327ec292f6ec7a6496ab803a22348b932cdf0867a690938b7b7bac00d3ad
+  SWING_FAILURE rank 12500; folds -633,-142,-191,138,-665;
+  total -1,493 ticks; 123 fills; PF 1869/3362; max drawdown 1,530 ticks
+9b14e34fa65b411cd85ec14f7f46681d9df9de13f1560b21c9dfb6812b96b636
+  PULLBACK_CONTINUATION rank 13773; folds -16,-217,-480,-599,-755;
+  total -2,067 ticks; 132 fills; PF 1526/3593; max drawdown 2,231 ticks
+```
+
+All four failed `POSITIVE_FOLDS_LT_4`, `TOTAL_NET_NOT_POSITIVE`,
+`PROFIT_FACTOR_LT_1_10`, `NET_OVER_MAX_DRAWDOWN_LT_1`,
+`WORST_FOLD_PROFIT_FACTOR_LT_0_70`, and
+`WORST_FOLD_LOSS_GT_1_5_MEDIAN_POSITIVE`. Three also failed
+`NULL_DELTA_NOT_POSITIVE`; the rank-4651 swing-failure candidate beat both
+frozen null totals but still had negative real net ticks and no BH rejection.
+
+The exact append-only lifecycle is:
+
+```text
+PRECOMMITTED
+SEARCH_UNIVERSE_FROZEN
+SEARCH_RESULTS_RELEASED
+WALK_FORWARD_MASKS_FROZEN
+WALK_FORWARD_RESULTS_RELEASED
+HOLDOUT_SKIPPED
+COMPLETED
+```
+
+Canonical SHA-256 identities are:
+
+```text
+request:                  3540d5ae274ed39e15da3d8923e7dfa2b82aa2b4ec1b9b33bc8582c65bba2655
+Search universe:          04e9198c3ac8dbea440fe55547f95cf96f8cf426edd37e3070e7b03e7caf78b7
+Search release:           96ffc4bec4179588d07cda1438fb8e0629852f8a80404cb0853e7ebf4bef2a7d
+walk-forward masks:       d8d497feb2da8ad97986607e3fd04fdfb3a209e320642e9648932958b170cfb6
+walk-forward results:     a0e72634418db6e57aeb8dc84d7166a701b0defa3ac1faa36fc413199599724d
+WF multiplicity:          4b5cc590cb10e77dd033433fe6dc66812c664f501ed91c1d728f54ff43cb1e7f
+holdout skip:             429cd26f8bc06176c956f56f374bfa0e7da911bdf6c1d2c2a657265133627ad9
+terminal report:          d967f27316f35493fa15049a4bebdd583844a5ce20665d07fd49120f245d3512
+ledger head:              afe0fab0f6f29d43be06314b670e8875914c89a46de31964ff4649ca87ea4a3c
+runtime identity:         bdc98c52f9e92550473b77785c9fa1e00845d5ea7fc51257e2a9f85f0b5de141
+fresh-verifier canonical JSON:
+  a28cb5706c3d76d026110cb9a86b00d5399c2804ba0894d59169c0c9f00bce23
+read-only result summary: aed184e0101d42c31e9c4c6d4d096524ab825cf92be9c4333cbedbd6e8e54068
+```
+
+After the writer exited `0`, a separate pinned clean-environment public
+verifier ran without writer overlap and exited `0`. Its stderr was empty and
+its single canonical JSON stdout reported `COMPLETED`, seven events, no
+finalists, `database_mutated = false`, and `network_accessed = false`. The
+complete pre/post verifier tree vectors were byte-for-byte identical:
+
+```text
+paths / files / directories: 454 / 441 / 13
+regular-file bytes:          9,822,770,842
+pre/post aggregate:          043ed2d7af792fc63a9349f7ff01967c301e61551943072fc53154c3f8fad817
+pre/post extended:           0f930f83385e57b40057cd7db147c417f18cd23db464f0965208af2275b16d14
+pre/post composite:          df877bda9e85c9f39fe1c57dc5317a195dd4b534b7b0c226ff191395987f912f
+```
+
+A final stdlib-only extractor and an independent evidence audit both
+recomputed the four candidate results, BH decision, economic failures, and
+terminal chain. The extractor also revalidated all 48 Direct/Meta chunks and
+480 public-ID bindings. It dereferenced only Search, walk-forward, and terminal
+report artifacts; the number of physical paths containing `holdout` that it
+opened was zero.
+
+With zero walk-forward finalists, holdout was never authorized and no holdout
+mask, result payload, or outcome row was opened. Terminal status is
+`NO_WALK_FORWARD_FINALISTS_HOLDOUT_NOT_OPENED` under authority
+`UNSEALED_LOCAL_AI_ALL_CASES_RESEARCH`. This is bounded retrospective screening
+over a finite frozen language and local data/execution contract. It is not a
+sealed-holdout or alpha result, a strict backtest, or Paper, Live, promotion,
+or M0b authority.
