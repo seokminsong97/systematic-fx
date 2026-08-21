@@ -1,0 +1,151 @@
+[campaign]
+id = "e2a_month_end_v1"
+schema_version = 1
+name = "6E month-end London-fix fade with fixed 24-hour exit"
+candidate_id = "e2a_last_eligible_weekday_london_1500_fade_mtd_hold_24h"
+candidate_count = 1
+status = "HISTORICAL_EVIDENCE_CONFLICT"
+mode = "REGISTERED_RESEARCH_ONLY"
+python_semantic_sha256 = "9357e6519fbe65f1e8972dabb823dd3de06f80b01720a6d69e589ec6ddc2bdbe"
+
+[authority]
+maximum_authority = "SHADOW_FORWARD"
+allowed_execution_mode = "OFFLINE_SHADOW_ONLY"
+paper_order_authority = false
+live_authority = false
+automatic_promotion = false
+forbidden_labels = ["PASS_BACKTEST", "ENTER_PAPER", "PAPER", "LIVE"]
+
+[candidate]
+instrument = "CME_6E"
+contract_selection = "TRADE_BAR_V1_PREVIOUS_SESSION_VOLUME"
+event_day = "LAST_MON_FRI_STRUCTURALLY_ELIGIBLE_DATE_IN_CALENDAR_MONTH"
+timezone = "Europe/London"
+decision_time = "15:00:00"
+month_open = "LAST_ONE_SECOND_TRADE_CLOSE_AT_OR_BEFORE_FIRST_BAR_START_PLUS_60_SECONDS_ON_FIRST_ELIGIBLE_DAY"
+month_open_staleness_seconds = 3600
+p15 = "LAST_PHYSICAL_TRADE_AT_OR_BEFORE_DECISION"
+p15_staleness_seconds = 1800
+direction = "NEGATIVE_SIGN_OF_P15_MINUS_MONTH_OPEN"
+equal_or_missing = "NO_TRADE"
+entry_delay_seconds = 1
+entry_wait_seconds = 3
+entry_side = "MARKETABLE_BBO"
+exit_family = "FIXED_HORIZON_ANCHOR"
+holding_seconds = 86400
+maximum_stream_gap_seconds = 345600
+maximum_concurrent_positions = 1
+pyramiding = false
+take_profit = false
+stop_loss = false
+
+[costs]
+primary = "BBO_GROSS_PLUS_VERIFIED_ACTUAL_PER_FILL_FEES"
+historical_lab_additive_friction_ticks = "1.5"
+stress_debit_ticks = [14, 18]
+fixed_cost_allocation = "USER_DECISION_REQUIRED_PORTFOLIO_OR_EXPECTED_FILL_DENOMINATOR"
+verified_fee_schedule = "ABSENT"
+
+[historical_evidence]
+local_dataset_history_through = 2026-07-31
+consumed_holdout_decision_coverage_through = 2026-07-08
+all_history_is_in_sample_for_family = true
+closed_map_remining_allowed = false
+parameter_retuning_allowed = false
+handover_claimed_event_count = 47
+handover_claimed_net_ticks_at_1_5 = "1253.5"
+independent_audit_status = "CONFLICT"
+independent_audit_legacy_direction_conditioned_disclosed_row_match_count = 47
+independent_audit_parquet_price_and_gross_match_count = 42
+independent_audit_full_timestamp_match_count = 32
+independent_audit_holdout_summary_only_match_count = 5
+independent_audit_calendar_rule_signal_count = 51
+independent_audit_calendar_rule_legacy_grid_completed_count = 50
+independent_audit_body_sha256 = "c61e39446c4eac4024abf5bfab6c410a633618c7cfaf6c9c4bc9714ff8491770"
+strict_physical_audit_status = "CONFLICT_AUDIT_ONLY_RESET_POLICY_NOT_GOVERNED"
+strict_physical_calendar_signal_count = 51
+strict_physical_completed_count = 50
+strict_physical_gross_ticks = 1043
+strict_physical_net_at_1_5_ticks = "968.0"
+strict_physical_exposed_gross_mismatch_count = 36
+strict_physical_audit_body_sha256 = "15ee2b22670d73402ce4896a782fe6f0b76d1159c6f54a4910bb1ec64b033b60"
+handover_precommit_final_sha256 = "b1183757c4d035e540d8c9d27aa378f57899ec9b126a94576e92168312dca976"
+consumed_holdout_disclosure = "The sealed holdout 2026-02-16..2026-07-08 was opened on 2026-08-20 as a one-shot single-candidate diagnostic for e2a (precommit precommits/precommit_final.json, sha b1183757c4d035e540d8c9d27aa378f57899ec9b126a94576e92168312dca976, hashed before opening). It is consumed for the month-end family and must not be presented as fresh OOS for it or for related calendar-anchor candidates. Result: 5 events, 4 wins, +42.5t (SUPPORTIVE label per frozen rule; n=5 carries no statistical claim)."
+discovery_and_validation_disclosure = "2022-01..2023-07 was the discovery screen (69 candidates). 2023-09..2024-12 and 2025-01..2026-01 were preregistered validation windows. 2026-02..2026-07 was the one-shot opened and consumed holdout diagnostic. Every historical window is now in-sample for the month-end calendar-anchor family."
+
+[historical_evidence.source_artifacts]
+r1_trades_sha256 = "6cef0ddec33937dc657d8453c118ac23d1a4c866593dbecd6f8403310559329e"
+r2_trades_sha256 = "d871162af1b026c4b5b348916109f2384d4480a3427f89838db45a2346994672"
+r3_trades_sha256 = "45a974ef90de1fa5bc066f299c74507ef689aa3cbd6309240bed5108167694c6"
+holdout_e2a_sha256 = "f576491d42bd79b857811d45529cb3bedf91f8ba5560f80069d6a9f934d7f94a"
+mechanism_diagnostics_sha256 = "2ba0ce270e16ca7cb1bbd33a9243c602ddf102c2980d2db09b6ee37c3e5bab90"
+precommit_ff_sha256 = "3bb8bab083f07f1b3fba84df502752d7e4258022615b466ebe17cea5a5b8baf9"
+precommit_final_sha256 = "b1183757c4d035e540d8c9d27aa378f57899ec9b126a94576e92168312dca976"
+precommit_flow_sha256 = "47d0d6a6e04ede6bccc2d40915d3d4a5600a58cdf0e34a6112a1d8f4bc8199b8"
+precommit_lastdoors_sha256 = "2b069f339482fcb4645d20c31ad506e7f2e06b4a34addf90d1799308f93f3f9a"
+precommit_round2_sha256 = "2bdb9ab83f04b51d9021238636727a881569e4649ba1a0eac1bbded2a5fb3982"
+precommit_round3_sha256 = "36840336cbc43b83ad9e7a3298fdde4fde88ce269a60f7f0b372edaa79567b93"
+precommit_wave3_sha256 = "ff2bbfb07e39faeb66a4963a7766d5cb4a6fc5fc1a564842374670718082a9b3"
+
+[historical_evidence.legacy_audit_artifact]
+artifact_schema = "systematic_fx.e2a_handover_raw_audit.v1"
+artifact_type = "E2A_HANDOVER_RAW_AUDIT"
+audit_body_sha256 = "c61e39446c4eac4024abf5bfab6c410a633618c7cfaf6c9c4bc9714ff8491770"
+byte_size = 7944
+content_sha256 = "4005d506a571c83ecbeede53b1b43fb2905b2b89dd2950a18b9fe302051ffdc2"
+media_type = "application/json"
+relative_uri = "artifacts/e2a_handover_raw_audit/sha256=4005d506a571c83ecbeede53b1b43fb2905b2b89dd2950a18b9fe302051ffdc2.json"
+repository_byte_size = 7945
+repository_content_sha256 = "fec7e5cc9fc41421c1dab929c673e4b6041a112603e880fa66535c5675e76a69"
+repository_relative_path = "docs/research/evidence/e2a_month_end_v1/sha256=fec7e5cc9fc41421c1dab929c673e4b6041a112603e880fa66535c5675e76a69.json"
+
+[historical_evidence.strict_physical_audit_artifact]
+artifact_schema = "systematic_fx.e2a_strict_physical_audit.v1"
+artifact_type = "E2A_STRICT_PHYSICAL_AUDIT"
+audit_body_sha256 = "15ee2b22670d73402ce4896a782fe6f0b76d1159c6f54a4910bb1ec64b033b60"
+byte_size = 45523
+content_sha256 = "be211e9c948ea4ac94c8acc8c1ca42545047f716584864b1e29cae2a1b105686"
+media_type = "application/json"
+relative_uri = "artifacts/e2a_strict_physical_audit/sha256=be211e9c948ea4ac94c8acc8c1ca42545047f716584864b1e29cae2a1b105686.json"
+repository_byte_size = 45524
+repository_content_sha256 = "456f9ffe39c13314bc2371a56143e5fc7b66918293fe3e552db72188822d010b"
+repository_relative_path = "docs/research/evidence/e2a_month_end_v1/sha256=456f9ffe39c13314bc2371a56143e5fc7b66918293fe3e552db72188822d010b.json"
+
+[policy_amendments]
+support_gate = "EVENT_CLASS_MINIMUM_12_ACCUMULATED_EVENTS"
+per_window_intraday_fill_quota = false
+calendar_month_fixed_cost_per_candidate = false
+calendar_and_clock_anchors_are_first_class = true
+fixed_horizon_over_6h_is_allowed_for_this_named_research_artifact = true
+single_window_bh = false
+prospective_significance_claim = "NONE"
+
+[forward_validation]
+status = "PLANNED_NOT_ARMABLE"
+window_start = 2026-08-01
+window_end = 2027-07-31
+planned_look_count = 1
+minimum_events = 12
+minimum_wins = 7
+alternative_net_ticks = 120
+maximum_positive_concentration = "0.50"
+maximum_average_slippage_ticks_per_side = "1.0"
+missing_event_policy = "NO_AUTOMATIC_EXTENSION_INCONCLUSIVE_SUPPORT"
+next_provisional_decision_local = "2026-08-31T15:00:00 Europe/London"
+next_provisional_decision_utc = "2026-08-31T14:00:00Z"
+
+[conflicts]
+history = [
+  "THE_47_ROW_HANDOVER_MIXES_LEGACY_ADJACENCY_WITH_CALENDAR_HOLDOUT",
+  "SECTION_7_CALENDAR_RULE_ADDS_FOUR_SIGNALS_AND_ONE_NO_FILL_OPPORTUNITY",
+  "R1_2022_03_31_DIRECTION_CHANGES_UNDER_THE_FROZEN_MONTH_OPEN_RULE",
+  "LEGACY_QUOTE_GRID_ACCEPTED_LOCKED_AND_MULTI_HOUR_STALE_BOOKS",
+  "HANDOVER_DID_NOT_FREEZE_BOOK_RESET_AND_RECOVERY_SEMANTICS",
+]
+paper = [
+  "NO_LIVE_MARKET_DATA_ADAPTER",
+  "NO_PAPER_BROKER_OR_RECONCILIATION_ADAPTER",
+  "NO_VERIFIED_ACTUAL_FEE_SCHEDULE",
+  "NO_AUTHORITATIVE_FUTURE_STATUS_OR_SCHEDULE_FEED",
+  "E2A_NO_STOP_NO_TARGET_CONFLICTS_WITH_EXISTING_PAPER_TP_SL_OCO_POLICY",
+]

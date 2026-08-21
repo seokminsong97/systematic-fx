@@ -1,6 +1,7 @@
 # Phase 2 Design: Live Platform Evaluation and Paper Trading
 
-- Document version: 1.7.0-draft
+- Document version: 1.8.0-draft
+- Revised: 2026-08-20
 - Status: `DRAFT`
 - Parent document: [`DESIGN.md`](../DESIGN.md)
 - Candidate A: IBKR Pro with CME market data
@@ -201,11 +202,37 @@ management and operational paths.
 
 ## 9. Paper Trading
 
-### Entry and execution
+### Shadow forward is not Paper Trading
+
+A process that consumes contemporaneous data and records a frozen signal plus
+hypothetical BBO fills without submitting an order is `SHADOW_FORWARD`. It
+creates no external order, fill, position, protection, cancellation, or
+recovery evidence and is not Paper Trading under this document.
+
+The present `e2a_month_end_v1` amendment authorizes only that no-order shadow
+mode. Its ledger may be made ready for later broker observations, but an empty,
+synthetic, assumed, or model-derived slippage value cannot stand in for
+broker-observed Paper fill slippage. Shadow events therefore cannot satisfy the
+complete 12-event forward gate, the Paper counts in `VALIDATION.md`, or any Live
+approval requirement.
+
+The existing fixed 24-hour, no-stop e2a research artifact conflicts with the
+broker-managed bracket requirement below. This document intentionally preserves
+that conflict. Before any broker Paper order may be submitted, a separate
+approved amendment must define broker-resident protection, timed-exit behavior
+during disconnects, partial-fill handling, forced contract/gap exits, Phase 4
+risk limits, platform integration, and explicit promotion authority. Until
+then, no process may label e2a as `ENTER_PAPER` or `PAPER`, invoke a broker Paper
+adapter for it, or submit an order on its behalf.
+
+### True broker Paper entry and execution
 
 Phase 2 accepts Paper-eligible artifacts from Phase 1. Run the same strategy
 on both candidates over the same period when possible. Evaluate
 provider-specific strategies separately.
+
+The following requirements govern true broker Paper Trading and are not relaxed
+by a historical or shadow-forward result.
 
 Every exposure-increasing Paper entry must be submitted as a broker-managed
 bracket:

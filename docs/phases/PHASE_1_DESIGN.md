@@ -1,7 +1,7 @@
 # Phase 1 Design: Deterministic Research and Backtesting
 
-- Document version: 1.11.0-draft
-- Revised: 2026-08-11
+- Document version: 1.12.0-draft
+- Revised: 2026-08-20
 - Status: `DRAFT`
 - Parent document: [`DESIGN.md`](../DESIGN.md)
 - Input: Historical MBP-10 from the Data Source
@@ -13,9 +13,12 @@
 ## 1. Objective
 
 Phase 1 runs reproducible, finite-budget Discovery computations and turns
-measured patterns into registered executable bracket candidates. An optional
-LLM may propose a hypothesis before an epoch is frozen, but it is never part of
-the daemon runtime loop or a result/promotion authority.
+measured patterns into registered executable strategy artifacts. Standard
+artifacts use executable brackets. Only an artifact expressly named by
+`DESIGN.md` may use a fixed-horizon exit, and that permission is limited to
+governed historical and no-order shadow research. An optional LLM may propose a
+hypothesis before an epoch is frozen, but it is never part of the daemon runtime
+loop or a result/promotion authority.
 
 ```text
 Verified MBP-10
@@ -26,7 +29,7 @@ finite precommitted search epoch
     ↓
 Registered experiment
     ↓
-directional entry, take-profit, and stop-loss policy
+directional entry and immutable registered exit policy
     ↓
 Deterministic backtest
     ↓
@@ -104,6 +107,47 @@ Owns:
 - M0a is a bounded engineering exception that explicitly preregisters a
   volatility-normalized 30/60/120-minute label horizon. It is not a deployment
   holding policy and cannot create Paper eligibility.
+
+### Governed e2a single-candidate replay
+
+The following semantics apply only to `e2a_month_end_v1` and are not a general
+candidate generator:
+
+- Instrument: CME 6E selected by the `trade_bar_v1` previous-session-volume
+  active-contract rule.
+- Event day: group structurally eligible active dates by calendar
+  `(year, month)`, retain dates whose weekday is Monday through Friday, and take
+  the maximum date in each group. Metas-adjacency or comparison with the next
+  manifest row is prohibited.
+- The calendar implementation must retain the regression dates `2022-07-29`,
+  `2023-04-28`, `2025-08-29`, and `2025-11-28`.
+- `month_open_px`: the last one-second trade close at or before 60 seconds after
+  the first bar of the month's first eligible day begins, with a 3,600-second
+  staleness cap.
+- `p15`: the last trade price at or before 15:00:00 `Europe/London`, with a
+  1,800-second staleness cap. London daylight-saving conversion is part of the
+  frozen rule.
+- Direction: `-sign(p15 - month_open_px)`. Missing input or equality emits
+  `NO_TRADE`.
+- Entry: decide at 15:00:00 London and use the prevailing best ask for a long or
+  best bid for a short at decision plus one second, with a three-second wait
+  cap.
+- Exit: target entry fill time plus 86,400 seconds; take the first valid
+  opposite-side BBO at or after the target, including across weekends.
+- Force exit at active-contract change or a stream gap greater than 96 hours
+  using the frozen campaign's deterministic last-valid-quote rule.
+- One position is allowed. There is no pyramiding, take-profit, stop, or target.
+
+Calendar, clock, event, and month-open cross-reference values are first-class
+artifact fields, not post-processing filters. The 24-hour fixed horizon is a
+legitimate replay exit for this named research path even though it exceeds the
+existing six-hour catalog limit. The artifact must remain isolated from the
+frozen Phase 1A, M0b CandidateWork, bar-pattern, delayed-MTF, and all-cases
+catalogs; none of their hashes, search spaces, or closure claims may change.
+
+All historical data exposed for this family are now in-sample. Historical
+replay may verify the exact artifact but must not tune any value or claim a new
+sealed holdout. This subsection does not create broker Paper eligibility.
 
 ---
 
@@ -240,9 +284,10 @@ hypothesis
 feature_set_version
 signal and entry rules
 direction and entry order policy
-take-profit and stop-trigger rules
-stop execution and OCO rules
-barrier observation and terminal exit policies
+exit_family = bracket | governed_fixed_horizon
+take-profit, stop-trigger, stop execution, and OCO rules when exit_family = bracket
+calendar, clock, cross-reference, horizon, and force-exit rules when
+exit_family = governed_fixed_horizon
 position sizing rule
 applicable regimes
 contract and roll policy
@@ -253,6 +298,10 @@ code commit and container digest
 backtest results
 validation decision
 ```
+
+`governed_fixed_horizon` is valid only for an artifact expressly named by
+`DESIGN.md`; it is not a generic registry option and carries no Paper or Live
+authority.
 
 An artifact change does not inherit prior evidence automatically.
 
@@ -311,8 +360,9 @@ Permitted initial models:
 - Marketable limits fill only within the limit.
 - Passive limits use a conservative fill or no-fill model.
 - Stops include routing delay and slippage after trigger.
-- Every simulated entry applies the artifact's take-profit, stop-loss, OCO,
-  and terminal risk/roll rules.
+- Every simulated entry applies its immutable registered exit family. Standard
+  candidates apply take-profit, stop-loss, OCO, and terminal risk/roll rules.
+  `e2a_month_end_v1` applies only the governed fixed-horizon semantics above.
 - Barrier results are determined from executable-side MBP-10 event order, not
   from five-minute high/low ordering.
 - A take-profit touch is not a fill unless the registered execution model
@@ -507,6 +557,18 @@ Report:
 
 Final strategy decisions must include fully loaded results.
 
+For `e2a_month_end_v1`, the primary research result uses executable-side BBO
+fills and a separately verified actual fee schedule. It must not add synthetic
+entry or exit adversity on top of BBO fills. Until the fee source and
+verification date are frozen, the runner may reproduce the historical
+BBO-plus-1.5-tick laboratory result but cannot label it actual measured cost.
+
+Its fixed operating costs are allocated at portfolio level or over a
+preregistered actual expected-fill denominator. The existing per-candidate
+calendar-month lump allocation is inapplicable. Fourteen- and eighteen-tick
+debits are diagnostic stresses only. These rules do not modify any frozen
+existing campaign cost artifact.
+
 ---
 
 ## 9. Validation
@@ -524,6 +586,24 @@ Sealed holdout
     ↓
 Paper eligibility decision
 ```
+
+The named e2a path instead follows:
+
+```text
+independent historical reconstruction
+    ↓
+REGISTERED_RESEARCH_ONLY with every historical period marked in-sample
+    ↓
+content-addressed no-order shadow precommit
+    ↓
+12 prospective calendar events with no interim promotion look
+    ↓
+shadow diagnostics; broker-fill slippage remains NOT_OBSERVABLE
+    ↓
+separate policy and user decision before any true Paper request
+```
+
+The exact numeric and evidence rules are in `VALIDATION.md` Section 14A.
 
 Required principles:
 
@@ -568,6 +648,11 @@ against the same trial budget, and apply multiplicity-aware validation.
 ---
 
 ## 11. Paper Eligibility
+
+This section does not accept `e2a_month_end_v1` under the present policy.
+Historical registration or a no-order shadow result creates no Phase 2 Paper
+artifact. A future handoff requires a separately approved amendment resolving
+the fixed-horizon strategy's broker-resident protection and risk controls.
 
 A strategy artifact that passes `VALIDATION.md` is handed to Phase 2 with:
 

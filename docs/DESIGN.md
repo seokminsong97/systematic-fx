@@ -1,13 +1,15 @@
 # CME 6E Systematic Trading System
 
-- Document version: 1.8.0-draft
-- Revised: 2026-08-11
+- Document version: 1.9.0-draft
+- Revised: 2026-08-20
 - Status: `DRAFT`
 - Documentation language: English
 - Market: CME Euro FX Futures (`6E`), outright futures only
 - Default deterministic discovery and signal interval: 5 minutes
 - Intrabucket feature interval: 1 second where supported by the data
-- Exit model: price-barrier first touch with no alpha-imposed holding target
+- Paper/Live exit model: price-barrier first touch with broker-managed
+  protection; the named `e2a_month_end_v1` fixed-horizon path is governed
+  historical and no-order shadow research only
 - Live platform candidates: IBKR and AMP Futures with Rithmic
 
 ---
@@ -65,6 +67,9 @@ gross return is not sufficient.
 - Price-barrier exits without an alpha-imposed maximum holding period; duration,
   capital occupancy, weekend exposure, and time to each exit remain measured
 - Historical research using verified MBP-10 data
+- Governed reconstruction and no-order prospective shadow evaluation of the
+  single frozen `e2a_month_end_v1` calendar-event artifact under the boundary
+  below
 - Measured comparison of IBKR and Rithmic before selecting one Live platform
 - An initial Live allocation of one 6E contract
 
@@ -80,7 +85,36 @@ gross return is not sufficient.
   to Paper or Live
 - Strategies that depend on unverified provider behavior
 - Strategies whose result is only a forecast, score, or chart pattern and does
-  not resolve to an executable bracket policy
+  not resolve to an executable bracket policy, except for the single named
+  research-only fixed-horizon artifact governed below; that exception does not
+  apply to broker Paper or Live trading
+
+### Governed e2a research boundary
+
+`e2a_month_end_v1` is the only calendar-event fixed-horizon artifact admitted
+by this amendment. It may be independently reconstructed, registered as
+governed historical research, and evaluated prospectively in
+`SHADOW_FORWARD`. It must not be added to a generic candidate catalog, used to
+reopen the closed search map, or varied on any historical period.
+
+For this boundary, `SHADOW_FORWARD` means that contemporaneous decision inputs,
+the frozen signal, and hypothetical BBO entry and exit fills are recorded
+without submitting an order to any broker or simulator account. It creates no
+broker order, position, fill, or recovery state. It is not Phase 2 Paper
+Trading, does not enter the `PAPER` lifecycle state, and cannot satisfy a Paper
+evidence requirement that depends on broker-observed fills or slippage.
+
+All historical periods exposed for the month-end family are in-sample. In
+particular, the 2026-02 through 2026-07 one-shot holdout is consumed and cannot
+be described as fresh out-of-sample evidence. Historical reconstruction
+verifies lineage and arithmetic; it does not restore holdout status.
+
+This amendment does not alter Governing Risk Rules 5-7. The fixed 24-hour
+research exit is not an exception to the broker-managed bracket requirement for
+true Paper or Live entries. `e2a_month_end_v1` may not enter broker Paper or
+Live until a separate approved amendment defines its broker-resident
+protection, risk limits, timed-exit recovery behavior, promotion authority, and
+user approval path.
 
 ---
 

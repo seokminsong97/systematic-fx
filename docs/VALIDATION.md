@@ -1,7 +1,7 @@
 # Validation and Promotion Criteria
 
-- Document version: 1.3.0-draft
-- Revised: 2026-08-09
+- Document version: 1.4.0-draft
+- Revised: 2026-08-20
 - Status: `DRAFT`
 - Parent document: [`DESIGN.md`](DESIGN.md)
 - Research scope: [`RESEARCH_PLAN.md`](RESEARCH_PLAN.md)
@@ -42,6 +42,15 @@ approval remains mandatory.
 
 A fully specified strategy artifact with immutable feature, signal, direction,
 entry, take-profit, stop, execution, cost, contract, and terminal-exit policies.
+
+### Governed research-only event artifact
+
+A research artifact expressly named by `DESIGN.md` may replace take-profit and
+stop policies with immutable calendar, clock, cross-reference, and
+fixed-horizon exit policies only for the historical and no-order shadow scope
+granted there. Such an artifact is not a standard Candidate for
+`PASS_BACKTEST`, `ENTER_PAPER`, or Live promotion. The only artifact currently
+admitted under this definition is `e2a_month_end_v1`.
 
 ### Variant
 
@@ -326,6 +335,10 @@ Paper promotion evidence.
 
 ## 6. Minimum Statistical Evidence
 
+The counts in Sections 6-13 govern the standard intraday bracket path. They
+must not be mechanically applied to `e2a_month_end_v1`. The narrow alternative
+in Section 14A governs that artifact only and does not create Paper eligibility.
+
 ### Walk-forward validation
 
 ```text
@@ -596,7 +609,112 @@ that holdout. A failed artifact remains permanently recorded.
 
 ---
 
+## 14A. Named e2a Historical and Shadow-Forward Policy
+
+This section applies only to the exact single-candidate
+`e2a_month_end_v1` artifact defined in `PHASE_1_DESIGN.md`. Where this section
+conflicts with Sections 6-13, it controls only that artifact. It does not amend
+the requirements for any existing or future bracket candidate.
+
+### Scope and consumed evidence
+
+The campaign contains exactly one candidate and no search, enumeration, model
+selection, parameter neighborhood, or descendant-generation authority. Entry
+time, direction rule, month-open reference, 24-hour hold, calendar rule,
+execution delays, and cost labels are immutable. Any change creates a new
+family that cannot use any currently opened historical period as fresh
+evidence.
+
+Every historical period through 2026-07 is in-sample for this family. The
+2026-02-16 through 2026-07-08 one-shot holdout was opened on 2026-08-20 and is
+consumed. The registration artifact must preserve the
+discovery-versus-preregistered split and this consumed-data disclosure without
+abbreviation. Historical reconstruction may be recorded only as
+`REGISTERED_RESEARCH_ONLY`; that label is local to this campaign and is not
+`PASS_BACKTEST`.
+
+### Event-class support and economics
+
+The historical research support rules are:
+
+```text
+minimum accumulated events:                    12
+measured-cost mean net ticks per event:         > 0
+per-window minimum fills:                       none
+per-window minimum active entry days:           none
+```
+
+Evidence is accumulated in chronological order across frozen windows. No event
+or losing window may be removed. Benjamini-Hochberg is not used as a
+single-window execution gate for this named one-candidate registration. The
+original discovery multiplicity and every tested family remain disclosed and
+the closed map is not reset.
+
+The primary null is a day-cluster sign-flip permutation over the accumulated
+event vector. Historical p-values are descriptive after the data have been
+opened and cannot authorize promotion. The prospective operational gate has
+exactly one planned look after 12 events and makes no new p-value claim. Any
+interim look, repeated inferential look, or continued significance testing
+requires a separately preregistered alpha-spending schedule before the first
+affected event.
+
+Primary economics use executable-side BBO fills plus a verified actual
+commission, exchange, regulatory, and routing fee schedule. Spread already
+represented by BBO fills must not be added again. The fee source, amount, and
+verification date must be frozen before a result may be labeled
+`measured-cost`.
+
+Fixed operating costs are reported at portfolio level or allocated over a
+preregistered actual expected-fill denominator. A full calendar-month operating
+cost must never be charged independently to this one-trade-per-month candidate.
+The historical BBO-plus-1.5-tick laboratory result must remain labeled
+`historical_lab_additive_friction`, not actual fees. Fourteen- and eighteen-tick
+results are diagnostics only and cannot replace the measured-cost primary
+result.
+
+### Prospective 12-event gate
+
+The first countable event is 2026-08-31 at 15:00 `Europe/London` only if the
+campaign precommit is content-addressed before that decision and the date passes
+the frozen eligibility rule. Otherwise it cannot be backfilled and the first
+countable event moves forward.
+
+At the single planned look after 12 consecutive eligible events, retain every
+missing-input, equal-price, no-fill, and incident outcome in the ledger and
+evaluate:
+
+```text
+measured-cost net PnL:                          > 0
+wins:                                           >= 7 of 12
+    OR measured-cost net PnL:                   > +120 ticks
+largest event / total gross positive PnL:       <= 50%
+average fill slippage vs simulated BBO:         <= +1 tick per executed side
+```
+
+The logical gate is:
+
+```text
+net > 0
+AND (wins >= 7 OR net > 120 ticks)
+AND positive-PnL concentration <= 0.50
+AND average slippage per executed side <= 1 tick
+```
+
+A no-order `SHADOW_FORWARD` run can preregister the schedule and evaluate the
+signal, simulated-BBO economics, wins, and concentration. It has no
+broker-observed fills, so its slippage field must be `NOT_OBSERVABLE`; simulated
+slippage or a constant assumption must not be substituted. Consequently a
+shadow-only run cannot emit a complete 12-event pass, `ENTER_PAPER`, or
+`PAPER`. Full evaluation of the slippage gate requires a separately authorized
+true broker Paper path that complies with `DESIGN.md`, Phase 2, and Phase 4.
+
+---
+
 ## 15. Paper Entry and Paper Evidence
+
+This section governs true broker Paper Trading. `REGISTERED_RESEARCH_ONLY`,
+`SHADOW_FORWARD`, and any partial Section 14A shadow result do not satisfy this
+section and cannot be serialized as `ENTER_PAPER` or `PAPER`.
 
 `PASS_BACKTEST` does not automatically permit Paper entry. It permits creation
 of a Paper promotion package for a separately authorized decision; the

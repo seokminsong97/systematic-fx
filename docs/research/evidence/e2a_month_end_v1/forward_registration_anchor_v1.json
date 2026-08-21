@@ -1,0 +1,39 @@
+{
+  "artifact_schema": "systematic_fx.e2a_forward_registration_anchor.v1",
+  "campaign_id": "e2a_month_end_v1",
+  "candidate_id": "e2a_last_eligible_weekday_london_1500_fade_mtd_hold_24h",
+  "plan_key": "e2a_month_end_24h_forward_2026_08_v1",
+  "anchor_classification": "SUBSEQUENT_REPOSITORY_ANCHOR_ONLY",
+  "plan": {
+    "byte_size": 17045,
+    "sha256": "229091c1dde32022808c5ff0f018f5f478a5702db948d386a50636d07937f174"
+  },
+  "ledger": {
+    "event_count": 1,
+    "tail_sha256": "edaa06dd98e8d93b460d44d8df87ebfbb814474ab1365b0b16b2b422712a7ae9",
+    "tail_event": {
+      "artifact_schema": "systematic_fx.e2a_forward_ledger_event.v1",
+      "event_type": "PLAN_REGISTERED",
+      "payload": {
+        "plan_artifact": {
+          "artifact_type": "E2A_FORWARD_PLAN",
+          "byte_size": 17045,
+          "content_sha256": "229091c1dde32022808c5ff0f018f5f478a5702db948d386a50636d07937f174",
+          "media_type": "application/json",
+          "relative_uri": "artifacts/e2a_forward_plan/sha256=229091c1dde32022808c5ff0f018f5f478a5702db948d386a50636d07937f174.json"
+        }
+      },
+      "plan_sha256": "229091c1dde32022808c5ff0f018f5f478a5702db948d386a50636d07937f174",
+      "predecessor_sha256": null,
+      "recorded_at_utc": "2026-08-21T03:43:04.106373Z",
+      "sequence": 1
+    }
+  },
+  "first_provisional_decision_utc": "2026-08-31T14:00:00Z",
+  "authority": {
+    "lifecycle_status": "PLANNED_NOT_ARMABLE",
+    "allowed_execution_mode": "OFFLINE_SHADOW_ONLY",
+    "paper_order_authority": false
+  },
+  "timing_caveat": "The ledger recorded_at_utc value is a local-clock claim. This repository anchor preserves the disclosed plan and ledger hashes but is not a trusted external timestamp and does not retroactively resolve any blocker in the immutable plan."
+}
